@@ -38,7 +38,7 @@ export function Admin() {
       <div className="page-head">
         <div>
           <h1 className="row" style={{ gap: 10 }}><Shield size={26} />Администрирование</h1>
-          <p className="sub">Все аккаунты и семьи CureMe и общий для всех список категорий.</p>
+          <p className="sub">Все аккаунты и семьи Капсулки и общий для всех список категорий.</p>
         </div>
       </div>
 

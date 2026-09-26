@@ -93,5 +93,5 @@ def export_txt(
     return PlainTextResponse(
         "\n".join(lines) + ("\n" if lines else ""),
         media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename=\"cureme-lekarstva-{date.today():%Y-%m-%d}.txt\"; filename*=UTF-8''{quote(filename)}"},
+        headers={"Content-Disposition": f"attachment; filename=\"kapsulka-lekarstva-{date.today():%Y-%m-%d}.txt\"; filename*=UTF-8''{quote(filename)}"},
     )

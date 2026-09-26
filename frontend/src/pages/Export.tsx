@@ -18,7 +18,7 @@ export function Export() {
   const count = text ? text.split('\n').filter(Boolean).length : 0
   const familyName = me?.families.find(f => f.id === familyId)?.name ?? 'аптечка'
   // Латиница в имени: часть браузеров молча заменяет кириллическое имя blob-файла на «download».
-  const filename = `cureme-lekarstva-${new Date().toLocaleDateString('sv-SE')}.txt`
+  const filename = `kapsulka-lekarstva-${new Date().toLocaleDateString('sv-SE')}.txt`
   const file = () => new File([text ?? ''], filename, { type: 'text/plain;charset=utf-8' })
 
   const download = () => {
