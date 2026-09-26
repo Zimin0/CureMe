@@ -53,9 +53,9 @@ export function Family() {
   const link = `${location.origin}/join/${f.invite_code}`
 
   const share = async () => {
-    const text = `Присоединяйся к нашей домашней аптечке «${f.name}» в CureMe`
+    const text = `Присоединяйся к нашей домашней аптечке «${f.name}» в Капсулке`
     if (navigator.share) {
-      try { await navigator.share({ title: 'CureMe', text, url: link }) } catch { /* отменили */ }
+      try { await navigator.share({ title: 'Капсулка', text, url: link }) } catch { /* отменили */ }
     } else {
       await navigator.clipboard.writeText(link)
       toast('Ссылка скопирована')

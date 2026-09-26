@@ -30,8 +30,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'CureMe — домашняя аптечка',
-        short_name: 'CureMe',
+        name: 'Капсулка — домашняя аптечка',
+        short_name: 'Капсулка',
         description: 'Лекарства всей семьи, сроки годности и остатки',
         lang: 'ru',
         theme_color: '#0f9d8a',

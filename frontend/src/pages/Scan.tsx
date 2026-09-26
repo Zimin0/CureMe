@@ -13,7 +13,7 @@ import { MedIcon, Sheet, Spinner, useToast } from '../components/ui'
 import { fmtDate, fmtQty } from '../format'
 import type { ScanPrefill } from './MedicineForm'
 
-const SOURCE_LABEL = { internet: 'Найдено в интернете', user: 'Из справочника CureMe', openfoodfacts: 'Из Open Food Facts' }
+const SOURCE_LABEL = { internet: 'Найдено в интернете', user: 'Из справочника Капсулки', openfoodfacts: 'Из Open Food Facts' }
 
 export function Scan() {
   const fam = useFamilyPath()
@@ -161,7 +161,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
             {p.manufacturer && <span className="small muted">{p.manufacturer}</span>}
           </div>
         ) : (
-          <p className="muted small">В интернете этот код не нашёлся. Впишите название один раз, и в следующий раз CureMe узнает упаковку сразу.</p>
+          <p className="muted small">В интернете этот код не нашёлся. Впишите название один раз, и в следующий раз Капсулка узнает упаковку сразу.</p>
         )}
 
         {!known && (

@@ -7,7 +7,7 @@ from .config import get_settings
 from .routers import admin, assist, auth, categories, families, files, medicines
 
 settings = get_settings()
-app = FastAPI(title="CureMe", version="1.0.0", description="Домашняя аптечка для всей семьи")
+app = FastAPI(title="Капсулка", version="1.0.0", description="Домашняя аптечка для всей семьи")
 app.add_middleware(
     CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],

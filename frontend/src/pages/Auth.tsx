@@ -12,7 +12,7 @@ function AuthShell({ title, sub, children }: { title: string; sub: string; child
     <div className="auth-wrap">
       <div className="auth-card stack lg">
         <div className="stack" style={{ gap: 6, textAlign: 'center' }}>
-          <div className="brand"><img src="/icon.svg" alt="" />CureMe</div>
+          <div className="brand"><img src="/icon.svg" alt="" />Капсулка</div>
           <h1 style={{ fontSize: 24 }}>{title}</h1>
           <p className="muted">{sub}</p>
         </div>
