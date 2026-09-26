@@ -15,6 +15,8 @@
 
 ### Для разработки
 
+Нужны **Node.js 20+** (лучше 22, см. `frontend/.nvmrc`) и **Python 3.10+**. Старый Node из `apt` в Ubuntu/WSL (v12) не подойдёт: Vite упадёт с `SyntaxError: Unexpected reserved word`.
+
 ```bash
 # бэкенд
 cd backend
