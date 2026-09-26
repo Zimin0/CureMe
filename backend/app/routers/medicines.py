@@ -33,8 +33,7 @@ def _detail(db: Session, fam: Family, medicine_id: int, user: User) -> MedicineD
 
 def _check_category(db: Session, fam: Family, category_id: int | None) -> None:
     if category_id is not None:
-        c = db.get(Category, category_id)
-        if not c or c.family_id != fam.id:
+        if not db.get(Category, category_id):
             raise HTTPException(400, "Категория не найдена")
 
 

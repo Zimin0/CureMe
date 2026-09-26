@@ -4,10 +4,10 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user
-from ..models import Category, Family, Membership, User
+from ..models import Family, Membership, User
 from ..schemas import FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
 from ..security import create_token, hash_password, new_invite_code, verify_password
-from ..seed import DEFAULT_CATEGORIES
+from ..seed import ensure_default_categories
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -15,16 +15,15 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def create_family(db: Session, name: str, owner: User) -> Family:
     fam = Family(name=name, invite_code=new_invite_code())
     fam.memberships.append(Membership(user=owner, role="owner"))
-    for i, (cname, icon, color) in enumerate(DEFAULT_CATEGORIES):
-        fam.categories.append(Category(name=cname, icon=icon, color=color, sort=i))
     db.add(fam)
+    ensure_default_categories(db)
     return fam
 
 
 def me_out(user: User) -> MeOut:
     fams = sorted(user.memberships, key=lambda m: m.joined_at)
     return MeOut(
-        id=user.id, email=user.email, name=user.name,
+        id=user.id, email=user.email, name=user.name, is_admin=user.is_admin,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
     )
 
@@ -40,7 +39,8 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         if not family:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден")
 
-    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password))
+    first = db.scalar(select(User.id).limit(1)) is None  # первый аккаунт — администратор
+    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password), is_admin=first)
     db.add(user)
     if family:
         db.add(Membership(family=family, user=user, role="member"))

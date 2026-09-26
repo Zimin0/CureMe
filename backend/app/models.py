@@ -19,6 +19,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(255))
+    # Администратор управляет всеми аккаунтами, семьями и общим списком категорий.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -33,7 +35,6 @@ class Family(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="family", cascade="all, delete-orphan")
-    categories: Mapped[list["Category"]] = relationship(back_populates="family", cascade="all, delete-orphan")
     medicines: Mapped[list["Medicine"]] = relationship(back_populates="family", cascade="all, delete-orphan")
 
 
@@ -52,16 +53,15 @@ class Membership(Base):
 
 
 class Category(Base):
+    """Категории общие для всех семей; менять их может только администратор."""
+
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
-    name: Mapped[str] = mapped_column(String(60))
+    name: Mapped[str] = mapped_column(String(60), unique=True)
     icon: Mapped[str] = mapped_column(String(16), default="💊")
     color: Mapped[str] = mapped_column(String(16), default="#0f9d8a")
     sort: Mapped[int] = mapped_column(Integer, default=0)
-
-    family: Mapped[Family] = relationship(back_populates="categories")
 
 
 class Medicine(Base):
