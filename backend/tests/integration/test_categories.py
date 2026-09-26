@@ -43,6 +43,40 @@ def test_any_existing_category_can_be_assigned(client, owner):
     h, _, f = owner
     cats = client.get(f"/api/families/{f}/categories", headers=h).json()
     url = f"/api/families/{f}/medicines"
-    m = client.post(url, headers=h, json={"name": "Тауфон", "category_id": cats[-1]["id"]}).json()
+    m = client.post(url, headers=h, json={"name": "Тауфон", "category_ids": [cats[-1]["id"]]}).json()
     assert m["category"]["name"] == cats[-1]["name"]
-    assert client.post(url, headers=h, json={"name": "X", "category_id": 999999}).status_code == 400
+    assert client.post(url, headers=h, json={"name": "X", "category_ids": [999999]}).status_code == 400
+
+
+def test_up_to_three_categories_first_is_primary(client, owner):
+    h, _, f = owner
+    ids = [c["id"] for c in client.get(f"/api/families/{f}/categories", headers=h).json()]
+    url = f"/api/families/{f}/medicines"
+    m = client.post(url, headers=h, json={"name": "Терафлю", "category_ids": [ids[2], ids[0], ids[2]]}).json()
+    assert m["category_ids"] == [ids[2], ids[0]]  # повтор убран, порядок сохранён
+    assert [c["id"] for c in m["categories"]] == [ids[2], ids[0]]
+    assert m["category"]["id"] == ids[2]
+    assert client.post(url, headers=h, json={"name": "X", "category_ids": ids[:4]}).status_code == 422
+
+    # меняем порядок и состав: основная становится другой
+    m = client.patch(f"{url}/{m['id']}", headers=h, json={"category_ids": [ids[0], ids[1], ids[2]]}).json()
+    assert m["category_ids"] == [ids[0], ids[1], ids[2]] and m["category"]["id"] == ids[0]
+    # правка других полей категории не трогает
+    m = client.patch(f"{url}/{m['id']}", headers=h, json={"notes": "после еды"}).json()
+    assert m["category_ids"] == [ids[0], ids[1], ids[2]]
+
+    # фильтр находит лекарство по любой из его категорий, счётчик учитывает каждую
+    for cid in ids[:3]:
+        assert [x["name"] for x in client.get(url, headers=h, params={"category_id": cid}).json()] == ["Терафлю"]
+    counts = {c["id"]: c["medicine_count"] for c in client.get(f"/api/families/{f}/categories", headers=h).json()}
+    assert [counts[i] for i in ids[:4]] == [1, 1, 1, 0]
+
+
+def test_legacy_single_category_id_still_accepted(client, owner):
+    """Старая версия приложения, закэшированная на телефоне, присылает одну category_id."""
+    h, _, f = owner
+    cid = client.get(f"/api/families/{f}/categories", headers=h).json()[0]["id"]
+    m = client.post(f"/api/families/{f}/medicines", headers=h, json={"name": "Нурофен", "category_id": cid}).json()
+    assert m["category_ids"] == [cid]
+    m = client.patch(f"/api/families/{f}/medicines/{m['id']}", headers=h, json={"category_id": None}).json()
+    assert m["category_ids"] == []

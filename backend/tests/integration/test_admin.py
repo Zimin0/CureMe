@@ -114,7 +114,10 @@ from app.config import get_settings
 JPEG = b"\xff\xd8\xff\xe0" + b"0" * 32
 
 
-@pytest.mark.parametrize("body", [{"name": ""}, {"name": "x" * 61}, {}])
+@pytest.mark.parametrize("body", [
+    {"name": ""}, {"name": "x" * 61}, {},
+    {"name": "Глаза", "color": "red"}, {"name": "Глаза", "color": "#12345"}, {"name": "Глаза", "icon": ""},
+])
 def test_category_validation(client, body):
     admin, _ = register(client)
     assert client.post("/api/admin/categories", headers=admin, json=body).status_code == 422

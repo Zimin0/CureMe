@@ -48,9 +48,9 @@ export function renderApp(route = '/', { loggedIn = true, me = ME } = {}) {
 
 export function medicine(over: Partial<Medicine> = {}): Medicine {
   return {
-    id: 1, name: 'Нурофен', category_id: null, form: 'Таблетки', dosage: '200 мг', active_ingredient: 'ибупрофен',
+    id: 1, name: 'Нурофен', category_ids: [], form: 'Таблетки', dosage: '200 мг', active_ingredient: 'ибупрофен',
     manufacturer: null, indications: 'головная боль', contraindications: '', notes: '', unit: 'таб',
-    min_quantity: null, blister_size: 10, gtin: null, category: null,
+    min_quantity: null, blister_size: 10, gtin: null, categories: [], category: null,
     stock: { total: 20, expired_quantity: 0, package_count: 1, nearest_expiry: '2027-05-31', days_left: 400, status: 'ok' },
     is_favorite: false, helps_me: false, personal_note: '', helps_members: [], photo_url: null,
     created_at: '2026-09-26T10:00:00Z', updated_at: '2026-09-26T10:00:00Z',

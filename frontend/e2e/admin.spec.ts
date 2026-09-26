@@ -10,7 +10,8 @@ test('администратор добавляет категорию, и её 
   await page.getByRole('button', { name: 'Новая' }).click()
   const dialog = page.getByRole('dialog', { name: 'Новая категория' })
   await dialog.getByPlaceholder('Название').fill(name)
-  await dialog.getByRole('button', { name: '👁️' }).click()
+  await dialog.getByRole('radio', { name: '👁️' }).click()
+  await dialog.getByRole('radio', { name: '#6e56cf' }).click()
   await dialog.getByRole('button', { name: 'Сохранить' }).click()
   await expect(page.getByText(name)).toBeVisible()
 
@@ -19,7 +20,7 @@ test('администратор добавляет категорию, и её 
   const ctx = await browser.newContext({ serviceWorkers: 'block' })
   const other = await ctx.newPage()
   await loginAs(other, user, '/medicines/new')
-  await expect(other.getByLabel('Категория').locator('option', { hasText: name })).toHaveCount(1)
+  await expect(other.getByRole('group', { name: 'Категории' }).getByRole('button', { name: new RegExp(name) })).toHaveCount(1)
   // а в админку его не пускает
   await other.goto('/admin')
   await expect(other).toHaveURL(/\/$/)

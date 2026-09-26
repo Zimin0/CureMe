@@ -6,7 +6,9 @@ test('лекарство: добавить вручную → принять →
   await loginAs(page, acc, '/medicines/new')
 
   await page.getByLabel('Название *').fill('Нурофен')
-  await page.getByLabel('Категория').selectOption({ label: '🩹 Обезболивающие' })
+  const cats = page.getByRole('group', { name: 'Категории' })
+  await cats.getByRole('button', { name: /Обезболивающие/ }).click()
+  await cats.getByRole('button', { name: /Жаропонижающие/ }).click()
   await page.getByLabel('Дозировка').fill('200 мг')
   await page.getByRole('button', { name: '+ головная боль' }).click()
   await page.getByLabel('Единица учёта').fill('таб')
@@ -21,6 +23,7 @@ test('лекарство: добавить вручную → принять →
   await expect(page.getByRole('heading', { name: 'Нурофен', level: 1 })).toBeVisible()
   await expect(page.getByText('«Нурофен» в аптечке')).toBeVisible()
   await expect(page.locator('.qty').first()).toHaveText('12таб')
+  await expect(page.locator('.cat-badge')).toHaveText(['🩹 Обезболивающие', '🌡️ Жаропонижающие'])
 
   await page.getByRole('button', { name: /Принял\(а\) 1 таб/ }).click()
   await expect(page.locator('.qty').first()).toHaveText('11таб')
