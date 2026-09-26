@@ -13,6 +13,7 @@ from ..schemas import (
     PackageUpdate,
 )
 from ..search import best_match
+from .files import _drop_photo
 from ..services import consume, load_medicines, medicine_out, member_names
 
 router = APIRouter(prefix="/api/families/{family_id}/medicines", tags=["medicines"])
@@ -133,8 +134,11 @@ def update_medicine(
 
 @router.delete("/{medicine_id}", status_code=204)
 def delete_medicine(medicine_id: int, fam: Family = Depends(get_family), db: Session = Depends(get_db)):
-    db.delete(_load_one(db, fam, medicine_id))
+    med = _load_one(db, fam, medicine_id)
+    photo = med.photo
+    db.delete(med)
     db.commit()
+    _drop_photo(photo)
     return Response(status_code=204)
 
 

@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Heart, MapPin, Minus, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { api, MedicineDetail as Detail, Package, PackageInput } from '../api'
+import { api, MedicineDetail as Detail, Package, PackageInput, uploadFile } from '../api'
 import { useFamilyPath } from '../auth'
+import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { Empty, MedIcon, PageLoader, Sheet, StatusBadge, useToast } from '../components/ui'
 import { daysText, fmtDate, fmtQty, splitTags, subtitle } from '../format'
@@ -24,6 +25,7 @@ export function MedicineDetail() {
     initial.addPackage ? { init: initial.addPackage } : null,
   )
   const [dose, setDose] = useState(1)
+  const [photoOpen, setPhotoOpen] = useState(false)
 
   const onSaved = (d: Detail, msg?: string) => {
     qc.setQueryData(key, d)
@@ -40,6 +42,12 @@ export function MedicineDetail() {
   const consume = useMutation({
     mutationFn: () => api<Detail>(fam(`/medicines/${id}/consume`), { body: { amount: dose } }),
     onSuccess: d => onSaved(d, `Списано ${fmtQty(dose)} ${d.unit}. Осталось ${fmtQty(d.stock.total)}`), onError,
+  })
+  const savePhoto = useMutation({
+    mutationFn: (b: Blob | null) => b
+      ? uploadFile<Detail>(fam(`/medicines/${id}/photo`), b)
+      : api<Detail>(fam(`/medicines/${id}/photo`), { method: 'DELETE' }),
+    onSuccess: (d, b) => { onSaved(d, b ? 'Фото сохранено' : 'Фото удалено'); setPhotoOpen(false) }, onError,
   })
   const removePkg = useMutation({
     mutationFn: (pid: number) => api<Detail>(fam(`/medicines/${id}/packages/${pid}`), { method: 'DELETE' }),
@@ -78,7 +86,11 @@ export function MedicineDetail() {
       </div>
 
       <div className="detail-head">
-        <MedIcon category={m.category} />
+        <button type="button" onClick={() => setPhotoOpen(true)} title={m.photo_url ? 'Открыть фото' : 'Добавить фото'}
+          style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', position: 'relative' }}>
+          <MedIcon category={m.category} photo={m.photo_url} size={m.photo_url ? 88 : 64} />
+          {!m.photo_url && <span className="badge" style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)', fontSize: 11, height: 20 }}>+ фото</span>}
+        </button>
         <div className="grow stack" style={{ gap: 6 }}>
           <h1>{m.name}</h1>
           <p className="muted">{subtitle(m) || 'Добавьте форму и дозировку в редактировании'}</p>
@@ -177,6 +189,16 @@ export function MedicineDetail() {
           </button>
         </div>
       </div>
+
+      {photoOpen && (
+        <Sheet title={m.name} onClose={() => setPhotoOpen(false)}>
+          <div className="stack">
+            {m.photo_url && <img className="photo-full" src={m.photo_url} alt={`Фото: ${m.name}`} />}
+            <PhotoPicker current={null} onChange={b => savePhoto.mutate(b)} />
+            {m.photo_url && <button className="btn danger" disabled={savePhoto.isPending} onClick={() => savePhoto.mutate(null)}><Trash2 size={16} />Удалить фото</button>}
+          </div>
+        </Sheet>
+      )}
 
       {pkgSheet && (
         <PackageSheet med={m} edit={pkgSheet.edit} init={pkgSheet.init} onClose={() => setPkgSheet(null)}

@@ -3,6 +3,7 @@ import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
 import { Join, Login, Register } from './pages/Auth'
+import { Export } from './pages/Export'
 import { Family } from './pages/Family'
 import { Find } from './pages/Find'
 import { Home } from './pages/Home'
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="scan" element={<Scan />} />
         <Route path="find" element={<Find />} />
         <Route path="family" element={<Family />} />
+        <Route path="export" element={<Export />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

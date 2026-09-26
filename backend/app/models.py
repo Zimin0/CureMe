@@ -82,6 +82,7 @@ class Medicine(Base):
     min_quantity: Mapped[float | None] = mapped_column(Float)      # порог «заканчивается»
     blister_size: Mapped[int | None] = mapped_column(Integer)      # таблеток в одном блистере
     gtin: Mapped[str | None] = mapped_column(String(14), index=True)
+    photo: Mapped[str | None] = mapped_column(String(64))           # имя файла в media_dir
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

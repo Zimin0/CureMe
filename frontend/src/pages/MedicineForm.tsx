@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo } from '../api'
+import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
 import { useFamilyPath } from '../auth'
+import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { PageLoader, useToast } from '../components/ui'
 
@@ -15,6 +16,7 @@ export interface ScanPrefill {
   fields?: Partial<MedicineFields>
   pkg?: PackageInput
   packSize?: number | null
+  photo?: Blob | null
   source?: string
 }
 
@@ -48,12 +50,17 @@ export function MedicineForm() {
     }
   }, [existing.data])
 
+  // undefined — фото не трогали, null — убрали, Blob — новое.
+  const [photo, setPhoto] = useState<Blob | null | undefined>(prefill.photo ?? undefined)
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const body = { ...f, gtin: f.gtin?.trim() || null }
-      return editing
-        ? api<MedicineDetail>(fam(`/medicines/${id}`), { method: 'PATCH', body })
-        : api<MedicineDetail>(fam('/medicines'), { body: { ...body, packages: pkg.quantity > 0 ? [pkg] : [] } })
+      let m = editing
+        ? await api<MedicineDetail>(fam(`/medicines/${id}`), { method: 'PATCH', body })
+        : await api<MedicineDetail>(fam('/medicines'), { body: { ...body, packages: pkg.quantity > 0 ? [pkg] : [] } })
+      if (photo) m = await uploadFile<MedicineDetail>(fam(`/medicines/${m.id}/photo`), photo)
+      else if (photo === null && m.photo_url) m = await api<MedicineDetail>(fam(`/medicines/${m.id}/photo`), { method: 'DELETE' })
+      return m
     },
     onSuccess: m => {
       qc.invalidateQueries({ queryKey: ['medicines'] })
@@ -112,6 +119,7 @@ export function MedicineForm() {
       <form className="stack lg" onSubmit={submit}>
         <section className="card stack">
           <h2>Основное</h2>
+          <PhotoPicker current={existing.data?.photo_url ?? null} onChange={setPhoto} />
           <label className="field"><span>Название *</span>
             <input className="input" required autoFocus={!f.name} placeholder="Например, Нурофен" {...text('name')} />
           </label>

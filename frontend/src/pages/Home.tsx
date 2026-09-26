@@ -20,7 +20,7 @@ function AttentionRow({ m, kind }: { m: Medicine; kind: 'expired' | 'expiring' |
     s.total <= 0 ? 'Закончилось' : `Осталось ${fmtQty(s.total)} ${m.unit}`
   return (
     <Link to={`/medicines/${m.id}`} className="list-row">
-      <MedIcon category={m.category} size={40} />
+      <MedIcon category={m.category} size={40} photo={m.photo_url} />
       <div className="grow">
         <div style={{ fontWeight: 700 }} className="ellipsis">{m.name}</div>
         <div className="small muted">{text}</div>

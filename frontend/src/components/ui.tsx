@@ -21,7 +21,11 @@ export function StatusBadge({ stock }: { stock: Stock }) {
   return <span className={`badge ${stock.status}`}>{STATUS_LABEL[stock.status]}</span>
 }
 
-export function MedIcon({ category, size }: { category: Category | null; size?: number }) {
+export function MedIcon({ category, size, photo }: { category: Category | null; size?: number; photo?: string | null }) {
+  if (photo) {
+    const px = size ?? 48
+    return <div className="med-photo" style={{ width: px, height: px }}><img src={photo} alt="" loading="lazy" /></div>
+  }
   const color = category?.color ?? '#687076'
   return (
     <div className="med-icon" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, width: size, height: size }}>

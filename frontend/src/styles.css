@@ -395,3 +395,19 @@ a.list-row:hover { background: var(--surface-2); }
 .segmented button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
 .found { padding: 14px; border-radius: 14px; background: var(--primary-soft); display: flex; flex-direction: column; gap: 4px; }
 .found .t { font-weight: 800; font-size: 16px; }
+
+.photo-picker { display: flex; gap: 14px; align-items: center; }
+.photo-slot {
+  width: 96px; height: 96px; border-radius: 18px; border: 2px dashed var(--border); background: var(--surface-2);
+  display: grid; place-items: center; color: var(--faint); cursor: pointer; overflow: hidden; padding: 0; flex-shrink: 0;
+}
+.photo-slot img, .med-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.med-photo { border-radius: 14px; overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
+.photo-full { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 16px; background: #000; }
+.export-preview {
+  margin: 0; padding: 16px; border-radius: 14px; background: var(--surface-2); max-height: 50vh; overflow: auto;
+  font: 500 14px/1.7 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; white-space: pre-wrap; color: var(--text);
+}
+@media (max-width: 899px) { .bottom-nav.six { grid-template-columns: repeat(6, 1fr); } .bottom-nav.six a { font-size: 10px; } }
+/* элементы сетки иначе растягиваются по длинному тексту и вылезают за экран */
+.med-list > *, .two-col > *, .med-card .grow { min-width: 0; }

@@ -2,6 +2,8 @@ import os
 
 os.environ["CUREME_REMOTE_LOOKUP"] = "false"
 os.environ["CUREME_FRONTEND_DIST"] = "/nonexistent"
+import tempfile
+os.environ["CUREME_MEDIA_DIR"] = tempfile.mkdtemp()
 
 import pytest
 from fastapi.testclient import TestClient

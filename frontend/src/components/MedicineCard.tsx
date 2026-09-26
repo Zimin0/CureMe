@@ -8,7 +8,7 @@ export function MedicineCard({ m }: { m: Medicine }) {
   const s = m.stock
   return (
     <Link to={`/medicines/${m.id}`} className="med-card">
-      <MedIcon category={m.category} />
+      <MedIcon category={m.category} photo={m.photo_url} />
       <div className="grow">
         <div className="row" style={{ gap: 6 }}>
           <span className="name ellipsis">{m.name}</span>

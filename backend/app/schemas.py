@@ -189,6 +189,7 @@ class MedicineOut(MedicineBase):
     helps_me: bool
     personal_note: str
     helps_members: list[str]     # кому ещё из семьи помогает
+    photo_url: str | None
     created_at: datetime
     updated_at: datetime
 

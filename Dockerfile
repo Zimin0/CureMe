@@ -9,7 +9,7 @@ RUN npm run build
 # 2) Python-сервер, который отдаёт и API, и собранный фронтенд
 FROM python:3.12-slim
 WORKDIR /app/backend
-ENV PYTHONUNBUFFERED=1 CUREME_DATABASE_URL=sqlite:////data/cureme.db CUREME_FRONTEND_DIST=/app/frontend/dist
+ENV PYTHONUNBUFFERED=1 CUREME_DATABASE_URL=sqlite:////data/cureme.db CUREME_MEDIA_DIR=/data/media CUREME_FRONTEND_DIST=/app/frontend/dist
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./

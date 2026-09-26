@@ -54,6 +54,7 @@ export interface Medicine extends MedicineFields {
   helps_me: boolean
   personal_note: string
   helps_members: string[]
+  photo_url: string | null
   created_at: string
   updated_at: string
 }
@@ -155,4 +156,31 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     throw new ApiError(res.status, msg)
   }
   return data as T
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function failure(res: Response): Promise<never> {
+  const data = await res.json().catch(() => null)
+  if (res.status === 401) onUnauthorized()
+  throw new ApiError(res.status, typeof data?.detail === 'string' ? data.detail : `Ошибка ${res.status}`)
+}
+
+/** Загрузка файла формой multipart (браузер сам выставит Content-Type с boundary). */
+export async function uploadFile<T>(path: string, file: Blob, filename = 'photo.jpg'): Promise<T> {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await fetch(`/api${path}`, { method: 'PUT', headers: authHeaders(), body: form })
+  if (!res.ok) return failure(res)
+  return res.json()
+}
+
+/** Скачивание файла, для которого нужен токен: обычная ссылка его не передаст. */
+export async function fetchText(path: string): Promise<string> {
+  const res = await fetch(`/api${path}`, { headers: authHeaders() })
+  if (!res.ok) return failure(res)
+  return res.text()
 }

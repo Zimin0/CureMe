@@ -69,6 +69,7 @@ def medicine_out(med: Medicine, user_id: int, names: dict[int, str], detail: boo
         helps_me=bool(mine and mine.helps_me),
         personal_note=mine.personal_note if mine else "",
         helps_members=[names[m.user_id] for m in med.marks if m.helps_me and m.user_id != user_id and m.user_id in names],
+        photo_url=f"/api/media/{med.photo}" if med.photo else None,
         created_at=med.created_at, updated_at=med.updated_at,
     )
     if not detail:

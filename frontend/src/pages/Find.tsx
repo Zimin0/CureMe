@@ -64,7 +64,7 @@ export function Find() {
                   <Link key={m.id} to={`/medicines/${m.id}`} className="card condition-result" style={unavailable ? { opacity: .7 } : undefined}>
                     <div className="row">
                       <span className="rank">{i + 1}</span>
-                      <MedIcon category={m.category} size={44} />
+                      <MedIcon category={m.category} size={44} photo={m.photo_url} />
                       <div className="grow">
                         <div style={{ fontWeight: 700, fontSize: 16 }}>{m.name}</div>
                         <div className="small muted ellipsis">{subtitle(m) || m.category?.name}</div>

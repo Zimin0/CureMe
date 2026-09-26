@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, Keyboard, Link2, PackagePlus, Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, Category, Medicine, MedicineDetail, PackageInput, ScanResult } from '../api'
+import { api, Category, Medicine, MedicineDetail, PackageInput, ScanResult, uploadFile } from '../api'
 import { useFamilyPath } from '../auth'
+import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { Scanner } from '../components/Scanner'
 import { MedIcon, Sheet, Spinner, useToast } from '../components/ui'
@@ -69,6 +70,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
   const [blister, setBlister] = useState<number | null>(known?.blister_size ?? p?.blister_size ?? null)
   const [expiry, setExpiry] = useState(result.parsed.expiry ?? '')
   const [linkTo, setLinkTo] = useState('')
+  const [photo, setPhoto] = useState<Blob | null>(null)
 
   const cats = useQuery({ queryKey: ['categories', fam('')], queryFn: () => api<Category[]>(fam('/categories')), enabled: !known })
   const meds = useQuery({ queryKey: ['medicines', fam(''), ''], queryFn: () => api<Medicine[]>(fam('/medicines')), enabled: !known })
@@ -85,13 +87,16 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
   }
 
   const create = useMutation({
-    mutationFn: () => api<MedicineDetail>(fam('/medicines'), {
+    mutationFn: async () => {
+      const m = await api<MedicineDetail>(fam('/medicines'), {
       body: {
         name: name.trim(), category_id: categoryId, form: p?.form ?? null, dosage: p?.dosage ?? null,
         active_ingredient: p?.active_ingredient ?? null, manufacturer: p?.manufacturer ?? null,
         unit, blister_size: blister, gtin: result.display_code, packages: quantity > 0 ? [pkg] : [],
       },
-    }),
+      })
+      return photo ? uploadFile<MedicineDetail>(fam(`/medicines/${m.id}/photo`), photo) : m
+    },
     onSuccess: m => done(m, `«${m.name}» в аптечке`),
   })
   const addPackage = useMutation({
@@ -120,6 +125,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
       },
       pkg,
       packSize: p?.pack_size ?? null,
+      photo,
     }
     nav('/medicines/new', { state })
   }
@@ -140,7 +146,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
 
         {known ? (
           <div className="med-card" style={{ boxShadow: 'none' }}>
-            <MedIcon category={known.category} />
+            <MedIcon category={known.category} photo={known.photo_url} />
             <div className="grow">
               <div className="name">{known.name}</div>
               <div className="meta">Сейчас в аптечке: {fmtQty(known.stock.total)} {known.unit}</div>
@@ -169,6 +175,8 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
             </label>
           </div>
         )}
+
+        {!known && <PhotoPicker current={null} onChange={setPhoto} />}
 
         <h3 style={{ marginTop: 4 }}>Сколько осталось в этой упаковке</h3>
         <QuantityInput unit={unit} quantity={quantity} onQuantity={setQuantity}
