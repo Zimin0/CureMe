@@ -1,0 +1,9 @@
+# Caddy сам получает и продлевает сертификат Let's Encrypt для домена.
+{$CUREME_DOMAIN} {
+	encode zstd gzip
+	# фото лекарств до 8 МБ
+	request_body {
+		max_size 10MB
+	}
+	reverse_proxy app:8000
+}

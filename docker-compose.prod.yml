@@ -1,0 +1,21 @@
+# Продакшен на своём сервере: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Приложение наружу не торчит, снаружи только Caddy на 80/443 с HTTPS.
+services:
+  app:
+    ports: !reset []
+    expose: ["8000"]
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      CUREME_DOMAIN: ${CUREME_DOMAIN:?укажите домен в .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:
