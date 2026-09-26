@@ -30,6 +30,20 @@ describe('parseExpiry', () => {
     expect(iso('EXP 1l.2027')).toBe('2027-11-30')
   })
 
+  it('reads MMYY without separator (0730 = July 2030)', () => {
+    expect(iso('Годен до: 0730')).toBe('2030-07-31')
+    expect(iso('Серия: 3589\nПроизв.: 0725\nГоден до: 0730')).toBe('2030-07-31')
+    expect(iso('Серия 1240')).toBeNull() // 2040 — слишком далеко для срока годности
+  })
+
+  // Настоящий вывод OCR с фото упаковок (английская модель читает кириллицу как латиницу).
+  it('works on real OCR output from package photos', () => {
+    expect(iso('SNFA8XJCIDOMY\n\nCepus:\n\n3589\n\nEh\n\nMpowuss.:\n\n0725\n\n[oper ao:\n\n0730\n\n||\n\nLL')).toBe('2030-07-31')
+    expect(iso('CH:\n\n1473\n\nSTs\n\nropes ao: 31.01.2028\n\nCepwss 100070118\n\nBE')).toBe('2028-01-31')
+    expect(iso('foper AO:\n\n51.01.2028')).toBe('2028-01-31')
+    expect(iso('CH: 14785\n\n08257674\n\nCepwsiss 100070118\n\nropes ao: 31.01.2028')).toBe('2028-01-31')
+  })
+
   it('returns null when there is no date', () => {
     expect(iso('Ларингобакт №30')).toBeNull()
     expect(iso('13.2027')).toBeNull()

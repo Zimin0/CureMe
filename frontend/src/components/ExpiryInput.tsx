@@ -38,7 +38,7 @@ export function ExpiryInput({ value, onChange, hint }: { value: string | null; o
     setPreview(URL.createObjectURL(file))
     setProgress(0)
     try {
-      const t = await recognizeText(file, setProgress)
+      const t = await recognizeText(file, setProgress, text => !!parseExpiry(text))
       setRecognized(t.trim())
       if (!apply(t, 'photo')) { setText(''); }
     } catch {
