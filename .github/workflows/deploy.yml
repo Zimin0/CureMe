@@ -20,9 +20,10 @@ env:
   DEPLOY_HOST: 158.255.7.113
   DEPLOY_USER: root
   DEPLOY_DIR: /opt/cureme
-  # Бесплатный домен, который указывает на IP сервера: нужен для HTTPS (без него не работает камера).
-  # Купите свой домен — поменяйте здесь. ":80" — только HTTP по IP, без сертификата.
-  CUREME_DOMAIN: 158-255-7-113.sslip.io
+  # Домен нужен для HTTPS (без него не работает камера). Его A-записи (@ и www) должны указывать на DEPLOY_HOST.
+  CUREME_DOMAIN: kapsulka.ru
+  # Прежний адрес: с него и с www Caddy делает редирект на CUREME_DOMAIN. Можно оставить пустым.
+  CUREME_OLD_DOMAIN: 158-255-7-113.sslip.io
   CADDY_IMAGE: caddy:2-alpine
 
 jobs:
@@ -71,7 +72,7 @@ jobs:
 
       - name: Restart on server
         run: |
-          ssh server DEPLOY_DIR="$DEPLOY_DIR" CUREME_DOMAIN="$CUREME_DOMAIN" bash -s <<'SH'
+          ssh server DEPLOY_DIR="$DEPLOY_DIR" CUREME_DOMAIN="$CUREME_DOMAIN" CUREME_OLD_DOMAIN="$CUREME_OLD_DOMAIN" bash -s <<'SH'
           set -euo pipefail
           cd "$DEPLOY_DIR"
           gunzip -c images.tar.gz | docker load
@@ -79,7 +80,9 @@ jobs:
           # секретный ключ создаётся один раз на сервере и больше не меняется (иначе всех разлогинит)
           touch .env && chmod 600 .env
           grep -q '^CUREME_SECRET_KEY=' .env || echo "CUREME_SECRET_KEY=$(openssl rand -hex 32)" >> .env
-          sed -i '/^CUREME_DOMAIN=/d' .env && echo "CUREME_DOMAIN=$CUREME_DOMAIN" >> .env
+          sed -i '/^CUREME_DOMAIN=/d; /^CUREME_OLD_DOMAIN=/d' .env
+          echo "CUREME_DOMAIN=$CUREME_DOMAIN" >> .env
+          echo "CUREME_OLD_DOMAIN=$CUREME_OLD_DOMAIN" >> .env
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --pull never --remove-orphans
           for i in $(seq 1 30); do
             if docker compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" 2>/dev/null; then

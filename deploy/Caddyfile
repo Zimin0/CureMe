@@ -7,3 +7,9 @@
 	}
 	reverse_proxy app:8000
 }
+
+# www и старый адрес на sslip.io (если задан) навсегда перенаправляем на основной домен,
+# чтобы у приложения был один адрес: вход и установка на телефон привязаны к адресу сайта.
+www.{$CUREME_DOMAIN} {$CUREME_OLD_DOMAIN} {
+	redir https://{$CUREME_DOMAIN}{uri} permanent
+}
