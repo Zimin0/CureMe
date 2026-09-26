@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      # Обязательно поменяйте на длинную случайную строку: openssl rand -hex 32
+      CUREME_SECRET_KEY: ${CUREME_SECRET_KEY:-please-change-me-to-a-long-random-string}
+      # Чтобы перейти на Postgres, раскомментируйте сервис db ниже и эту строку:
+      # CUREME_DATABASE_URL: postgresql+psycopg://cureme:cureme@db:5432/cureme
+    volumes: ["cureme-data:/data"]
+    restart: unless-stopped
+  # db:
+  #   image: postgres:16-alpine
+  #   environment: { POSTGRES_USER: cureme, POSTGRES_PASSWORD: cureme, POSTGRES_DB: cureme }
+  #   volumes: ["pg-data:/var/lib/postgresql/data"]
+
+volumes:
+  cureme-data:
+  # pg-data:

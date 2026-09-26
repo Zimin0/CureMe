@@ -1,0 +1,139 @@
+from datetime import date, datetime, timezone
+
+from sqlalchemy import (
+    Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .db import Base
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    password_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class Family(Base):
+    __tablename__ = "families"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    invite_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    memberships: Mapped[list["Membership"]] = relationship(back_populates="family", cascade="all, delete-orphan")
+    categories: Mapped[list["Category"]] = relationship(back_populates="family", cascade="all, delete-orphan")
+    medicines: Mapped[list["Medicine"]] = relationship(back_populates="family", cascade="all, delete-orphan")
+
+
+class Membership(Base):
+    __tablename__ = "memberships"
+    __table_args__ = (UniqueConstraint("family_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member")  # owner | member
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    family: Mapped[Family] = relationship(back_populates="memberships")
+    user: Mapped[User] = relationship(back_populates="memberships")
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    icon: Mapped[str] = mapped_column(String(16), default="💊")
+    color: Mapped[str] = mapped_column(String(16), default="#0f9d8a")
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+
+    family: Mapped[Family] = relationship(back_populates="categories")
+
+
+class Medicine(Base):
+    __tablename__ = "medicines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    form: Mapped[str | None] = mapped_column(String(60))           # таблетки, сироп, мазь…
+    dosage: Mapped[str | None] = mapped_column(String(60))         # 500 мг
+    active_ingredient: Mapped[str | None] = mapped_column(String(200))
+    manufacturer: Mapped[str | None] = mapped_column(String(200))
+    indications: Mapped[str] = mapped_column(Text, default="")     # «от чего помогает»
+    contraindications: Mapped[str] = mapped_column(Text, default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    unit: Mapped[str] = mapped_column(String(20), default="шт")
+    min_quantity: Mapped[float | None] = mapped_column(Float)      # порог «заканчивается»
+    gtin: Mapped[str | None] = mapped_column(String(14), index=True)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    family: Mapped[Family] = relationship(back_populates="medicines")
+    category: Mapped[Category | None] = relationship()
+    packages: Mapped[list["Package"]] = relationship(
+        back_populates="medicine", cascade="all, delete-orphan", order_by="Package.expiry_date"
+    )
+    marks: Mapped[list["UserMark"]] = relationship(cascade="all, delete-orphan")
+
+
+class Package(Base):
+    """Конкретная упаковка: у каждой свой срок годности и остаток."""
+
+    __tablename__ = "packages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    medicine_id: Mapped[int] = mapped_column(ForeignKey("medicines.id", ondelete="CASCADE"), index=True)
+    quantity: Mapped[float] = mapped_column(Float, default=1)
+    expiry_date: Mapped[date | None] = mapped_column(Date)
+    opened_at: Mapped[date | None] = mapped_column(Date)
+    serial: Mapped[str | None] = mapped_column(String(64), index=True)   # из DataMatrix
+    batch: Mapped[str | None] = mapped_column(String(64))
+    location: Mapped[str | None] = mapped_column(String(100))
+    added_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    medicine: Mapped[Medicine] = relationship(back_populates="packages")
+
+
+class UserMark(Base):
+    """Личные отметки участника: «избранное» и «помогает мне»."""
+
+    __tablename__ = "user_marks"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    medicine_id: Mapped[int] = mapped_column(ForeignKey("medicines.id", ondelete="CASCADE"), primary_key=True)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
+    helps_me: Mapped[bool] = mapped_column(Boolean, default=False)
+    personal_note: Mapped[str] = mapped_column(Text, default="")
+
+
+class ProductCode(Base):
+    """Общий справочник «код товара → название». Пополняется, когда кто-то сохраняет лекарство с кодом."""
+
+    __tablename__ = "product_codes"
+
+    gtin: Mapped[str] = mapped_column(String(14), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    form: Mapped[str | None] = mapped_column(String(60))
+    dosage: Mapped[str | None] = mapped_column(String(60))
+    active_ingredient: Mapped[str | None] = mapped_column(String(200))
+    manufacturer: Mapped[str | None] = mapped_column(String(200))
+    source: Mapped[str] = mapped_column(String(30), default="user")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

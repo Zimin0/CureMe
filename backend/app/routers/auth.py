@@ -1,0 +1,74 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from ..db import get_db
+from ..deps import current_user
+from ..models import Category, Family, Membership, User
+from ..schemas import FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
+from ..security import create_token, hash_password, new_invite_code, verify_password
+from ..seed import DEFAULT_CATEGORIES
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def create_family(db: Session, name: str, owner: User) -> Family:
+    fam = Family(name=name, invite_code=new_invite_code())
+    fam.memberships.append(Membership(user=owner, role="owner"))
+    for i, (cname, icon, color) in enumerate(DEFAULT_CATEGORIES):
+        fam.categories.append(Category(name=cname, icon=icon, color=color, sort=i))
+    db.add(fam)
+    return fam
+
+
+def me_out(user: User) -> MeOut:
+    fams = sorted(user.memberships, key=lambda m: m.joined_at)
+    return MeOut(
+        id=user.id, email=user.email, name=user.name,
+        families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
+    )
+
+
+@router.post("/register", response_model=TokenOut, status_code=201)
+def register(body: RegisterIn, db: Session = Depends(get_db)):
+    email = body.email.lower()
+    if db.scalar(select(User).where(func.lower(User.email) == email)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть")
+    family = None
+    if body.invite_code:
+        family = db.scalar(select(Family).where(Family.invite_code == body.invite_code.strip().upper()))
+        if not family:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден")
+
+    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password))
+    db.add(user)
+    if family:
+        db.add(Membership(family=family, user=user, role="member"))
+    else:
+        create_family(db, f"Семья {user.name}", user)
+    db.commit()
+    db.refresh(user)
+    return TokenOut(access_token=create_token(user.id), user=me_out(user))
+
+
+@router.post("/login", response_model=TokenOut)
+def login(body: LoginIn, db: Session = Depends(get_db)):
+    user = db.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
+    if not user or not verify_password(body.password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверная почта или пароль")
+    return TokenOut(access_token=create_token(user.id), user=me_out(user))
+
+
+@router.get("/me", response_model=MeOut)
+def me(user: User = Depends(current_user)):
+    return me_out(user)
+
+
+@router.patch("/me", response_model=MeOut)
+def update_me(body: UserUpdate, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if body.name:
+        user.name = body.name.strip()
+    if body.password:
+        user.password_hash = hash_password(body.password)
+    db.commit()
+    return me_out(user)
