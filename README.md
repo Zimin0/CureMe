@@ -36,7 +36,7 @@ npm install
 npm run dev                              # http://localhost:5173, запросы /api уходят на :8000
 ```
 
-Тесты бэкенда: `cd backend && pytest`. Тесты фронтенда: `cd frontend && npm test`.
+Тесты бэкенда: `cd backend && pytest`. Тесты фронтенда: `cd frontend && npm test`, e2e в браузере: `npm run build && npm run test:e2e`. Все уровни тестов, как их запускать и словарик терминов — в [TESTING.md](TESTING.md).
 
 ### Одним контейнером
 
@@ -67,10 +67,12 @@ backend/
   app/websearch.py   поиск лекарства по штрихкоду через поисковики и разбор заголовков аптек
   app/search.py      подбор по болезни: нормализация, грубый стемминг, синонимы
   alembic/           миграции схемы
-  tests/             pytest: коды, семьи, остатки, подбор, сканирование, изоляция семей
+  tests/             pytest: unit/ (функции), integration/ (API на настоящей базе), migrations/ (Alembic)
 frontend/
   src/pages/         Главная, Аптечка, Карточка, Форма, Скан, Подобрать, Семья, Вход/Регистрация/Приглашение
   src/components/Scanner.tsx   камера + распознавание (zxing-wasm, работает офлайн)
+  src/**/*.test.tsx  Vitest + Testing Library + MSW: функции, компоненты, страницы
+  e2e/               Playwright: сценарии в настоящем браузере против настоящего бэкенда
 ```
 
 ## Словарик для собеседования

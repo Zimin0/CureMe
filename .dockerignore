@@ -3,3 +3,9 @@ frontend/dist
 **/__pycache__
 **/*.db
 docs
+**/.venv
+**/.pytest_cache
+**/.hypothesis
+frontend/test-results
+frontend/playwright-report
+frontend/coverage
