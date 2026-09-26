@@ -1,9 +1,30 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { copyFileSync, mkdirSync } from 'node:fs'
+import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Распознавание текста (срок годности на фото) работает в браузере через tesseract.js.
+// Его воркер, wasm-ядро и языковую модель кладём к себе в public/ocr, чтобы не зависеть от CDN.
+function ocrAssets(): Plugin {
+  const files: [string, string][] = [
+    ['tesseract.js/dist/worker.min.js', 'worker.min.js'],
+    ['tesseract.js-core/tesseract-core-lstm.wasm.js', 'tesseract-core-lstm.wasm.js'],
+    ['tesseract.js-core/tesseract-core-simd-lstm.wasm.js', 'tesseract-core-simd-lstm.wasm.js'],
+    ['tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js', 'tesseract-core-relaxedsimd-lstm.wasm.js'],
+    ['@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz', 'eng.traineddata.gz'],
+  ]
+  return {
+    name: 'cureme-ocr-assets',
+    buildStart() {
+      mkdirSync('public/ocr', { recursive: true })
+      for (const [from, to] of files) copyFileSync(`node_modules/${from}`, `public/ocr/${to}`)
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
+    ocrAssets(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -28,6 +49,9 @@ export default defineConfig({
         // wasm-модуль сканера больше лимита по умолчанию
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,svg,png,wasm,woff2}'],
+        // OCR весит ~8 МБ: не качаем его всем заранее, а кешируем при первом использовании.
+        globIgnores: ['ocr/**'],
+        runtimeCaching: [{ urlPattern: /\/ocr\//, handler: 'CacheFirst', options: { cacheName: 'ocr' } }],
         navigateFallbackDenylist: [/^\/api/, /^\/docs/],
       },
     }),

@@ -3,6 +3,7 @@ import { Globe, Keyboard, Link2, PackagePlus, Plus } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, Category, Medicine, MedicineDetail, PackageInput, ScanResult, uploadFile } from '../api'
+import { ExpiryInput } from '../components/ExpiryInput'
 import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
@@ -182,10 +183,8 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
         <QuantityInput unit={unit} quantity={quantity} onQuantity={setQuantity}
           blisterSize={blister} onBlisterSize={setBlister} packSize={p?.pack_size} />
 
-        <label className="field"><span>Годен до</span>
-          <input className="input" type="date" value={expiry} onChange={e => setExpiry(e.target.value)} />
-          {result.parsed.expiry && <span className="hint">Взято из кода на упаковке: {fmtDate(result.parsed.expiry)}</span>}
-        </label>
+        <ExpiryInput value={expiry || null} onChange={v => setExpiry(v ?? '')}
+          hint={result.parsed.expiry ? `Взято из кода на упаковке: ${fmtDate(result.parsed.expiry)}` : 'На штрихкоде срока нет: сфотографируйте его или впишите текстом'} />
 
         {error && <div className="alert error">{error.message}</div>}
 

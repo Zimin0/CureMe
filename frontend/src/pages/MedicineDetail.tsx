@@ -3,6 +3,7 @@ import { ArrowLeft, Heart, MapPin, Minus, Pencil, Plus, Star, Trash2 } from 'luc
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, MedicineDetail as Detail, Package, PackageInput, uploadFile } from '../api'
+import { ExpiryInput } from '../components/ExpiryInput'
 import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
@@ -231,9 +232,7 @@ function PackageSheet({ med, edit, init, onClose, onSaved }: {
         {init?.serial && <div className="alert ok">Срок и серия взяты из кода на упаковке</div>}
         <QuantityInput unit={med.unit} quantity={p.quantity} onQuantity={q => setP(prev => ({ ...prev, quantity: q }))}
           blisterSize={blister} onBlisterSize={setBlister} />
-        <label className="field"><span>Годен до</span>
-          <input className="input" type="date" value={p.expiry_date ?? ''} onChange={e => setP({ ...p, expiry_date: e.target.value || null })} />
-        </label>
+        <ExpiryInput value={p.expiry_date ?? null} onChange={v => setP(prev => ({ ...prev, expiry_date: v }))} />
         <label className="field"><span>Где лежит</span>
           <input className="input" placeholder="Кухня, верхняя полка" value={p.location ?? ''} onChange={e => setP({ ...p, location: e.target.value || null })} />
         </label>

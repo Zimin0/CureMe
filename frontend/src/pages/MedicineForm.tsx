@@ -3,6 +3,7 @@ import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
+import { ExpiryInput } from '../components/ExpiryInput'
 import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
@@ -196,10 +197,8 @@ export function MedicineForm() {
               <QuantityInput unit={f.unit} quantity={pkg.quantity} onQuantity={q => setPkg(prev => ({ ...prev, quantity: q }))}
                 blisterSize={f.blister_size} onBlisterSize={n => set('blister_size', n)} packSize={packSize} />
               <div className="grid-2">
-                <label className="field"><span>Годен до</span>
-                  <input className="input" type="date" value={pkg.expiry_date ?? ''} onChange={e => setPkg({ ...pkg, expiry_date: e.target.value || null })} />
-                  {prefill.pkg?.expiry_date && <span className="hint">Взято из кода на упаковке</span>}
-                </label>
+                <ExpiryInput value={pkg.expiry_date ?? null} onChange={v => setPkg(prev => ({ ...prev, expiry_date: v }))}
+                  hint={prefill.pkg?.expiry_date ? 'Взято из кода на упаковке' : undefined} />
                 <label className="field"><span>Где лежит</span>
                   <input className="input" placeholder="Кухня, верхняя полка" value={pkg.location ?? ''} onChange={e => setPkg({ ...pkg, location: e.target.value || null })} />
                 </label>
