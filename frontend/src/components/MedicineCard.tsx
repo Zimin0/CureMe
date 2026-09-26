@@ -15,7 +15,7 @@ export function MedicineCard({ m }: { m: Medicine }) {
           {m.helps_me && <Heart size={15} fill="var(--danger)" color="var(--danger)" aria-label="Помогает мне" />}
           {m.is_favorite && <Star size={15} fill="#f5a623" color="#f5a623" aria-label="В избранном" />}
         </div>
-        <div className="meta ellipsis">{subtitle(m) || m.category?.name || 'Без категории'}</div>
+        <div className="meta ellipsis">{subtitle(m) || m.categories.map(c => c.name).join(', ') || 'Без категории'}</div>
         <div className="tags">
           {s.status !== 'ok' && <StatusBadge stock={s} />}
           {s.days_left !== null && s.status !== 'expired' && (

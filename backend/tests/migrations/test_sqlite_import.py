@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import Base, make_engine
-from app.models import Category, Family, Medicine, Membership, Package, ProductCode, User, UserMark
+from app.models import Category, Family, Medicine, MedicineCategory, Membership, Package, ProductCode, User, UserMark
 from app.seed import ensure_default_categories
 from app.sqlite_import import import_sqlite
 
@@ -43,7 +43,7 @@ def sqlite_file(tmp_path):
         s.add_all([eyes, admin, masha, fam])
         s.flush()
         s.add_all([Membership(family=fam, user=admin, role="owner"), Membership(family=fam, user=masha)])
-        med = Medicine(id=11, family=fam, category=eyes, name="Тауфон", dosage="4%", created_by_id=7)
+        med = Medicine(id=11, family=fam, category_links=[MedicineCategory(category=eyes)], name="Тауфон", dosage="4%", created_by_id=7)
         med.packages.append(Package(id=21, quantity=5.5, expiry_date=date(2030, 7, 31), batch="3589"))
         s.add_all([med, ProductCode(gtin="04605077018932", name="Ларингобакт", pack_size=30, source="internet")])
         s.flush()

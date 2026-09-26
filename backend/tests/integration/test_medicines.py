@@ -87,7 +87,7 @@ def test_search(client, cabinet, q, expected):
 
 def test_category_filter(client, cabinet):
     h, f, meds = cabinet
-    cid = meds["ok"]["category_id"]
+    cid = meds["ok"]["category_ids"][0]
     assert names(client.get(f"/api/families/{f}/medicines", headers=h, params={"category_id": cid})) == ["Ибупрофен"]
 
 
@@ -119,10 +119,10 @@ def test_update_is_partial(client, cabinet):
     assert m["name"] == "Ибупрофен" and m["notes"] == "после еды"
     assert m["indications"] == "головная боль"  # не трогали — не изменилось
     # явный null очищает категорию и порог
-    m = client.patch(url, headers=h, json={"category_id": None, "min_quantity": None}).json()
-    assert m["category_id"] is None and m["min_quantity"] is None
+    m = client.patch(url, headers=h, json={"category_ids": [], "min_quantity": None}).json()
+    assert m["category_ids"] == [] and m["category"] is None and m["min_quantity"] is None
     assert client.patch(url, headers=h, json={"gtin": "abc"}).status_code == 400
-    assert client.patch(url, headers=h, json={"category_id": 999999}).status_code == 400
+    assert client.patch(url, headers=h, json={"category_ids": [999999]}).status_code == 400
 
 
 def test_delete(client, cabinet):

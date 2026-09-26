@@ -36,7 +36,7 @@ export interface Package {
 
 export interface MedicineFields {
   name: string
-  category_id: number | null
+  category_ids: number[]  // до трёх, первая — основная
   form: string | null
   dosage: string | null
   active_ingredient: string | null
@@ -52,7 +52,8 @@ export interface MedicineFields {
 
 export interface Medicine extends MedicineFields {
   id: number
-  category: Category | null
+  categories: Category[]
+  category: Category | null  // основная категория
   stock: Stock
   is_favorite: boolean
   helps_me: boolean

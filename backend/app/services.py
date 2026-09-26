@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
-from .models import Medicine, Membership, Package, UserMark
+from .models import Medicine, MedicineCategory, Membership, Package, UserMark
 from .schemas import CategoryOut, MedicineDetail, MedicineOut, PackageOut, StockOut
 
 
@@ -41,7 +41,11 @@ def load_medicines(db: Session, family_id: int, ids: list[int] | None = None) ->
     q = (
         select(Medicine)
         .where(Medicine.family_id == family_id)
-        .options(selectinload(Medicine.packages), selectinload(Medicine.category), selectinload(Medicine.marks))
+        .options(
+            selectinload(Medicine.packages),
+            selectinload(Medicine.category_links).joinedload(MedicineCategory.category),
+            selectinload(Medicine.marks),
+        )
         .order_by(Medicine.name)
     )
     if ids is not None:
@@ -59,10 +63,11 @@ def member_names(db: Session, family_id: int) -> dict[int, str]:
 def medicine_out(med: Medicine, user_id: int, names: dict[int, str], detail: bool = False) -> MedicineOut:
     mine: UserMark | None = next((m for m in med.marks if m.user_id == user_id), None)
     data = dict(
-        id=med.id, name=med.name, category_id=med.category_id, form=med.form, dosage=med.dosage,
+        id=med.id, name=med.name, category_ids=[c.id for c in med.categories], form=med.form, dosage=med.dosage,
         active_ingredient=med.active_ingredient, manufacturer=med.manufacturer,
         indications=med.indications, contraindications=med.contraindications, notes=med.notes,
         unit=med.unit, min_quantity=med.min_quantity, blister_size=med.blister_size, gtin=med.gtin,
+        categories=[CategoryOut.model_validate(c) for c in med.categories],
         category=CategoryOut.model_validate(med.category) if med.category else None,
         stock=stock_of(med),
         is_favorite=bool(mine and mine.is_favorite),

@@ -13,7 +13,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.config import get_settings
 from app.db import Base, make_engine
@@ -67,3 +67,27 @@ def test_downgrade_and_upgrade_again(alembic):
     assert set(inspect(engine).get_table_names()) <= {"alembic_version"}
     command.upgrade(cfg, "head")
     assert "medicines" in inspect(engine).get_table_names()
+
+
+def test_single_category_moves_to_link_table(alembic):
+    """Миграция на несколько категорий переносит уже выбранную категорию, ничего не теряя."""
+    cfg, engine = alembic
+    command.upgrade(cfg, "c3a9e1f0ad01")
+    with engine.begin() as conn:
+        cat = conn.execute(text("SELECT id FROM categories ORDER BY id LIMIT 1")).scalar()
+        conn.execute(text("INSERT INTO families (id, name, invite_code, created_at) VALUES (1, 'Семья', 'X1', '2026-01-01')"))
+        conn.execute(text(
+            "INSERT INTO medicines (id, family_id, category_id, name, indications, contraindications, notes, unit, created_at, updated_at) "
+            "VALUES (1, 1, :c, 'Нурофен', '', '', '', 'шт', '2026-01-01', '2026-01-01'),"
+            "       (2, 1, NULL, 'Бинт', '', '', '', 'шт', '2026-01-01', '2026-01-01')"
+        ), {"c": cat})
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        links = conn.execute(text("SELECT medicine_id, category_id, position FROM medicine_categories")).all()
+    assert [tuple(r) for r in links] == [(1, cat, 0)]
+    assert "category_id" not in {c["name"] for c in inspect(engine).get_columns("medicines")}
+
+    command.downgrade(cfg, "c3a9e1f0ad01")  # обратно основная категория возвращается в колонку
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT id, category_id FROM medicines ORDER BY id")).all()
+    assert [tuple(r) for r in rows] == [(1, cat), (2, None)]

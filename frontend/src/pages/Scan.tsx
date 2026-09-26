@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, Category, Medicine, MedicineDetail, PackageInput, ScanResult, uploadFile } from '../api'
 import { ExpiryInput } from '../components/ExpiryInput'
 import { useFamilyPath } from '../auth'
+import { CategoryPicker } from '../components/CategoryPicker'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { Scanner } from '../components/Scanner'
@@ -66,7 +67,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
 
   const unit = known?.unit ?? p?.unit ?? 'шт'
   const [name, setName] = useState(p?.name ?? '')
-  const [categoryId, setCategoryId] = useState<number | null>(null)
+  const [categoryIds, setCategoryIds] = useState<number[]>([])
   const [quantity, setQuantity] = useState(p?.pack_size ?? 1)
   const [blister, setBlister] = useState<number | null>(known?.blister_size ?? p?.blister_size ?? null)
   const [expiry, setExpiry] = useState(result.parsed.expiry ?? '')
@@ -91,7 +92,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
     mutationFn: async () => {
       const m = await api<MedicineDetail>(fam('/medicines'), {
       body: {
-        name: name.trim(), category_id: categoryId, form: p?.form ?? null, dosage: p?.dosage ?? null,
+        name: name.trim(), category_ids: categoryIds, form: p?.form ?? null, dosage: p?.dosage ?? null,
         active_ingredient: p?.active_ingredient ?? null, manufacturer: p?.manufacturer ?? null,
         unit, blister_size: blister, gtin: result.display_code, packages: quantity > 0 ? [pkg] : [],
       },
@@ -120,7 +121,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
   const moreDetails = () => {
     const state: ScanPrefill = {
       fields: {
-        name, category_id: categoryId, form: p?.form ?? null, dosage: p?.dosage ?? null,
+        name, category_ids: categoryIds, form: p?.form ?? null, dosage: p?.dosage ?? null,
         active_ingredient: p?.active_ingredient ?? null, manufacturer: p?.manufacturer ?? null,
         unit, blister_size: blister, gtin: result.display_code,
       },
@@ -164,17 +165,12 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
         )}
 
         {!known && (
-          <div className="grid-2">
+          <>
             <label className="field"><span>Название</span>
               <input className="input" required value={name} onChange={e => setName(e.target.value)} placeholder="Например, Ларингобакт" />
             </label>
-            <label className="field"><span>Категория</span>
-              <select value={categoryId ?? ''} onChange={e => setCategoryId(e.target.value ? Number(e.target.value) : null)}>
-                <option value="">Без категории</option>
-                {cats.data?.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-              </select>
-            </label>
-          </div>
+            <CategoryPicker categories={cats.data ?? []} value={categoryIds} onChange={setCategoryIds} />
+          </>
         )}
 
         {!known && <PhotoPicker current={null} onChange={setPhoto} />}

@@ -3,6 +3,7 @@ import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
+import { CategoryPicker } from '../components/CategoryPicker'
 import { ExpiryInput } from '../components/ExpiryInput'
 import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
@@ -22,7 +23,7 @@ export interface ScanPrefill {
 }
 
 const EMPTY: MedicineFields = {
-  name: '', category_id: null, form: null, dosage: null, active_ingredient: null, manufacturer: null,
+  name: '', category_ids: [], form: null, dosage: null, active_ingredient: null, manufacturer: null,
   indications: '', contraindications: '', notes: '', unit: 'шт', min_quantity: null, blister_size: null, gtin: null,
 }
 
@@ -46,8 +47,8 @@ export function MedicineForm() {
   })
   useEffect(() => {
     if (existing.data) {
-      const { name, category_id, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, blister_size, gtin } = existing.data
-      setF({ name, category_id, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, blister_size, gtin: gtin?.replace(/^0/, '') ?? null })
+      const { name, category_ids, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, blister_size, gtin } = existing.data
+      setF({ name, category_ids, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, blister_size, gtin: gtin?.replace(/^0/, '') ?? null })
     }
   }, [existing.data])
 
@@ -124,13 +125,8 @@ export function MedicineForm() {
           <label className="field"><span>Название *</span>
             <input className="input" required autoFocus={!f.name} placeholder="Например, Нурофен" {...text('name')} />
           </label>
+          <CategoryPicker categories={cats.data ?? []} value={f.category_ids} onChange={ids => set('category_ids', ids)} />
           <div className="grid-2">
-            <label className="field"><span>Категория</span>
-              <select value={f.category_id ?? ''} onChange={e => set('category_id', e.target.value ? Number(e.target.value) : null)}>
-                <option value="">Без категории</option>
-                {cats.data?.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-              </select>
-            </label>
             <label className="field"><span>Форма</span>
               <input className="input" list="forms" placeholder="Таблетки" {...text('form')} />
               <datalist id="forms">{FORMS.map(x => <option key={x} value={x} />)}</datalist>

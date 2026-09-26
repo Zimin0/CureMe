@@ -1,6 +1,8 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+
+MAX_CATEGORIES = 3  # сколько категорий можно поставить одному лекарству
 
 
 class ORM(BaseModel):
@@ -88,8 +90,8 @@ class InviteInfo(BaseModel):
 # --- категории ---
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    icon: str = "💊"
-    color: str = "#0f9d8a"
+    icon: str = Field(default="💊", min_length=1, max_length=16)   # эмодзи (с модификаторами бывает до 7 символов)
+    color: str = Field(default="#0f9d8a", pattern="^#[0-9a-fA-F]{6}$")
 
 
 class CategoryOrderIn(BaseModel):
@@ -174,9 +176,16 @@ class PackageOut(ORM):
     days_left: int | None = None
 
 
+def _legacy_category_id(data):
+    """Старые версии приложения (закэшированные на телефоне) присылают одну category_id."""
+    if isinstance(data, dict) and "category_id" in data and "category_ids" not in data:
+        data = {**data, "category_ids": [data["category_id"]] if data["category_id"] is not None else []}
+    return data
+
+
 class MedicineBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    category_id: int | None = None
+    category_ids: list[int] = Field(default_factory=list, max_length=MAX_CATEGORIES)  # первая — основная
     form: str | None = None
     dosage: str | None = None
     active_ingredient: str | None = None
@@ -193,10 +202,15 @@ class MedicineBase(BaseModel):
 class MedicineIn(MedicineBase):
     packages: list[PackageIn] = []
 
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy(cls, data):
+        return _legacy_category_id(data)
+
 
 class MedicineUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    category_id: int | None = None
+    category_ids: list[int] | None = Field(default=None, max_length=MAX_CATEGORIES)
     form: str | None = None
     dosage: str | None = None
     active_ingredient: str | None = None
@@ -208,6 +222,11 @@ class MedicineUpdate(BaseModel):
     min_quantity: float | None = None
     blister_size: int | None = None
     gtin: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy(cls, data):
+        return _legacy_category_id(data)
 
 
 class MarkIn(BaseModel):
@@ -227,7 +246,8 @@ class StockOut(BaseModel):
 
 class MedicineOut(MedicineBase):
     id: int
-    category: CategoryOut | None
+    categories: list[CategoryOut]
+    category: CategoryOut | None  # основная (первая) категория — для значка и цвета
     stock: StockOut
     is_favorite: bool
     helps_me: bool

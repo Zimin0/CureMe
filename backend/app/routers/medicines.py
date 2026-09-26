@@ -7,7 +7,7 @@ from ..codes import parse_code
 from ..db import get_db
 from ..deps import current_user, get_family
 from ..lookup import remember_product
-from ..models import Category, Family, Medicine, Package, User, UserMark
+from ..models import Category, Family, Medicine, MedicineCategory, Package, User, UserMark
 from ..schemas import (
     ConsumeIn, MarkIn, MedicineDetail, MedicineIn, MedicineOut, MedicineUpdate, PackageIn, PackageOut,
     PackageUpdate,
@@ -31,10 +31,15 @@ def _detail(db: Session, fam: Family, medicine_id: int, user: User) -> MedicineD
     return medicine_out(_load_one(db, fam, medicine_id), user.id, member_names(db, fam.id), detail=True)
 
 
-def _check_category(db: Session, fam: Family, category_id: int | None) -> None:
-    if category_id is not None:
-        if not db.get(Category, category_id):
-            raise HTTPException(400, "Категория не найдена")
+def _set_categories(db: Session, med: Medicine, category_ids: list[int]) -> None:
+    """Ставит лекарству категории в заданном порядке (первая — основная)."""
+    ids = list(dict.fromkeys(category_ids))  # повторы убираем, порядок сохраняем
+    if any(db.get(Category, cid) is None for cid in ids):
+        raise HTTPException(400, "Категория не найдена")
+    keep = {link.category_id: link for link in med.category_links}
+    med.category_links = [keep.get(cid) or MedicineCategory(category_id=cid) for cid in ids]
+    for pos, link in enumerate(med.category_links):
+        link.position = pos
 
 
 def _normalize_gtin(value: str | None) -> str | None:
@@ -67,7 +72,7 @@ def list_medicines(
     names = member_names(db, fam.id)
     items = [medicine_out(m, user.id, names) for m in load_medicines(db, fam.id)]
     if category_id is not None:
-        items = [m for m in items if m.category_id == category_id]
+        items = [m for m in items if category_id in m.category_ids]
     if filter == "favorites":
         items = [m for m in items if m.is_favorite]
     elif filter == "helps_me":
@@ -82,7 +87,7 @@ def list_medicines(
         phrases = [(q, 1.0)]
         def hay(m: MedicineOut) -> str:
             return " ".join(filter_none([m.name, m.active_ingredient, m.manufacturer, m.indications, m.form,
-                                         m.category.name if m.category else None, m.gtin]))
+                                         *(c.name for c in m.categories), m.gtin]))
         needle = q.strip().lower()
         items = [m for m in items if needle in hay(m).lower() or best_match(phrases, hay(m))[0] > 0]
     return items
@@ -96,10 +101,10 @@ def filter_none(xs):
 def create_medicine(
     body: MedicineIn, fam: Family = Depends(get_family), user: User = Depends(current_user), db: Session = Depends(get_db)
 ):
-    _check_category(db, fam, body.category_id)
-    data = body.model_dump(exclude={"packages"})
+    data = body.model_dump(exclude={"packages", "category_ids"})
     data["gtin"] = _normalize_gtin(body.gtin)
     med = Medicine(family_id=fam.id, created_by_id=user.id, **data)
+    _set_categories(db, med, body.category_ids)
     for p in body.packages:
         med.packages.append(Package(added_by_id=user.id, **p.model_dump()))
     db.add(med)
@@ -120,12 +125,12 @@ def update_medicine(
 ):
     med = _load_one(db, fam, medicine_id)
     data = body.model_dump(exclude_unset=True)
-    if "category_id" in data:
-        _check_category(db, fam, data["category_id"])
+    if "category_ids" in data:
+        _set_categories(db, med, data.pop("category_ids") or [])
     if "gtin" in data:
         data["gtin"] = _normalize_gtin(data["gtin"])
     for k, v in data.items():
-        setattr(med, k, v if v is not None or k in ("category_id", "min_quantity", "blister_size", "gtin") else getattr(med, k))
+        setattr(med, k, v if v is not None or k in ("min_quantity", "blister_size", "gtin") else getattr(med, k))
     _remember(db, med)
     db.commit()
     return _detail(db, fam, medicine_id, user)
