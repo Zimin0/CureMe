@@ -1,6 +1,7 @@
 services:
   app:
     build: .
+    image: cureme-app:latest
     ports: ["8000:8000"]
     environment:
       # Обязательно поменяйте на длинную случайную строку: openssl rand -hex 32

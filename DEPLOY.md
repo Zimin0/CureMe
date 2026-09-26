@@ -3,6 +3,25 @@
 Подходит любой VPS с Ubuntu 22.04/24.04 и Docker. Хватает 2 vCPU и 2 ГБ RAM: сама программа занимает ~150 МБ,
 а память нужна в основном на сборку фронтенда.
 
+## 0. Автодеплой из GitHub (рекомендуется)
+
+Файл `.github/workflows/deploy.yml` при каждом push в `main` собирает образы в GitHub Actions
+и по SSH привозит их на сервер в `/opt/cureme`. Сервер не качает образы с Docker Hub и не тратит память на сборку.
+
+Один раз на своём компьютере (WSL):
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/cureme_deploy -N "" -C github-actions   # отдельный ключ только для деплоя
+ssh-copy-id -i ~/.ssh/cureme_deploy.pub root@158.255.7.113
+cat ~/.ssh/cureme_deploy                     # → секрет SSH_PRIVATE_KEY
+ssh-keyscan -t ed25519 158.255.7.113         # → секрет SSH_KNOWN_HOSTS
+```
+
+Секреты добавляются в GitHub: Settings → Secrets and variables → Actions → New repository secret.
+Адрес сервера и домен записаны в `env` в начале workflow. По умолчанию домен `158-255-7-113.sslip.io`
+(бесплатный, указывает на IP сервера), свой домен можно подставить туда же. Запустить деплой вручную можно
+на вкладке Actions → Deploy → Run workflow. Ниже описан ручной способ, если автодеплой не нужен.
+
 ## 1. Домен
 
 Камера в браузере работает только по HTTPS, а HTTPS-сертификат выдают на домен, не на IP.
