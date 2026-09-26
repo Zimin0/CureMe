@@ -10,7 +10,7 @@ import { AuthProvider } from '../auth'
 import { ToastProvider } from '../components/ui'
 import { server } from './server'
 
-export const ME: Me = { id: 1, email: 'nikita@example.com', name: 'Никита', families: [{ id: 7, name: 'Семья Никита', role: 'owner' }] }
+export const ME: Me = { id: 1, email: 'nikita@example.com', name: 'Никита', is_admin: false, families: [{ id: 7, name: 'Семья Никита', role: 'owner' }] }
 
 /** Показывает текущий адрес — удобно проверять навигацию. */
 export function LocationProbe() {

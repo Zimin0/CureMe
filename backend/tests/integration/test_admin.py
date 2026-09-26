@@ -1,4 +1,4 @@
-from .conftest import register
+from tests.conftest import register
 
 
 def test_first_account_is_admin_and_others_are_not(client):
@@ -101,3 +101,62 @@ def test_admin_emails_setting_grants_admin(client, monkeypatch):
     from app.config import get_settings
     monkeypatch.setattr(get_settings(), "admin_emails", ["Masha@Example.com"])
     assert client.get("/api/auth/me", headers=h).json()["is_admin"] is True
+
+
+# --- дополнительные случаи -----------------------------------------------------
+
+import os
+
+import pytest
+
+from app.config import get_settings
+
+JPEG = b"\xff\xd8\xff\xe0" + b"0" * 32
+
+
+@pytest.mark.parametrize("body", [{"name": ""}, {"name": "x" * 61}, {}])
+def test_category_validation(client, body):
+    admin, _ = register(client)
+    assert client.post("/api/admin/categories", headers=admin, json=body).status_code == 422
+
+
+def test_category_rename_checks_duplicates_but_allows_own_name(client):
+    admin, _ = register(client)
+    cats = client.get("/api/admin/categories", headers=admin).json()
+    first, second = cats[0], cats[1]
+    url = f"/api/admin/categories/{first['id']}"
+    assert client.put(url, headers=admin, json={"name": second["name"].upper()}).status_code == 409
+    r = client.put(url, headers=admin, json={"name": f"  {first['name']}  ", "icon": "💉"})
+    assert r.status_code == 200 and (r.json()["name"], r.json()["icon"]) == (first["name"], "💉")
+    assert client.put("/api/admin/categories/99999", headers=admin, json={"name": "X"}).status_code == 404
+
+
+def test_partial_reorder_keeps_the_rest_after(client):
+    admin, _ = register(client)
+    ids = [c["id"] for c in client.get("/api/admin/categories", headers=admin).json()]
+    order = client.put("/api/admin/categories/order", headers=admin, json={"ids": [ids[-1], ids[-2]]}).json()
+    assert [c["id"] for c in order][:2] == [ids[-1], ids[-2]]
+    assert sorted(c["id"] for c in order) == sorted(ids)
+
+
+def test_deleting_family_removes_photos(client):
+    admin, _ = register(client)
+    h, u = register(client, "masha@example.com", "Маша")
+    f = u["families"][0]["id"]
+    med = client.post(f"/api/families/{f}/medicines", headers=h, json={"name": "Нурофен"}).json()
+    photo = client.put(f"/api/families/{f}/medicines/{med['id']}/photo", headers=h,
+                       files={"file": ("p.jpg", JPEG, "image/jpeg")}).json()["photo_url"]
+    path = get_settings().media_dir / photo.rsplit("/", 1)[1]
+    assert os.path.exists(path)
+    assert client.delete(f"/api/admin/families/{f}", headers=admin).status_code == 204
+    assert not os.path.exists(path)
+    assert client.get("/api/auth/me", headers=h).json()["families"] == []
+
+
+def test_stats(client):
+    admin, _ = register(client)
+    h, u = register(client, "masha@example.com", "Маша")
+    client.post(f"/api/families/{u['families'][0]['id']}/medicines", headers=h, json={"name": "Нурофен"})
+    assert client.get("/api/admin/stats", headers=admin).json() == {
+        "users": 2, "admins": 1, "families": 2, "medicines": 1, "categories": 12,
+    }

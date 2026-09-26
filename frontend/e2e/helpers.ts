@@ -40,3 +40,13 @@ export function randomEan13() {
   const sum = [...body].reverse().reduce((acc, d, i) => acc + Number(d) * (i % 2 === 0 ? 3 : 1), 0)
   return body + ((10 - (sum % 10)) % 10)
 }
+
+/** Администратор (его почта задана в CUREME_ADMIN_EMAILS в server.sh). Аккаунт общий для всех тестов. */
+export async function adminApi(request: APIRequestContext): Promise<Account> {
+  const email = 'e2e-admin@example.com', password = 'secret123'
+  await request.post('/api/auth/register', { data: { email, name: 'Админ', password } })  // 409, если уже есть
+  const res = await request.post('/api/auth/login', { data: { email, password } })
+  expect(res.status()).toBe(200)
+  const body = await res.json()
+  return { email, password, token: body.access_token, familyId: body.user.families[0]?.id, name: 'Админ' }
+}
