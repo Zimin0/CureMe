@@ -6,15 +6,27 @@ services:
     environment:
       # Обязательно поменяйте на длинную случайную строку: openssl rand -hex 32
       CUREME_SECRET_KEY: ${CUREME_SECRET_KEY:-please-change-me-to-a-long-random-string}
-      # Чтобы перейти на Postgres, раскомментируйте сервис db ниже и эту строку:
-      # CUREME_DATABASE_URL: postgresql+psycopg://cureme:cureme@db:5432/cureme
+      CUREME_DATABASE_URL: postgresql+psycopg://cureme:${CUREME_DB_PASSWORD:-cureme}@db:5432/cureme
+    # В /data лежат фото лекарств. Старая SQLite-база cureme.db оттуда переносится в Postgres
+    # при первом старте и остаётся рядом как cureme.db.imported-<время>.
     volumes: ["cureme-data:/data"]
+    depends_on:
+      db: { condition: service_healthy }
     restart: unless-stopped
-  # db:
-  #   image: postgres:16-alpine
-  #   environment: { POSTGRES_USER: cureme, POSTGRES_PASSWORD: cureme, POSTGRES_DB: cureme }
-  #   volumes: ["pg-data:/var/lib/postgresql/data"]
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cureme
+      POSTGRES_PASSWORD: ${CUREME_DB_PASSWORD:-cureme}
+      POSTGRES_DB: cureme
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cureme -d cureme"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
 volumes:
   cureme-data:
-  # pg-data:
+  pg-data:

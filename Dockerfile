@@ -16,4 +16,4 @@ COPY backend/ ./
 COPY --from=web /web/dist /app/frontend/dist
 VOLUME /data
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "start.sh"]
