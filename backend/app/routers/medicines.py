@@ -51,6 +51,7 @@ def _remember(db: Session, med: Medicine) -> None:
         remember_product(
             db, med.gtin, name=med.name, form=med.form, dosage=med.dosage,
             active_ingredient=med.active_ingredient, manufacturer=med.manufacturer,
+            unit=med.unit, blister_size=med.blister_size,
         )
 
 
@@ -124,7 +125,7 @@ def update_medicine(
     if "gtin" in data:
         data["gtin"] = _normalize_gtin(data["gtin"])
     for k, v in data.items():
-        setattr(med, k, v if v is not None or k in ("category_id", "min_quantity", "gtin") else getattr(med, k))
+        setattr(med, k, v if v is not None or k in ("category_id", "min_quantity", "blister_size", "gtin") else getattr(med, k))
     _remember(db, med)
     db.commit()
     return _detail(db, fam, medicine_id, user)

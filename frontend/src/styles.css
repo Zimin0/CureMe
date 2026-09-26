@@ -389,3 +389,9 @@ a.list-row:hover { background: var(--surface-2); }
 .spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--surface-3); border-top-color: var(--primary); animation: spin .8s linear infinite; }
 .center { display: grid; place-items: center; min-height: 40vh; }
 @keyframes spin { to { transform: rotate(360deg) } }
+
+.segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); }
+.segmented button { height: 38px; border: none; border-radius: 11px; background: transparent; font-weight: 700; color: var(--muted); cursor: pointer; }
+.segmented button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.found { padding: 14px; border-radius: 14px; background: var(--primary-soft); display: flex; flex-direction: column; gap: 4px; }
+.found .t { font-weight: 800; font-size: 16px; }

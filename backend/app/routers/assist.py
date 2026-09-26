@@ -7,8 +7,8 @@ from ..codes import display_code, parse_code
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user, get_family
-from ..lookup import lookup_remote, product_from_cache
-from ..models import Family, Medicine, User
+from ..lookup import find_product
+from ..models import Family, ProductCode, User
 from ..schemas import OverviewOut, ProductInfo, ScanIn, ScanOut, SuggestionOut, SuggestOut
 from ..search import best_match, expand_query
 from ..seed import COMMON_CONDITIONS
@@ -109,18 +109,25 @@ def scan(body: ScanIn, fam: Family = Depends(get_family), user: User = Depends(c
     medicine = medicine_out(med_row, user.id, member_names(db, fam.id)) if med_row else None
     duplicate = bool(parsed.serial and find_package_by_serial(db, fam.id, parsed.gtin, parsed.serial))
 
-    product = None
-    if not medicine:
-        cached = product_from_cache(db, parsed.gtin)
-        if cached:
-            product = ProductInfo(
-                name=cached.name, form=cached.form, dosage=cached.dosage,
-                active_ingredient=cached.active_ingredient, manufacturer=cached.manufacturer, source="catalog",
-            )
-        elif remote := lookup_remote(parsed.gtin):
-            product = ProductInfo(**remote)
+    # Для уже известного лекарства в сеть не ходим — хватит справочника (там размер блистера).
+    row = db.get(ProductCode, parsed.gtin) if medicine else find_product(db, parsed.gtin)
+    db.commit()
+    product = ProductInfo.model_validate(row) if row else None
 
     return ScanOut(
         parsed=parsed.to_dict(), display_code=display_code(parsed.gtin),
         medicine=medicine, product=product, duplicate_package=duplicate,
     )
+
+
+@router.get("/products/{code}", response_model=ProductInfo)
+def product(code: str, refresh: bool = False, _: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Поиск товара по штрихкоду (кнопка «Найти по коду» в форме)."""
+    parsed = parse_code(code)
+    if not parsed.gtin:
+        raise HTTPException(422, "Это не похоже на штрихкод")
+    row = find_product(db, parsed.gtin, refresh=refresh)
+    db.commit()
+    if not row:
+        raise HTTPException(404, "В интернете ничего не нашлось по этому коду. Впишите название вручную.")
+    return ProductInfo.model_validate(row)

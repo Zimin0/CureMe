@@ -112,7 +112,7 @@ def test_scan_flow(client):
     # другая семья получает подсказку названия из общего справочника
     h2, u2 = register(client, "other@example.com", "Сосед")
     r4 = client.post(f"/api/families/{fid(u2)}/scan", headers=h2, json={"raw": "4601669002013"}).json()
-    assert r4["medicine"] is None and r4["product"]["name"] == "Нурофен"
+    assert r4["medicine"] is None and r4["product"]["name"] == "Нурофен" and r4["product"]["source"] == "user"
 
 
 def test_other_family_is_isolated(client):

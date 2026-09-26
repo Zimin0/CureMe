@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, MedicineDetail as Detail, Package, PackageInput } from '../api'
 import { useFamilyPath } from '../auth'
+import { QuantityInput } from '../components/QuantityInput'
 import { Empty, MedIcon, PageLoader, Sheet, StatusBadge, useToast } from '../components/ui'
 import { daysText, fmtDate, fmtQty, splitTags, subtitle } from '../format'
 
@@ -101,6 +102,7 @@ export function MedicineDetail() {
               <div>
                 <p className="muted small">Всего годного</p>
                 <div className="qty" style={{ fontSize: 32 }}>{fmtQty(s.total)}<small>{m.unit}</small></div>
+                {m.blister_size && s.total > 0 && <p className="small muted">≈ {fmtQty(Math.round((s.total / m.blister_size) * 10) / 10)} бл. по {m.blister_size}</p>}
                 {s.nearest_expiry && <p className="small muted">Ближайший срок: {fmtDate(s.nearest_expiry)} ({daysText(s.days_left!)})</p>}
               </div>
             </div>
@@ -191,19 +193,22 @@ function PackageSheet({ med, edit, init, onClose, onSaved }: {
   const [p, setP] = useState<PackageInput>(edit
     ? { quantity: edit.quantity, expiry_date: edit.expiry_date, location: edit.location, batch: edit.batch }
     : { quantity: med.packages.at(-1)?.quantity || 1, expiry_date: null, location: med.packages.at(-1)?.location ?? null, ...init })
+  const [blister, setBlister] = useState<number | null>(med.blister_size)
   const save = useMutation({
-    mutationFn: () => edit
+    mutationFn: async () => {
+      if (blister !== med.blister_size) await api(fam(`/medicines/${med.id}`), { method: 'PATCH', body: { blister_size: blister } })
+      return edit
       ? api<Detail>(fam(`/medicines/${med.id}/packages/${edit.id}`), { method: 'PATCH', body: p })
-      : api<Detail>(fam(`/medicines/${med.id}/packages`), { body: p }),
+      : api<Detail>(fam(`/medicines/${med.id}/packages`), { body: p })
+    },
     onSuccess: onSaved,
   })
   return (
     <Sheet title={edit ? 'Упаковка' : `Новая упаковка: ${med.name}`} onClose={onClose}>
       <form className="stack" onSubmit={e => { e.preventDefault(); save.mutate() }}>
         {init?.serial && <div className="alert ok">Срок и серия взяты из кода на упаковке</div>}
-        <label className="field"><span>{edit ? 'Осталось' : 'Количество'} ({med.unit})</span>
-          <input className="input" type="number" min={0} step="any" autoFocus value={p.quantity} onChange={e => setP({ ...p, quantity: Number(e.target.value) })} />
-        </label>
+        <QuantityInput unit={med.unit} quantity={p.quantity} onQuantity={q => setP(prev => ({ ...prev, quantity: q }))}
+          blisterSize={blister} onBlisterSize={setBlister} />
         <label className="field"><span>Годен до</span>
           <input className="input" type="date" value={p.expiry_date ?? ''} onChange={e => setP({ ...p, expiry_date: e.target.value || null })} />
         </label>

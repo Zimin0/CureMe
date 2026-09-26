@@ -42,6 +42,7 @@ export interface MedicineFields {
   notes: string
   unit: string
   min_quantity: number | null
+  blister_size: number | null
   gtin: string | null
 }
 
@@ -91,12 +92,17 @@ export interface ParsedCode {
   expiry: string | null
 }
 export interface ProductInfo {
+  gtin: string
   name: string
+  title: string | null
   form: string | null
   dosage: string | null
   active_ingredient: string | null
   manufacturer: string | null
-  source: string
+  unit: string | null
+  pack_size: number | null
+  blister_size: number | null
+  source: 'user' | 'internet' | 'openfoodfacts'
 }
 export interface ScanResult {
   parsed: ParsedCode

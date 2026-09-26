@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ScanLine } from 'lucide-react'
+import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { api, Category, MedicineDetail, MedicineFields, PackageInput } from '../api'
+import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo } from '../api'
 import { useFamilyPath } from '../auth'
+import { QuantityInput } from '../components/QuantityInput'
 import { PageLoader, useToast } from '../components/ui'
 
 const FORMS = ['Таблетки', 'Капсулы', 'Сироп', 'Суспензия', 'Капли', 'Спрей', 'Мазь', 'Гель', 'Крем', 'Порошок', 'Раствор', 'Свечи', 'Пластырь', 'Ампулы']
@@ -13,12 +14,13 @@ const INDICATION_HINTS = ['головная боль', 'температура',
 export interface ScanPrefill {
   fields?: Partial<MedicineFields>
   pkg?: PackageInput
+  packSize?: number | null
   source?: string
 }
 
 const EMPTY: MedicineFields = {
   name: '', category_id: null, form: null, dosage: null, active_ingredient: null, manufacturer: null,
-  indications: '', contraindications: '', notes: '', unit: 'шт', min_quantity: null, gtin: null,
+  indications: '', contraindications: '', notes: '', unit: 'шт', min_quantity: null, blister_size: null, gtin: null,
 }
 
 export function MedicineForm() {
@@ -41,8 +43,8 @@ export function MedicineForm() {
   })
   useEffect(() => {
     if (existing.data) {
-      const { name, category_id, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, gtin } = existing.data
-      setF({ name, category_id, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, gtin })
+      const { name, category_id, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, blister_size, gtin } = existing.data
+      setF({ name, category_id, form, dosage, active_ingredient, manufacturer, indications, contraindications, notes, unit, min_quantity, blister_size, gtin: gtin?.replace(/^0/, '') ?? null })
     }
   }, [existing.data])
 
@@ -61,6 +63,27 @@ export function MedicineForm() {
       toast(editing ? 'Сохранено' : `«${m.name}» в аптечке`)
       nav(`/medicines/${m.id}`, { replace: true })
     },
+  })
+
+  const [packSize, setPackSize] = useState<number | null>(prefill.packSize ?? null)
+  const lookup = useMutation({
+    mutationFn: () => api<ProductInfo>(`/products/${encodeURIComponent(f.gtin!.trim())}`),
+    onSuccess: p => {
+      // Заполняем только пустые поля — то, что человек уже вписал, не трогаем.
+      setF(prev => ({
+        ...prev,
+        name: prev.name || p.name,
+        form: prev.form || p.form,
+        dosage: prev.dosage || p.dosage,
+        active_ingredient: prev.active_ingredient || p.active_ingredient,
+        manufacturer: prev.manufacturer || p.manufacturer,
+        unit: !editing && p.unit ? p.unit : prev.unit,
+        blister_size: prev.blister_size ?? p.blister_size,
+      }))
+      if (p.pack_size) { setPackSize(p.pack_size); if (!editing) setPkg(prev => ({ ...prev, quantity: p.pack_size! })) }
+      toast(`Нашли: ${p.title ?? p.name}`)
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
   })
 
   const set = <K extends keyof MedicineFields>(k: K, v: MedicineFields[K]) => setF(prev => ({ ...prev, [k]: v }))
@@ -113,7 +136,13 @@ export function MedicineForm() {
               <input className="input" {...text('manufacturer')} />
             </label>
             <label className="field"><span>Штрихкод</span>
-              <input className="input" inputMode="numeric" placeholder="Заполнится при сканировании" {...text('gtin')} />
+              <div className="row" style={{ gap: 8 }}>
+                <input className="input grow" inputMode="numeric" placeholder="Заполнится при сканировании" {...text('gtin')} />
+                <button type="button" className="btn" title="Найти лекарство по штрихкоду в интернете"
+                  disabled={!f.gtin?.trim() || lookup.isPending} onClick={() => lookup.mutate()}>
+                  <Globe size={17} />{lookup.isPending ? '…' : 'Найти'}
+                </button>
+              </div>
             </label>
           </div>
         </section>
@@ -142,6 +171,12 @@ export function MedicineForm() {
               <input className="input" list="units" {...text('unit')} />
               <datalist id="units">{UNITS.map(x => <option key={x} value={x} />)}</datalist>
             </label>
+            {editing && (
+              <label className="field"><span>Штук в блистере</span>
+                <input className="input" type="number" min={1} placeholder="Например, 10"
+                  value={f.blister_size ?? ''} onChange={e => set('blister_size', e.target.value === '' ? null : Number(e.target.value))} />
+              </label>
+            )}
             <label className="field"><span>Напомнить, когда останется</span>
               <input className="input" type="number" min={0} step="any" placeholder="Например, 5"
                 value={f.min_quantity ?? ''} onChange={e => set('min_quantity', e.target.value === '' ? null : Number(e.target.value))} />
@@ -150,11 +185,9 @@ export function MedicineForm() {
           {!editing && (
             <>
               <h3 style={{ marginTop: 6 }}>Первая упаковка</h3>
+              <QuantityInput unit={f.unit} quantity={pkg.quantity} onQuantity={q => setPkg(prev => ({ ...prev, quantity: q }))}
+                blisterSize={f.blister_size} onBlisterSize={n => set('blister_size', n)} packSize={packSize} />
               <div className="grid-2">
-                <label className="field"><span>Количество в упаковке ({f.unit})</span>
-                  <input className="input" type="number" min={0} step="any" value={pkg.quantity}
-                    onChange={e => setPkg({ ...pkg, quantity: Number(e.target.value) })} />
-                </label>
                 <label className="field"><span>Годен до</span>
                   <input className="input" type="date" value={pkg.expiry_date ?? ''} onChange={e => setPkg({ ...pkg, expiry_date: e.target.value || null })} />
                   {prefill.pkg?.expiry_date && <span className="hint">Взято из кода на упаковке</span>}

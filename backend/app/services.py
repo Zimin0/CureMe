@@ -62,7 +62,7 @@ def medicine_out(med: Medicine, user_id: int, names: dict[int, str], detail: boo
         id=med.id, name=med.name, category_id=med.category_id, form=med.form, dosage=med.dosage,
         active_ingredient=med.active_ingredient, manufacturer=med.manufacturer,
         indications=med.indications, contraindications=med.contraindications, notes=med.notes,
-        unit=med.unit, min_quantity=med.min_quantity, gtin=med.gtin,
+        unit=med.unit, min_quantity=med.min_quantity, blister_size=med.blister_size, gtin=med.gtin,
         category=CategoryOut.model_validate(med.category) if med.category else None,
         stock=stock_of(med),
         is_favorite=bool(mine and mine.is_favorite),

@@ -80,6 +80,7 @@ class Medicine(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     unit: Mapped[str] = mapped_column(String(20), default="шт")
     min_quantity: Mapped[float | None] = mapped_column(Float)      # порог «заканчивается»
+    blister_size: Mapped[int | None] = mapped_column(Integer)      # таблеток в одном блистере
     gtin: Mapped[str | None] = mapped_column(String(14), index=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -135,5 +136,9 @@ class ProductCode(Base):
     dosage: Mapped[str | None] = mapped_column(String(60))
     active_ingredient: Mapped[str | None] = mapped_column(String(200))
     manufacturer: Mapped[str | None] = mapped_column(String(200))
-    source: Mapped[str] = mapped_column(String(30), default="user")
+    title: Mapped[str | None] = mapped_column(String(300))          # полное название из аптек
+    unit: Mapped[str | None] = mapped_column(String(20))
+    pack_size: Mapped[float | None] = mapped_column(Float)          # сколько в упаковке (30 таб)
+    blister_size: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(30), default="user")  # user | internet | openfoodfacts
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

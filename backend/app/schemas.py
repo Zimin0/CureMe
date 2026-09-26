@@ -142,6 +142,7 @@ class MedicineBase(BaseModel):
     notes: str = ""
     unit: str = "шт"
     min_quantity: float | None = Field(default=None, ge=0)
+    blister_size: int | None = Field(default=None, ge=1, le=1000)
     gtin: str | None = None
 
 
@@ -161,6 +162,7 @@ class MedicineUpdate(BaseModel):
     notes: str | None = None
     unit: str | None = None
     min_quantity: float | None = None
+    blister_size: int | None = None
     gtin: str | None = None
 
 
@@ -217,13 +219,18 @@ class ScanIn(BaseModel):
     raw: str = Field(min_length=1, max_length=512)
 
 
-class ProductInfo(BaseModel):
+class ProductInfo(ORM):
+    gtin: str
     name: str
+    title: str | None = None
     form: str | None = None
     dosage: str | None = None
     active_ingredient: str | None = None
     manufacturer: str | None = None
-    source: str
+    unit: str | None = None
+    pack_size: float | None = None
+    blister_size: int | None = None
+    source: str                        # user | internet | openfoodfacts
 
 
 class ScanOut(BaseModel):
