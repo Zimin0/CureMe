@@ -11,6 +11,7 @@ services:
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
       CUREME_DOMAIN: ${CUREME_DOMAIN:?укажите домен в .env}
+      CUREME_OLD_DOMAIN: ${CUREME_OLD_DOMAIN:-}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

@@ -20,9 +20,11 @@ env:
   DEPLOY_HOST: 158.255.7.113
   DEPLOY_USER: root
   DEPLOY_DIR: /opt/cureme
-  # Бесплатный домен, который указывает на IP сервера: нужен для HTTPS (без него не работает камера).
-  # Купите свой домен — поменяйте здесь. ":80" — только HTTP по IP, без сертификата.
-  CUREME_DOMAIN: 158-255-7-113.sslip.io
+  # Домен нужен для HTTPS (без него не работает камера). Его A-записи (@ и www) должны указывать на DEPLOY_HOST.
+  CUREME_DOMAIN: kapsulka.ru
+  # Дополнительные адреса через пробел: с них и с www.CUREME_DOMAIN Caddy делает редирект на CUREME_DOMAIN.
+  # Каждый должен указывать на DEPLOY_HOST, иначе Caddy не получит для него сертификат. Можно оставить пустым.
+  CUREME_OLD_DOMAIN: 158-255-7-113.sslip.io kapsulka.online www.kapsulka.online
   CADDY_IMAGE: caddy:2-alpine
   POSTGRES_IMAGE: postgres:16-alpine
 
@@ -73,7 +75,7 @@ jobs:
 
       - name: Restart on server
         run: |
-          ssh server DEPLOY_DIR="$DEPLOY_DIR" CUREME_DOMAIN="$CUREME_DOMAIN" bash -s <<'SH'
+          ssh server DEPLOY_DIR="$DEPLOY_DIR" CUREME_DOMAIN="$CUREME_DOMAIN" "CUREME_OLD_DOMAIN='$CUREME_OLD_DOMAIN'" bash -s <<'SH'
           set -euo pipefail
           cd "$DEPLOY_DIR"
           gunzip -c images.tar.gz | docker load
@@ -83,7 +85,9 @@ jobs:
           grep -q '^CUREME_SECRET_KEY=' .env || echo "CUREME_SECRET_KEY=$(openssl rand -hex 32)" >> .env
           # пароль базы тоже создаётся один раз: Postgres запоминает его при первом запуске
           grep -q '^CUREME_DB_PASSWORD=' .env || echo "CUREME_DB_PASSWORD=$(openssl rand -hex 24)" >> .env
-          sed -i '/^CUREME_DOMAIN=/d' .env && echo "CUREME_DOMAIN=$CUREME_DOMAIN" >> .env
+          sed -i '/^CUREME_DOMAIN=/d; /^CUREME_OLD_DOMAIN=/d' .env
+          echo "CUREME_DOMAIN=$CUREME_DOMAIN" >> .env
+          echo "CUREME_OLD_DOMAIN=\"$CUREME_OLD_DOMAIN\"" >> .env
           # Один раз перед переездом на Postgres снимаем отдельную копию SQLite-базы на случай отката.
           # sqlite3.backup даёт целостную копию, даже если старое приложение прямо сейчас пишет в базу.
           if docker volume inspect cureme_cureme-data >/dev/null 2>&1; then
