@@ -33,6 +33,7 @@ class FamilyBrief(BaseModel):
 
 
 class MeOut(UserOut):
+    is_admin: bool = False
     families: list[FamilyBrief]
 
 
@@ -91,12 +92,55 @@ class CategoryIn(BaseModel):
     color: str = "#0f9d8a"
 
 
+class CategoryOrderIn(BaseModel):
+    ids: list[int]
+
+
 class CategoryOut(ORM):
     id: int
     name: str
     icon: str
     color: str
     medicine_count: int = 0
+
+
+# --- администрирование ---
+class AdminStats(BaseModel):
+    users: int
+    admins: int
+    families: int
+    medicines: int
+    categories: int
+
+
+class AdminUserOut(BaseModel):
+    id: int
+    email: str
+    name: str
+    is_admin: bool
+    created_at: datetime
+    families: list[FamilyBrief]
+
+
+class AdminUserUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    email: EmailStr | None = None
+    is_admin: bool | None = None
+    password: str | None = Field(default=None, min_length=6, max_length=128)
+
+
+class AdminFamilyOut(BaseModel):
+    id: int
+    name: str
+    invite_code: str
+    created_at: datetime
+    medicine_count: int
+    members: list[MemberOut]
+
+
+class AdminMemberIn(BaseModel):
+    email: EmailStr
+    role: str = Field(default="member", pattern="^(owner|member)$")
 
 
 # --- лекарства и упаковки ---

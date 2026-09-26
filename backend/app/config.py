@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Куда складывать фото лекарств (в Docker это том /data).
     media_dir: Path = Path("./media")
     max_photo_mb: int = 8
+    # Почты, которые всегда получают права администратора (запасной вход, если первый аккаунт потерян).
+    # Первый зарегистрированный аккаунт становится администратором и без этого.
+    admin_emails: list[str] = []
     cors_origins: list[str] = ["http://localhost:5173"]
 
 

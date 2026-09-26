@@ -1,4 +1,4 @@
-import { FileDown, House, LogOut, Pill, ScanLine, Stethoscope, Users } from 'lucide-react'
+import { FileDown, House, LogOut, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 
@@ -22,6 +22,9 @@ export function Layout() {
             <Icon size={20} />{label}
           </NavLink>
         ))}
+        {me?.is_admin && (
+          <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
+        )}
         <div className="spacer" />
         {me && me.families.length > 1 && (
           <label className="family-switch small">

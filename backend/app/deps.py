@@ -3,6 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .config import get_settings
 from .db import get_db
 from .models import Family, Membership, User
 from .security import decode_token
@@ -17,6 +18,15 @@ def current_user(
     user = db.get(User, user_id) if user_id else None
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужно войти в аккаунт")
+    if not user.is_admin and user.email.lower() in {e.lower() for e in get_settings().admin_emails}:
+        user.is_admin = True
+        db.commit()
+    return user
+
+
+def admin_user(user: User = Depends(current_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Нужны права администратора")
     return user
 
 
