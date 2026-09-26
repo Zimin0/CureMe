@@ -45,15 +45,21 @@ jobs:
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # tr убирает \r, если ключ вставили из Windows
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_deploy ~/.ssh/known_hosts
+          if ! ssh-keygen -y -f ~/.ssh/id_deploy > /dev/null; then
+            echo "::error::SSH_PRIVATE_KEY is not a private key. Paste the whole output of 'cat ~/.ssh/cureme_deploy' (the file without .pub), BEGIN and END lines included."
+            exit 1
+          fi
           cat > ~/.ssh/config <<CFG
           Host server
             HostName $DEPLOY_HOST
             User $DEPLOY_USER
             IdentityFile ~/.ssh/id_deploy
             StrictHostKeyChecking yes
+            BatchMode yes
             ServerAliveInterval 30
           CFG
 
