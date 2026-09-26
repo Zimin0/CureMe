@@ -19,7 +19,7 @@ ssh-keyscan -t ed25519 158.255.7.113         # → секрет SSH_KNOWN_HOSTS
 
 Секреты добавляются в GitHub: Settings → Secrets and variables → Actions → New repository secret.
 Адрес сервера и домен записаны в `env` в начале workflow: основной домен `kapsulka.ru` (`CUREME_DOMAIN`),
-а с `www.kapsulka.ru` и прежнего адреса `158-255-7-113.sslip.io` (`CUREME_OLD_DOMAIN`) Caddy делает редирект на основной. Запустить деплой вручную можно
+а с `www.kapsulka.ru`, `kapsulka.online` и прежнего адреса `158-255-7-113.sslip.io` (`CUREME_OLD_DOMAIN`) Caddy делает редирект на основной. Запустить деплой вручную можно
 на вкладке Actions → Deploy → Run workflow. Ниже описан ручной способ, если автодеплой не нужен.
 
 ## 1. Домен
