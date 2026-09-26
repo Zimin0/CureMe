@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Heart, MapPin, Minus, Pencil, Plus, Star, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { CSSProperties, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, MedicineDetail as Detail, Package, PackageInput, uploadFile } from '../api'
 import { ExpiryInput } from '../components/ExpiryInput'
@@ -96,7 +96,11 @@ export function MedicineDetail() {
           <h1>{m.name}</h1>
           <p className="muted">{subtitle(m) || 'Добавьте форму и дозировку в редактировании'}</p>
           <div className="row wrap" style={{ gap: 6 }}>
-            {m.category && <span className="badge accent">{m.category.icon} {m.category.name}</span>}
+            {m.categories.map(c => (
+              <Link key={c.id} to={`/medicines?category=${c.id}`} className="badge cat-badge" style={{ '--cat': c.color } as CSSProperties}>
+                {c.icon} {c.name}
+              </Link>
+            ))}
             <StatusBadge stock={s} />
           </div>
         </div>

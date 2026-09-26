@@ -59,7 +59,11 @@ def suggest(
     for med in load_medicines(db, fam.id):
         out = medicine_out(med, user.id, names)
         s_ind, w_ind = best_match(phrases, med.indications)
-        s_cat, w_cat = best_match(phrases, med.category.name if med.category else "")
+        # каждую категорию сравниваем отдельно, чтобы фраза не «склеилась» из двух соседних
+        s_cat, w_cat, cat_hit = max(
+            ((*best_match(phrases, c.name), c.name) for c in med.categories), default=(0.0, None, None),
+            key=lambda x: x[0],
+        )
         s_name, _ = best_match(phrases, " ".join(filter(None, [med.name, med.active_ingredient, med.notes])))
         base = s_ind * 10 + s_cat * 5 + s_name * 3
         if base <= 0:
@@ -67,8 +71,8 @@ def suggest(
         reasons, warnings = [], []
         if w_ind:
             reasons.append(f"В показаниях: «{w_ind}»")
-        if w_cat and med.category:
-            reasons.append(f"Категория «{med.category.name}»")
+        if w_cat:
+            reasons.append(f"Категория «{cat_hit}»")
         if not reasons:
             reasons.append("Совпадает название или заметка")
         score = base

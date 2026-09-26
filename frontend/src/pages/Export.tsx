@@ -10,7 +10,7 @@ export function Export() {
   const fam = useFamilyPath()
   const { me, familyId } = useAuth()
   const toast = useToast()
-  const [inStock, setInStock] = useState(false)
+  const [inStock, setInStock] = useState(true)
   const { data: text, isLoading, error } = useQuery({
     queryKey: ['export', fam(''), inStock],
     queryFn: () => fetchText(fam(`/export.txt${inStock ? '?in_stock=true' : ''}`)),
@@ -46,8 +46,8 @@ export function Export() {
 
       <section className="card stack">
         <div className="segmented" role="tablist">
-          <button type="button" role="tab" aria-selected={!inStock} className={!inStock ? 'on' : ''} onClick={() => setInStock(false)}>Вся аптечка</button>
           <button type="button" role="tab" aria-selected={inStock} className={inStock ? 'on' : ''} onClick={() => setInStock(true)}>Только в наличии</button>
+          <button type="button" role="tab" aria-selected={!inStock} className={!inStock ? 'on' : ''} onClick={() => setInStock(false)}>Вся аптечка</button>
         </div>
 
         {isLoading ? <div className="center" style={{ minHeight: 120 }}><Spinner /></div>

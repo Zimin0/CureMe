@@ -69,7 +69,6 @@ class Medicine(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     name: Mapped[str] = mapped_column(String(200), index=True)
     form: Mapped[str | None] = mapped_column(String(60))           # таблетки, сироп, мазь…
     dosage: Mapped[str | None] = mapped_column(String(60))         # 500 мг
@@ -88,11 +87,36 @@ class Medicine(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     family: Mapped[Family] = relationship(back_populates="medicines")
-    category: Mapped[Category | None] = relationship()
+    # До трёх категорий; первая (position = 0) — основная, её значок и цвет показываются в списках.
+    category_links: Mapped[list["MedicineCategory"]] = relationship(
+        cascade="all, delete-orphan", order_by="MedicineCategory.position"
+    )
     packages: Mapped[list["Package"]] = relationship(
         back_populates="medicine", cascade="all, delete-orphan", order_by="Package.expiry_date"
     )
     marks: Mapped[list["UserMark"]] = relationship(cascade="all, delete-orphan")
+
+    @property
+    def categories(self) -> list[Category]:
+        return [link.category for link in self.category_links]
+
+    @property
+    def category(self) -> Category | None:
+        return self.category_links[0].category if self.category_links else None
+
+
+class MedicineCategory(Base):
+    """Связь «лекарство — категория» (многие ко многим) с порядком: первая категория основная."""
+
+    __tablename__ = "medicine_categories"
+
+    medicine_id: Mapped[int] = mapped_column(ForeignKey("medicines.id", ondelete="CASCADE"), primary_key=True)
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+    category: Mapped[Category] = relationship(lazy="joined")
 
 
 class Package(Base):

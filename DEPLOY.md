@@ -72,8 +72,23 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 ## 5. Резервная копия
 
-База и фото лежат в Docker-томе `cureme_cureme-data`:
+База живёт в PostgreSQL (том `cureme_pg-data`), фото лекарств в томе `cureme_cureme-data`. Команды выполняются в `/opt/cureme`:
 
 ```bash
-docker run --rm -v cureme_cureme-data:/data -v "$PWD":/backup alpine tar czf /backup/cureme-$(date +%F).tar.gz -C /data .
+# база: SQL-дамп, можно снимать на ходу
+docker compose exec -T db pg_dump -U cureme cureme | gzip > cureme-db-$(date +%F).sql.gz
+# фото
+docker run --rm -v cureme_cureme-data:/data -v "$PWD":/backup alpine tar czf /backup/cureme-media-$(date +%F).tar.gz -C /data media
 ```
+
+Восстановить базу из дампа: `gunzip -c cureme-db-ДАТА.sql.gz | docker compose exec -T db psql -U cureme cureme` (в пустую базу).
+
+## 6. Переезд с SQLite на PostgreSQL
+
+Раньше база была файлом `/data/cureme.db`. Первый деплой с Postgres переносит её сам:
+
+1. Перед перезапуском деплой снимает копию `/data/cureme.db.before-postgres`.
+2. Контейнер приложения при старте догоняет старую базу миграциями, создаёт схему в Postgres и одной транзакцией копирует все таблицы. В логе видно `Перенесено: users N, medicines N, …`.
+3. Файл переименовывается в `/data/cureme.db.imported-<время>`. Если в Postgres уже есть пользователи, перенос больше не запускается.
+
+Если перенос упадёт, транзакция откатится, SQLite-файл останется на месте, а деплой покажет лог с ошибкой. Откатиться на SQLite можно так: скопировать `/data/cureme.db.before-postgres` обратно в `/data/cureme.db` и задеплоить прежний `docker-compose.yml` из git. Всё, что записали уже в Postgres, при этом в SQLite не попадёт.

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from ..deps import admin_user
-from ..models import Category, Family, Medicine, Membership, User
+from ..models import Category, Family, Medicine, MedicineCategory, Membership, User
 from ..schemas import (
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
     CategoryOut, FamilyBrief, FamilyIn, MemberOut, RoleIn,
@@ -203,7 +203,9 @@ def _check_name(db: Session, name: str, exclude: int | None = None) -> str:
 
 @router.get("/categories", response_model=list[CategoryOut])
 def list_categories(db: Session = Depends(get_db)):
-    counts = dict(db.execute(select(Medicine.category_id, func.count()).group_by(Medicine.category_id)).all())
+    counts = dict(db.execute(
+        select(MedicineCategory.category_id, func.count()).group_by(MedicineCategory.category_id)
+    ).all())
     cats = db.scalars(select(Category).order_by(Category.sort, Category.name))
     return [CategoryOut.model_validate(c).model_copy(update={"medicine_count": counts.get(c.id, 0)}) for c in cats]
 
@@ -238,6 +240,6 @@ def update_category(category_id: int, body: CategoryIn, db: Session = Depends(ge
 
 @router.delete("/categories/{category_id}", status_code=204)
 def delete_category(category_id: int, db: Session = Depends(get_db)):
-    db.delete(_category(db, category_id))  # у лекарств всех семей категория станет пустой
+    db.delete(_category(db, category_id))  # у лекарств всех семей эта категория просто исчезнет
     db.commit()
     return Response(status_code=204)

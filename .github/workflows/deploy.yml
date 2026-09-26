@@ -26,6 +26,7 @@ env:
   # Каждый должен указывать на DEPLOY_HOST, иначе Caddy не получит для него сертификат. Можно оставить пустым.
   CUREME_OLD_DOMAIN: 158-255-7-113.sslip.io kapsulka.online www.kapsulka.online
   CADDY_IMAGE: caddy:2-alpine
+  POSTGRES_IMAGE: postgres:16-alpine
 
 jobs:
   deploy:
@@ -38,7 +39,8 @@ jobs:
         run: |
           docker build -t cureme-app:latest .
           docker pull "$CADDY_IMAGE"
-          docker save cureme-app:latest "$CADDY_IMAGE" | gzip > images.tar.gz
+          docker pull "$POSTGRES_IMAGE"
+          docker save cureme-app:latest "$CADDY_IMAGE" "$POSTGRES_IMAGE" | gzip > images.tar.gz
           ls -lh images.tar.gz
 
       - name: Set up SSH
@@ -81,11 +83,23 @@ jobs:
           # секретный ключ создаётся один раз на сервере и больше не меняется (иначе всех разлогинит)
           touch .env && chmod 600 .env
           grep -q '^CUREME_SECRET_KEY=' .env || echo "CUREME_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+          # пароль базы тоже создаётся один раз: Postgres запоминает его при первом запуске
+          grep -q '^CUREME_DB_PASSWORD=' .env || echo "CUREME_DB_PASSWORD=$(openssl rand -hex 24)" >> .env
           sed -i '/^CUREME_DOMAIN=/d; /^CUREME_OLD_DOMAIN=/d' .env
           echo "CUREME_DOMAIN=$CUREME_DOMAIN" >> .env
           echo "CUREME_OLD_DOMAIN=\"$CUREME_OLD_DOMAIN\"" >> .env
+          # Один раз перед переездом на Postgres снимаем отдельную копию SQLite-базы на случай отката.
+          # sqlite3.backup даёт целостную копию, даже если старое приложение прямо сейчас пишет в базу.
+          if docker volume inspect cureme_cureme-data >/dev/null 2>&1; then
+            docker run --rm -v cureme_cureme-data:/data cureme-app:latest python -c "
+          import os, sqlite3
+          src, dst = '/data/cureme.db', '/data/cureme.db.before-postgres'
+          if os.path.exists(src) and not os.path.exists(dst):
+              sqlite3.connect(src).backup(sqlite3.connect(dst)); print('SQLite backup:', dst)
+          "
+          fi
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --pull never --remove-orphans
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             if docker compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" 2>/dev/null; then
               echo "CureMe is up"; docker image prune -f >/dev/null; exit 0
             fi

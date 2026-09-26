@@ -7,3 +7,9 @@ __pycache__/
 media/
 frontend/tsconfig.tsbuildinfo
 frontend/public/ocr/
+frontend/test-results/
+frontend/playwright-report/
+frontend/coverage/
+backend/.coverage
+backend/htmlcov/
+.hypothesis/
