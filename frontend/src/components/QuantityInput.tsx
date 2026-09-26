@@ -5,12 +5,23 @@ import { fmtQty } from '../format'
 const COUNTABLE = ['таб', 'капс', 'шт', 'пак', 'амп']
 
 function Stepper({ value, onChange, min = 0, label }: { value: number; onChange: (v: number) => void; min?: number; label: string }) {
+  // Пока поле редактируют, держим введённый текст как есть: иначе пустое поле сразу превращается в 0,
+  // и этот ноль нельзя стереть.
+  const [draft, setDraft] = useState<string | null>(null)
+  const step = (v: number) => { setDraft(null); onChange(v) }
   return (
     <div className="stepper" aria-label={label}>
-      <button type="button" onClick={() => onChange(Math.max(min, value - 1))} aria-label="Меньше"><Minus size={16} /></button>
-      <input type="number" min={min} step="any" inputMode="decimal" value={Number.isFinite(value) ? value : ''}
-        onChange={e => onChange(Math.max(min, Number(e.target.value)))} />
-      <button type="button" onClick={() => onChange(value + 1)} aria-label="Больше"><Plus size={16} /></button>
+      <button type="button" onClick={() => step(Math.max(min, value - 1))} aria-label="Меньше"><Minus size={16} /></button>
+      <input type="number" min={min} step="any" inputMode="decimal"
+        value={draft ?? (Number.isFinite(value) ? value : '')}
+        onFocus={e => e.target.select()}
+        onChange={e => {
+          const text = e.target.value
+          setDraft(text)
+          if (text.trim() !== '' && Number.isFinite(Number(text))) onChange(Math.max(min, Number(text)))
+        }}
+        onBlur={() => { if (draft !== null && draft.trim() === '') onChange(min); setDraft(null) }} />
+      <button type="button" onClick={() => step(value + 1)} aria-label="Больше"><Plus size={16} /></button>
     </div>
   )
 }
