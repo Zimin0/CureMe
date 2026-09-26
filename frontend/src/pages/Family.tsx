@@ -1,13 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Crown, LogOut, Pencil, Plus, RefreshCw, Share2, Trash2, UserPlus } from 'lucide-react'
+import { Copy, Crown, LogOut, Pencil, Plus, RefreshCw, Settings, Share2, Shield, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, Category, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
-
-const ICONS = ['💊', '🩹', '🌡️', '🤧', '🗣️', '🌼', '🫄', '❤️', '🩺', '🍊', '🌙', '🧸', '👁️', '🦷', '🧴', '💉', '🐾', '🧘']
-const COLORS = ['#e5484d', '#f76b15', '#ffb224', '#30a46c', '#12a594', '#0090ff', '#3e63dd', '#8e4ec6', '#d6409f', '#687076']
 
 export function Family() {
   const { me, familyId, setFamilyId, refresh, signOut } = useAuth()
@@ -20,7 +18,6 @@ export function Family() {
 
   const [email, setEmail] = useState('')
   const [rename, setRename] = useState<string | null>(null)
-  const [catEdit, setCatEdit] = useState<Partial<Category> | null>(null)
   const [newFamily, setNewFamily] = useState<string | null>(null)
 
   const onFam = (d: FamilyT, msg?: string) => { qc.setQueryData(key, d); if (msg) toast(msg) }
@@ -51,18 +48,6 @@ export function Family() {
     mutationFn: (name: string) => api<FamilyT>('/families', { body: { name } }),
     onSuccess: async d => { await refresh(); setFamilyId(d.id); setNewFamily(null); toast(`Создана «${d.name}»`) }, onError,
   })
-  const saveCat = useMutation({
-    mutationFn: (c: Partial<Category>) => {
-      const body = { name: c.name, icon: c.icon ?? '💊', color: c.color ?? COLORS[4] }
-      return c.id ? api(fam(`/categories/${c.id}`), { method: 'PUT', body }) : api(fam('/categories'), { body })
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categories'] }); qc.invalidateQueries({ queryKey: ['medicines'] }); setCatEdit(null) }, onError,
-  })
-  const delCat = useMutation({
-    mutationFn: (id: number) => api(fam(`/categories/${id}`), { method: 'DELETE' }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['categories'] }); qc.invalidateQueries({ queryKey: ['medicines'] }); setCatEdit(null) }, onError,
-  })
-
   if (isLoading || !f) return <PageLoader />
   const owner = f.role === 'owner'
   const link = `${location.origin}/join/${f.invite_code}`
@@ -133,13 +118,14 @@ export function Family() {
       <section className="card">
         <div className="card-head">
           <h2>Категории</h2>
-          <button className="btn sm" onClick={() => setCatEdit({ icon: '💊', color: COLORS[4] })}><Plus size={16} />Новая</button>
+          {me?.is_admin && <Link to="/admin?tab=categories" className="btn sm"><Settings size={16} />Настроить</Link>}
         </div>
+        <p className="muted small" style={{ marginBottom: 10 }}>Список категорий общий для всех семей, его ведёт администратор. Цифра показывает, сколько лекарств в вашей аптечке.</p>
         <div className="chips wrap">
           {cats.data?.map(c => (
-            <button key={c.id} className="chip" onClick={() => setCatEdit(c)} style={{ borderColor: `color-mix(in srgb, ${c.color} 40%, transparent)` }}>
+            <Link key={c.id} to={`/medicines?category=${c.id}`} className="chip" style={{ borderColor: `color-mix(in srgb, ${c.color} 40%, transparent)` }}>
               {c.icon} {c.name} <span className="count">{c.medicine_count}</span>
-            </button>
+            </Link>
           ))}
         </div>
       </section>
@@ -154,6 +140,7 @@ export function Family() {
           </label>
         )}
         <div className="row wrap">
+          {me?.is_admin && <Link to="/admin" className="btn"><Shield size={16} />Панель администратора</Link>}
           <button className="btn ghost" onClick={() => setNewFamily('')}><Plus size={16} />Создать ещё одну семью</button>
           <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»?`) && removeMember.mutate(me!.id)}>Покинуть семью</button>
           <button className="btn danger" onClick={signOut}><LogOut size={16} />Выйти из аккаунта</button>
@@ -174,25 +161,6 @@ export function Family() {
             <p className="muted small">Например, отдельная аптечка на даче или у родителей.</p>
             <input className="input" autoFocus required placeholder="Дача" value={newFamily} onChange={e => setNewFamily(e.target.value)} />
             <button className="btn primary block">Создать</button>
-          </form>
-        </Sheet>
-      )}
-      {catEdit && (
-        <Sheet title={catEdit.id ? 'Категория' : 'Новая категория'} onClose={() => setCatEdit(null)}>
-          <form className="stack" onSubmit={e => { e.preventDefault(); saveCat.mutate(catEdit) }}>
-            <input className="input" autoFocus required placeholder="Название" value={catEdit.name ?? ''} onChange={e => setCatEdit({ ...catEdit, name: e.target.value })} />
-            <div className="row wrap" style={{ gap: 6 }}>
-              {ICONS.map(i => <button type="button" key={i} className={`emoji-pick ${catEdit.icon === i ? 'active' : ''}`} onClick={() => setCatEdit({ ...catEdit, icon: i })}>{i}</button>)}
-            </div>
-            <div className="row wrap" style={{ gap: 8 }}>
-              {COLORS.map(c => <button type="button" key={c} aria-label={c} className={`color-dot ${catEdit.color === c ? 'active' : ''}`} style={{ background: c }} onClick={() => setCatEdit({ ...catEdit, color: c })} />)}
-            </div>
-            <button className="btn primary block">Сохранить</button>
-            {catEdit.id && (
-              <button type="button" className="btn danger block" onClick={() => confirm('Удалить категорию? Лекарства останутся без категории.') && delCat.mutate(catEdit.id!)}>
-                <Trash2 size={16} />Удалить
-              </button>
-            )}
           </form>
         </Sheet>
       )}

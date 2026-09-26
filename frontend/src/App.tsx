@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
 import { Join, Login, Register } from './pages/Auth'
 import { Export } from './pages/Export'
+import { Admin } from './pages/Admin'
 import { Family } from './pages/Family'
 import { Find } from './pages/Find'
 import { Home } from './pages/Home'
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="find" element={<Find />} />
         <Route path="family" element={<Family />} />
         <Route path="export" element={<Export />} />
+        <Route path="admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -13,6 +13,19 @@ DEFAULT_CATEGORIES = [
     ("Прочее", "💊", "#687076"),
 ]
 
+
+
+def ensure_default_categories(db) -> None:
+    """Заполняет общий список категорий, если он пуст (новая база)."""
+    from sqlalchemy import select
+
+    from .models import Category
+
+    if db.scalar(select(Category.id).limit(1)) is None:
+        db.add_all(Category(name=n, icon=i, color=c, sort=k) for k, (n, i, c) in enumerate(DEFAULT_CATEGORIES))
+        db.flush()
+
+
 # Группы синонимов для подбора по болезни: если запрос совпал с любой фразой группы,
 # ищем по всем фразам группы. Список намеренно короткий и бытовой.
 CONDITION_SYNONYMS: list[list[str]] = [
