@@ -48,7 +48,7 @@ describe('сканирование: ручной ввод кода', () => {
     expect(within(dialog).getByLabelText('Название')).toHaveValue('Ларингобакт')
     await user.click(within(dialog).getByRole('button', { name: 'Сохранить в аптечку' }))
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/42'))
-    expect(created).toMatchObject({ name: 'Ларингобакт', gtin: '4605077018932', unit: 'таб', blister_size: 10, packages: [{ quantity: 30 }] })
+    expect(created).toMatchObject({ name: 'Ларингобакт', indications: '', gtin: '4605077018932', unit: 'таб', blister_size: 10, packages: [{ quantity: 30 }] })
   })
 
   it('уже известное лекарство: добавляется упаковка, повтор упаковки подсвечен', async () => {
@@ -100,5 +100,34 @@ describe('сканирование: ручной ввод кода', () => {
     await user.click(screen.getByRole('button', { name: /Добавить в аптечку|Сохранить/ }))
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/42'))
     expect(uploaded).toBe(true)
+  })
+
+  it('«От чего помогает» заполняется прямо в окне сканирования и доезжает до полной формы', async () => {
+    scanReturns({ product: { gtin: '04605077018932', name: 'Ларингобакт', title: null, form: 'Таблетки', dosage: null, active_ingredient: null, manufacturer: null, unit: 'таб', pack_size: 30, blister_size: 10, source: 'internet' } })
+    let created: Record<string, unknown> = {}
+    server.use(
+      http.get('/api/families/7/categories', () => HttpResponse.json([])),
+      http.get('/api/families/7/medicines', () => HttpResponse.json([])),
+      http.post('/api/families/7/medicines', async ({ request }) => {
+        created = await request.json() as Record<string, unknown>
+        return HttpResponse.json({ ...medicine({ id: 42, name: 'Ларингобакт' }), packages: [] }, { status: 201 })
+      }),
+      http.get('/api/families/7/medicines/42', () => HttpResponse.json({ ...medicine({ id: 42, name: 'Ларингобакт' }), packages: [] })),
+    )
+    const { user } = renderApp('/scan')
+    await enterCode(user)
+    const dialog = await screen.findByRole('dialog', { name: 'Нашли лекарство' })
+    const field = within(dialog).getByLabelText('От чего помогает')
+    await user.type(field, 'ангина')
+    await user.click(within(dialog).getByRole('button', { name: '+ боль в горле' }))
+    await user.click(within(dialog).getByRole('button', { name: '+ боль в горле' }))  // повтор не дублируется
+    expect(field).toHaveValue('ангина, боль в горле')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Заполнить подробнее' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/new'))
+    expect(screen.getByPlaceholderText(/Через запятую/)).toHaveValue('ангина, боль в горле')
+    await user.click(screen.getByRole('button', { name: 'Добавить в аптечку' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/42'))
+    expect(created).toMatchObject({ indications: 'ангина, боль в горле' })
   })
 })
