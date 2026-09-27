@@ -1,7 +1,8 @@
 from datetime import date, datetime, timezone
+from typing import Any
 
 from sqlalchemy import (
-    Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
+    JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -65,6 +66,18 @@ class Category(Base):
     icon: Mapped[str] = mapped_column(String(16), default="💊")
     color: Mapped[str] = mapped_column(String(16), default="#0f9d8a")
     sort: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AppSetting(Base):
+    """Настройки приложения, которые меняет администратор: ключ → значение в JSON.
+
+    Строки нет — действует значение по умолчанию из seed.py.
+    """
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON)
 
 
 class Medicine(Base):

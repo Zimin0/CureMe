@@ -8,9 +8,10 @@ from ..deps import admin_user
 from ..models import Category, Family, Medicine, MedicineCategory, Membership, User
 from ..schemas import (
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
-    CategoryOut, FamilyBrief, FamilyIn, MemberOut, RoleIn,
+    CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..security import hash_password
+from ..services import indication_hints, set_indication_hints
 from .files import _drop_photo
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_user)])
@@ -243,3 +244,14 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     db.delete(_category(db, category_id))  # у лекарств всех семей эта категория просто исчезнет
     db.commit()
     return Response(status_code=204)
+
+
+# --- подсказки «От чего помогает» ---
+@router.get("/indication-hints", response_model=list[str])
+def get_hints(db: Session = Depends(get_db)):
+    return indication_hints(db)
+
+
+@router.put("/indication-hints", response_model=list[str])
+def put_hints(body: IndicationHintsIn, db: Session = Depends(get_db)):
+    return set_indication_hints(db, body.hints)
