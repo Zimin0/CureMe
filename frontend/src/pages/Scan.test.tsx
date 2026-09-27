@@ -13,8 +13,9 @@ vi.mock('../image', () => ({ compressImage: async (f: File) => f }))
 
 const PARSED = { kind: 'ean13', raw: '4605077018932', gtin: '04605077018932', serial: null, batch: null, expiry: null }
 
-function scanReturns(result: Partial<ScanResult>) {
+function scanReturns(result: Partial<ScanResult>, hints = ['головная боль', 'боль в горле']) {
   let sent: unknown
+  server.use(http.get('/api/indication-hints', () => HttpResponse.json(hints)))
   server.use(http.post('/api/families/7/scan', async ({ request }) => {
     sent = await request.json()
     return HttpResponse.json({ parsed: PARSED, display_code: '4605077018932', medicine: null, product: null, duplicate_package: false, ...result })
@@ -103,7 +104,8 @@ describe('сканирование: ручной ввод кода', () => {
   })
 
   it('«От чего помогает» заполняется прямо в окне сканирования и доезжает до полной формы', async () => {
-    scanReturns({ product: { gtin: '04605077018932', name: 'Ларингобакт', title: null, form: 'Таблетки', dosage: null, active_ingredient: null, manufacturer: null, unit: 'таб', pack_size: 30, blister_size: 10, source: 'internet' } })
+    // подсказки приходят с сервера — их задаёт администратор
+    scanReturns({ product: { gtin: '04605077018932', name: 'Ларингобакт', title: null, form: 'Таблетки', dosage: null, active_ingredient: null, manufacturer: null, unit: 'таб', pack_size: 30, blister_size: 10, source: 'internet' } }, ['боль в горле', 'зубная боль'])
     let created: Record<string, unknown> = {}
     server.use(
       http.get('/api/families/7/categories', () => HttpResponse.json([])),
@@ -118,6 +120,8 @@ describe('сканирование: ручной ввод кода', () => {
     await enterCode(user)
     const dialog = await screen.findByRole('dialog', { name: 'Нашли лекарство' })
     const field = within(dialog).getByLabelText('От чего помогает')
+    expect(await within(dialog).findByRole('button', { name: '+ зубная боль' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: '+ температура' })).not.toBeInTheDocument()
     await user.type(field, 'ангина')
     await user.click(within(dialog).getByRole('button', { name: '+ боль в горле' }))
     await user.click(within(dialog).getByRole('button', { name: '+ боль в горле' }))  // повтор не дублируется

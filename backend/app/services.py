@@ -4,8 +4,26 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
-from .models import Medicine, MedicineCategory, Membership, Package, UserMark
+from .models import AppSetting, Medicine, MedicineCategory, Membership, Package, UserMark
 from .schemas import CategoryOut, MedicineDetail, MedicineOut, PackageOut, StockOut
+from .seed import DEFAULT_INDICATION_HINTS
+
+INDICATION_HINTS = "indication_hints"
+
+
+def indication_hints(db: Session) -> list[str]:
+    row = db.get(AppSetting, INDICATION_HINTS)
+    return list(row.value) if row else list(DEFAULT_INDICATION_HINTS)
+
+
+def set_indication_hints(db: Session, hints: list[str]) -> list[str]:
+    row = db.get(AppSetting, INDICATION_HINTS)
+    if row:
+        row.value = hints
+    else:
+        db.add(AppSetting(key=INDICATION_HINTS, value=hints))
+    db.commit()
+    return hints
 
 
 def stock_of(med: Medicine, today: date | None = None) -> StockOut:

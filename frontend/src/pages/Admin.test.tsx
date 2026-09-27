@@ -72,4 +72,37 @@ describe('админка', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }))
     await waitFor(() => expect(created).toMatchObject({ name: 'Глаза', icon: '👁️', color: '#6e56cf' }))
   })
+
+  it('подсказки «От чего помогает»: добавить, поднять, убрать и сохранить', async () => {
+    let saved: unknown
+    server.use(
+      stats,
+      http.get('/api/admin/indication-hints', () => HttpResponse.json(['головная боль', 'температура', 'кашель'])),
+      http.put('/api/admin/indication-hints', async ({ request }) => {
+        saved = await request.json()
+        return HttpResponse.json((saved as { hints: string[] }).hints)
+      }),
+    )
+    const { user } = renderApp('/admin?tab=hints', { me: ADMIN })
+    expect(await screen.findByText('температура')).toBeInTheDocument()
+    const save = screen.getByRole('button', { name: 'Сохранить' })
+    expect(save).toBeDisabled()  // пока ничего не меняли
+
+    await user.type(screen.getByPlaceholderText('Например, зубная боль'), '  зубная   боль ')
+    await user.click(screen.getByRole('button', { name: 'Добавить' }))
+    await user.type(screen.getByPlaceholderText('Например, зубная боль'), 'Кашель')
+    await user.click(screen.getByRole('button', { name: 'Добавить' }))  // повтор без учёта регистра не добавится
+    expect(await screen.findByText('Такая подсказка уже есть')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Убрать «температура»' }))
+    const rows = () => [...document.querySelectorAll('.list-row .grow')].map(e => e.textContent)
+    expect(rows()).toEqual(['головная боль', 'кашель', 'зубная боль'])
+    const [, , up] = screen.getAllByTitle('Выше')
+    await user.click(up)
+    expect(rows()).toEqual(['головная боль', 'зубная боль', 'кашель'])
+
+    await user.click(save)
+    await waitFor(() => expect(saved).toEqual({ hints: ['головная боль', 'зубная боль', 'кашель'] }))
+    expect(await screen.findByText('Подсказки сохранены')).toBeInTheDocument()
+  })
 })

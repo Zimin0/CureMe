@@ -42,6 +42,32 @@ def test_categories_are_shared_and_only_admin_changes_them(client):
     assert med["category"] is None
 
 
+def test_indication_hints_are_shared_and_only_admin_changes_them(client):
+    admin, _ = register(client)
+    user, _ = register(client, "masha@example.com", "Маша")
+    hints = lambda h: client.get("/api/indication-hints", headers=h).json()  # noqa: E731
+    # пока администратор ничего не менял — стандартный список
+    assert hints(user)[:3] == ["головная боль", "температура", "простуда"] and len(hints(user)) == 12
+
+    assert client.put("/api/admin/indication-hints", headers=user, json={"hints": ["x"]}).status_code == 403
+    r = client.put("/api/admin/indication-hints", headers=admin,
+                   json={"hints": ["  зубная   боль ", "Кашель", "", "кашель", "насморк"]})
+    assert r.status_code == 200
+    # пробелы схлопнуты, пустые и повторы (без учёта регистра) убраны, порядок сохранён
+    assert r.json() == ["зубная боль", "Кашель", "насморк"]
+    assert hints(user) == ["зубная боль", "Кашель", "насморк"]
+    assert client.get("/api/admin/indication-hints", headers=admin).json() == hints(user)
+
+    # пустой список — это тоже выбор администратора, стандартные подсказки не возвращаются
+    client.put("/api/admin/indication-hints", headers=admin, json={"hints": []})
+    assert hints(user) == []
+
+    too_long = client.put("/api/admin/indication-hints", headers=admin, json={"hints": ["я" * 61]})
+    assert too_long.status_code == 422
+    too_many = client.put("/api/admin/indication-hints", headers=admin, json={"hints": [f"h{i}" for i in range(51)]})
+    assert too_many.status_code == 422
+
+
 def test_admin_manages_users(client):
     admin, me = register(client)
     _, masha = register(client, "masha@example.com", "Маша")
