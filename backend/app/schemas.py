@@ -1,8 +1,28 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+from .security import MAX_PASSWORD_BYTES
 
 MAX_CATEGORIES = 3  # сколько категорий можно поставить одному лекарству
+TEXT_MAX = 5000     # длинные текстовые поля: показания, заметки
+
+
+def _password_bytes(value: str) -> str:
+    if len(value.encode()) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            f"Пароль слишком длинный: не больше {MAX_PASSWORD_BYTES} байт "
+            "(примерно 36 русских или 72 латинских символа)"
+        )
+    return value
+
+
+# Новый пароль: от 8 символов и не длиннее, чем умеет bcrypt.
+NewPassword = Annotated[str, Field(min_length=8, max_length=128), AfterValidator(_password_bytes)]
+# Старые пароли бывали и по 6 символов, поэтому при входе длину снизу не проверяем.
+AnyPassword = Annotated[str, Field(min_length=1, max_length=128)]
 
 
 class ORM(BaseModel):
@@ -13,8 +33,8 @@ class ORM(BaseModel):
 class RegisterIn(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1, max_length=100)
-    password: str = Field(min_length=6, max_length=128)
-    invite_code: str | None = None
+    password: NewPassword
+    invite_code: str | None = Field(default=None, max_length=32)
     consent: bool = False  # галочка «даю согласие на обработку персональных данных»
 
 
@@ -23,12 +43,12 @@ class ConsentIn(BaseModel):
 
 
 class DeleteAccountIn(BaseModel):
-    password: str
+    password: AnyPassword
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    password: AnyPassword
 
 
 class UserOut(ORM):
@@ -47,6 +67,8 @@ class MeOut(UserOut):
     is_admin: bool = False
     consent_needed: bool = False  # согласия нет или оно старой редакции — показать экран согласия
     families: list[FamilyBrief]
+    # Только после смены своего пароля: старый токен уже не действует, вот новый.
+    access_token: str | None = None
 
 
 class TokenOut(BaseModel):
@@ -57,7 +79,9 @@ class TokenOut(BaseModel):
 
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
-    password: str | None = Field(default=None, min_length=6, max_length=128)
+    password: NewPassword | None = None
+    # Чтобы сменить пароль, нужен текущий: иначе украденный токен позволил бы захватить аккаунт навсегда.
+    current_password: AnyPassword | None = None
 
 
 class FamilyIn(BaseModel):
@@ -89,7 +113,7 @@ class RoleIn(BaseModel):
 
 
 class JoinIn(BaseModel):
-    code: str
+    code: str = Field(min_length=1, max_length=32)
 
 
 class InviteInfo(BaseModel):
@@ -105,7 +129,7 @@ class CategoryIn(BaseModel):
 
 
 class CategoryOrderIn(BaseModel):
-    ids: list[int]
+    ids: list[int] = Field(max_length=1000)
 
 
 class IndicationHintsIn(BaseModel):
@@ -154,7 +178,7 @@ class AdminUserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     email: EmailStr | None = None
     is_admin: bool | None = None
-    password: str | None = Field(default=None, min_length=6, max_length=128)
+    password: NewPassword | None = None
 
 
 class AdminFamilyOut(BaseModel):
@@ -173,20 +197,20 @@ class AdminMemberIn(BaseModel):
 
 # --- лекарства и упаковки ---
 class PackageIn(BaseModel):
-    quantity: float = Field(default=1, ge=0)
+    quantity: float = Field(default=1, ge=0, le=1_000_000)
     expiry_date: date | None = None
     opened_at: date | None = None
-    serial: str | None = None
-    batch: str | None = None
-    location: str | None = None
+    serial: str | None = Field(default=None, max_length=64)
+    batch: str | None = Field(default=None, max_length=64)
+    location: str | None = Field(default=None, max_length=100)
 
 
 class PackageUpdate(BaseModel):
-    quantity: float | None = Field(default=None, ge=0)
+    quantity: float | None = Field(default=None, ge=0, le=1_000_000)
     expiry_date: date | None = None
     opened_at: date | None = None
-    location: str | None = None
-    batch: str | None = None
+    location: str | None = Field(default=None, max_length=100)
+    batch: str | None = Field(default=None, max_length=64)
 
 
 class PackageOut(ORM):
@@ -212,21 +236,22 @@ def _legacy_category_id(data):
 class MedicineBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     category_ids: list[int] = Field(default_factory=list, max_length=MAX_CATEGORIES)  # первая — основная
-    form: str | None = None
-    dosage: str | None = None
-    active_ingredient: str | None = None
-    manufacturer: str | None = None
-    indications: str = ""
-    contraindications: str = ""
-    notes: str = ""
-    unit: str = "шт"
-    min_quantity: float | None = Field(default=None, ge=0)
+    # Длины как у столбцов в базе: Postgres на более длинной строке падает с ошибкой 500.
+    form: str | None = Field(default=None, max_length=60)
+    dosage: str | None = Field(default=None, max_length=60)
+    active_ingredient: str | None = Field(default=None, max_length=200)
+    manufacturer: str | None = Field(default=None, max_length=200)
+    indications: str = Field(default="", max_length=TEXT_MAX)
+    contraindications: str = Field(default="", max_length=TEXT_MAX)
+    notes: str = Field(default="", max_length=TEXT_MAX)
+    unit: str = Field(default="шт", min_length=1, max_length=20)
+    min_quantity: float | None = Field(default=None, ge=0, le=1_000_000)
     blister_size: int | None = Field(default=None, ge=1, le=1000)
-    gtin: str | None = None
+    gtin: str | None = Field(default=None, max_length=512)
 
 
 class MedicineIn(MedicineBase):
-    packages: list[PackageIn] = []
+    packages: list[PackageIn] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="before")
     @classmethod
@@ -237,17 +262,17 @@ class MedicineIn(MedicineBase):
 class MedicineUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     category_ids: list[int] | None = Field(default=None, max_length=MAX_CATEGORIES)
-    form: str | None = None
-    dosage: str | None = None
-    active_ingredient: str | None = None
-    manufacturer: str | None = None
-    indications: str | None = None
-    contraindications: str | None = None
-    notes: str | None = None
-    unit: str | None = None
-    min_quantity: float | None = None
-    blister_size: int | None = None
-    gtin: str | None = None
+    form: str | None = Field(default=None, max_length=60)
+    dosage: str | None = Field(default=None, max_length=60)
+    active_ingredient: str | None = Field(default=None, max_length=200)
+    manufacturer: str | None = Field(default=None, max_length=200)
+    indications: str | None = Field(default=None, max_length=TEXT_MAX)
+    contraindications: str | None = Field(default=None, max_length=TEXT_MAX)
+    notes: str | None = Field(default=None, max_length=TEXT_MAX)
+    unit: str | None = Field(default=None, min_length=1, max_length=20)
+    min_quantity: float | None = Field(default=None, ge=0, le=1_000_000)
+    blister_size: int | None = Field(default=None, ge=1, le=1000)
+    gtin: str | None = Field(default=None, max_length=512)
 
     @model_validator(mode="before")
     @classmethod
@@ -258,7 +283,7 @@ class MedicineUpdate(BaseModel):
 class MarkIn(BaseModel):
     is_favorite: bool | None = None
     helps_me: bool | None = None
-    personal_note: str | None = None
+    personal_note: str | None = Field(default=None, max_length=TEXT_MAX)
 
 
 class StockOut(BaseModel):
@@ -289,7 +314,7 @@ class MedicineDetail(MedicineOut):
 
 
 class ConsumeIn(BaseModel):
-    amount: float = Field(default=1, gt=0)
+    amount: float = Field(default=1, gt=0, le=1_000_000)
 
 
 class SuggestionOut(BaseModel):

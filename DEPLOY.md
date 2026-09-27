@@ -50,6 +50,8 @@ ENV
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
+Полный список мер по защите сервера (SSH без паролей, fail2ban, резервные копии) — в [SECURITY.md](SECURITY.md).
+
 Через минуту откройте `https://cureme.example.ru`: Caddy сам получит сертификат Let's Encrypt.
 
 ## 3. Проверить поиск по штрихкоду с сервера

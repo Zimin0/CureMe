@@ -155,9 +155,12 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   if (!res.ok) {
     if (res.status === 401 && token) onUnauthorized()
     const detail = data?.detail
+    // Наши собственные проверки (например, «Пароль слишком длинный») приходят как «Value error, …»
+    const own = Array.isArray(detail) && typeof detail[0]?.msg === 'string' && detail[0].msg.startsWith('Value error, ')
+      ? detail[0].msg.slice('Value error, '.length) : null
     const msg = typeof detail === 'string'
       ? detail
-      : Array.isArray(detail) ? 'Проверьте заполнение полей' : `Ошибка ${res.status}`
+      : own ?? (Array.isArray(detail) ? 'Проверьте заполнение полей' : `Ошибка ${res.status}`)
     throw new ApiError(res.status, msg)
   }
   return data as T
