@@ -7,11 +7,12 @@ from ..db import get_db
 from ..deps import admin_user
 from ..models import Category, Family, Medicine, MedicineCategory, Membership, User
 from ..schemas import (
+    AccessSettings,
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
     CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..security import hash_password
-from ..services import indication_hints, set_indication_hints
+from ..services import access_settings, indication_hints, set_access_settings, set_indication_hints
 from .files import _drop_photo
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_user)])
@@ -255,3 +256,15 @@ def get_hints(db: Session = Depends(get_db)):
 @router.put("/indication-hints", response_model=list[str])
 def put_hints(body: IndicationHintsIn, db: Session = Depends(get_db)):
     return set_indication_hints(db, body.hints)
+
+
+# --- закрытый режим ---
+@router.get("/access", response_model=AccessSettings)
+def get_access(db: Session = Depends(get_db)):
+    return access_settings(db)
+
+
+@router.put("/access", response_model=AccessSettings)
+def put_access(body: AccessSettings, db: Session = Depends(get_db)):
+    known = set(db.scalars(select(User.id).where(User.id.in_(body.user_ids))))
+    return set_access_settings(db, body.closed, [i for i in body.user_ids if i in known])

@@ -46,7 +46,17 @@ class FamilyBrief(BaseModel):
 class MeOut(UserOut):
     is_admin: bool = False
     consent_needed: bool = False  # согласия нет или оно старой редакции — показать экран согласия
+    access_blocked: bool = False  # закрытый режим, а этого аккаунта нет в списке тестировщиков
     families: list[FamilyBrief]
+
+
+class AccessOut(BaseModel):
+    closed: bool
+
+
+class AccessSettings(BaseModel):
+    closed: bool
+    user_ids: list[int] = Field(default_factory=list, max_length=1000)
 
 
 class TokenOut(BaseModel):

@@ -7,13 +7,16 @@ from .config import get_settings
 from .db import get_db
 from .models import Family, Membership, User
 from .security import decode_token
+from .services import has_access
 
 bearer = HTTPBearer(auto_error=False)
 
 
-def current_user(
+def signed_in_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)
 ) -> User:
+    """Любой вошедший, даже без доступа в закрытом режиме: ему можно посмотреть профиль,
+    дать согласие и удалить аккаунт (права по 152-ФЗ не зависят от закрытого режима)."""
     user_id = decode_token(creds.credentials) if creds else None
     user = db.get(User, user_id) if user_id else None
     if not user:
@@ -21,6 +24,13 @@ def current_user(
     if not user.is_admin and user.email.lower() in {e.lower() for e in get_settings().admin_emails}:
         user.is_admin = True
         db.commit()
+    return user
+
+
+def current_user(user: User = Depends(signed_in_user), db: Session = Depends(get_db)) -> User:
+    """Вошедший, которому открыт сайт. Остальные получают 403 с кодом closed."""
+    if not has_access(db, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Сайт в разработке: доступ пока только у участников теста")
     return user
 
 
