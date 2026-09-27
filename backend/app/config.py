@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Первый зарегистрированный аккаунт становится администратором и без этого.
     admin_emails: list[str] = []
     cors_origins: list[str] = ["http://localhost:5173"]
+    # Ограничение частоты входа, регистрации и проверки кодов приглашений (см. ratelimit.py).
+    rate_limit: bool = True
+    # Интерактивная документация API (/docs, /openapi.json). На сервере выключена.
+    api_docs: bool = True
 
 
 @lru_cache

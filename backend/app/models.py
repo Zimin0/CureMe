@@ -22,6 +22,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     # Администратор управляет всеми аккаунтами, семьями и общим списком категорий.
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Растёт при смене пароля: все выданные раньше токены (входы на других устройствах) перестают действовать.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Когда и какую редакцию согласия на обработку персональных данных человек принял (152-ФЗ).
     consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consent_version: Mapped[str | None] = mapped_column(String(20))

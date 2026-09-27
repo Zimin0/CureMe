@@ -26,7 +26,8 @@ def test_unicode_password():
 
 
 def test_token_roundtrip():
-    assert decode_token(create_token(42)) == 42
+    assert decode_token(create_token(42)) == (42, 0)
+    assert decode_token(create_token(42, token_version=3)) == (42, 3)
 
 
 def test_token_expires_after_ttl():
@@ -48,6 +49,8 @@ def _forge(payload: dict, key: str | None = None, alg: str = ALGORITHM) -> str:
     _forge({"exp": datetime.now(timezone.utc) + timedelta(days=1)}),                           # нет sub
     _forge({"sub": "abc", "exp": datetime.now(timezone.utc) + timedelta(days=1)}),             # sub не число
     _forge({"sub": "1"}, alg="HS512"),                                                          # другой алгоритм
+    _forge({"sub": "1"}),                                                                       # без срока — вечный токен
+    _forge({"sub": "1", "tv": "x", "exp": datetime.now(timezone.utc) + timedelta(days=1)}),    # версия не число
 ])
 def test_invalid_tokens_are_rejected(token):
     assert decode_token(token) is None

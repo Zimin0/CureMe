@@ -42,6 +42,7 @@ describe('api()', () => {
   it.each([
     [{ detail: 'Аккаунт с такой почтой уже есть' }, 409, 'Аккаунт с такой почтой уже есть'],
     [{ detail: [{ loc: ['body', 'name'], msg: 'too short' }] }, 422, 'Проверьте заполнение полей'],
+    [{ detail: [{ loc: ['body', 'password'], msg: 'Value error, Пароль слишком длинный' }] }, 422, 'Пароль слишком длинный'],
     [null, 500, 'Ошибка 500'],
   ])('ошибка сервера → ApiError с понятным текстом (%j)', async (body, status, message) => {
     server.use(http.get('/api/fail', () => (body ? HttpResponse.json(body, { status }) : new HttpResponse('boom', { status }))))
