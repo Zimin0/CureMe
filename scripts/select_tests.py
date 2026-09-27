@@ -42,7 +42,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/auth.py", "security.py", "legal.py", "ratelimit.py"],
         "tests": [
             "unit/test_security.py", "integration/test_auth.py", "integration/test_security_hardening.py",
-            "integration/test_access_control.py",
+            "integration/test_closed_mode.py", "integration/test_access_control.py",
         ],
     },
     "Семьи и приглашения": {
@@ -80,7 +80,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "Администрирование": {
         "sources": ["routers/admin.py"],
-        "tests": ["integration/test_admin.py", "integration/test_access_control.py"],
+        "tests": ["integration/test_admin.py", "integration/test_closed_mode.py", "integration/test_access_control.py"],
     },
     "Схема базы, миграции, перенос из SQLite": {
         "sources": ["models.py", "db.py", "sqlite_import.py"],
