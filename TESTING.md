@@ -65,7 +65,7 @@ PYTHON=../backend/.venv/bin/python npm run test:e2e   # если зависим�
 
 | Раздел | Модули | Тесты |
 |---|---|---|
-| Аккаунты и вход | `routers/auth.py`, `security.py`, `legal.py` | `test_security`, `test_auth`, `test_access_control` |
+| Аккаунты и вход | `routers/auth.py`, `security.py`, `legal.py`, `ratelimit.py` | `test_security`, `test_auth`, `test_security_hardening`, `test_access_control` |
 | Семьи и приглашения | `routers/families.py` | `test_families`, `test_api`, `test_access_control` |
 | Лекарства, упаковки, остатки | `routers/medicines.py`, `services.py` | `test_services`, `test_medicines`, `test_api`, `test_categories`, `test_access_control` |
 | Категории | `routers/categories.py` | `test_categories`, `test_access_control` |

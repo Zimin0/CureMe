@@ -39,8 +39,11 @@ TESTS = "backend/tests"
 # Разделы бэкенда: «свои» модули (пути от backend/app) → тесты (пути от backend/tests).
 SECTIONS: dict[str, dict[str, list[str]]] = {
     "Аккаунты и вход": {
-        "sources": ["routers/auth.py", "security.py", "legal.py"],
-        "tests": ["unit/test_security.py", "integration/test_auth.py", "integration/test_access_control.py"],
+        "sources": ["routers/auth.py", "security.py", "legal.py", "ratelimit.py"],
+        "tests": [
+            "unit/test_security.py", "integration/test_auth.py", "integration/test_security_hardening.py",
+            "integration/test_access_control.py",
+        ],
     },
     "Семьи и приглашения": {
         "sources": ["routers/families.py"],
