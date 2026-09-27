@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 os.environ["CUREME_REMOTE_LOOKUP"] = "false"
+os.environ["CUREME_RATE_LIMIT"] = "false"  # сотни регистраций с одного адреса; лимиты проверяет test_security_hardening.py
 os.environ["CUREME_FRONTEND_DIST"] = "/nonexistent"
 os.environ["CUREME_MEDIA_DIR"] = tempfile.mkdtemp()
 

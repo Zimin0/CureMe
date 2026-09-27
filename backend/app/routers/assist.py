@@ -9,6 +9,7 @@ from ..db import get_db
 from ..deps import current_user, get_family
 from ..lookup import find_product
 from ..models import Family, ProductCode, User
+from ..ratelimit import limiter
 from ..schemas import OverviewOut, ProductInfo, ScanIn, ScanOut, SuggestionOut, SuggestOut
 from ..search import best_match, expand_query
 from ..seed import COMMON_CONDITIONS
@@ -103,6 +104,8 @@ def suggest(
 
 @router.post("/families/{family_id}/scan", response_model=ScanOut)
 def scan(body: ScanIn, fam: Family = Depends(get_family), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    # Незнакомый код ищется в интернете: не даём превратить сервер в робота, долбящего поисковики.
+    limiter.hit(f"lookup:{user.id}", limit=60, window=60)
     parsed = parse_code(body.raw)
     if not parsed.gtin:
         raise HTTPException(422, "Не получилось распознать код товара. Попробуйте штрихкод или DataMatrix.")
@@ -125,8 +128,9 @@ def scan(body: ScanIn, fam: Family = Depends(get_family), user: User = Depends(c
 
 
 @router.get("/products/{code}", response_model=ProductInfo)
-def product(code: str, refresh: bool = False, _: User = Depends(current_user), db: Session = Depends(get_db)):
+def product(code: str, refresh: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Поиск товара по штрихкоду (кнопка «Найти по коду» в форме)."""
+    limiter.hit(f"lookup:{user.id}", limit=60, window=60)
     parsed = parse_code(code)
     if not parsed.gtin:
         raise HTTPException(422, "Это не похоже на штрихкод")

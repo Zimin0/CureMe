@@ -76,7 +76,7 @@ def test_me_requires_valid_token(client, headers):
 
 def test_update_profile_and_password(client):
     h, _ = register(client)
-    r = client.patch("/api/auth/me", headers=h, json={"name": "  Никита З.  ", "password": "newpass1"})
+    r = client.patch("/api/auth/me", headers=h, json={"name": "  Никита З.  ", "password": "newpass1", "current_password": "secret123"})
     assert r.status_code == 200 and r.json()["name"] == "Никита З."
     assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "secret123"}).status_code == 401
     assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "newpass1"}).status_code == 200

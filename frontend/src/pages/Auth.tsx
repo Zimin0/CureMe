@@ -81,8 +81,8 @@ export function Register() {
           <input className="input" type="email" required autoComplete="email" value={form.email} onChange={set('email')} />
         </label>
         <label className="field"><span>Пароль</span>
-          <input className="input" type="password" required minLength={6} autoComplete="new-password" value={form.password} onChange={set('password')} />
-          <span className="hint">Не короче 6 символов</span>
+          <input className="input" type="password" required minLength={8} autoComplete="new-password" value={form.password} onChange={set('password')} />
+          <span className="hint">Не короче 8 символов</span>
         </label>
         <label className="field"><span>Код приглашения в семью</span>
           <input className="input" value={form.invite_code} onChange={set('invite_code')} placeholder="Необязательно" style={{ textTransform: 'uppercase' }} />

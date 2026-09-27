@@ -21,6 +21,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     # Администратор управляет всеми аккаунтами, семьями и общим списком категорий.
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Растёт при смене пароля: все выданные раньше токены (входы на других устройствах) перестают действовать.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
