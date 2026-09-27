@@ -4,6 +4,15 @@ import { parseExpiry, toISO } from '../expiry'
 import { fmtDate } from '../format'
 import { recognizeText } from '../ocr'
 
+const isoToDots = (iso: string) => iso.split('-').reverse().join('.')
+
+/** Что человек набрал в поле срока. Восемь цифр подряд без точек — ДДММГГГГ (на iPhone в цифровой клавиатуре точки нет). */
+function parseTyped(t: string) {
+  const s = t.trim()
+  const eight = /^(\d{2})(\d{2})(\d{4})$/.exec(s)
+  return parseExpiry(eight ? `${eight[1]}.${eight[2]}.${eight[3]}` : s)
+}
+
 /**
  * Поле «Годен до» с двумя подсказками: сфотографировать срок на упаковке
  * или вписать его как написано («05.2027», «EXP 05/27», «май 2027»).
@@ -30,6 +39,17 @@ export function ExpiryInput({ value, onChange, hint }: { value: string | null; o
     return d
   }
 
+  // Главное поле — обычный текст с цифровой клавиатурой. Раньше был <input type="date">,
+  // а он на части телефонов (и в установленном приложении) не открывает ни клавиатуру, ни календарь.
+  const [typed, setTyped] = useState<string | null>(null)
+  const onTyped = (t: string) => {
+    setTyped(t)
+    if (!t.trim()) { onChange(null); setNote(null); return }
+    const d = parseTyped(t)
+    if (d) { onChange(toISO(d)); setNote(null) }
+    else setNote(t.replace(/\D/g, '').length >= 4 ? { kind: 'warn', text: 'Не понял дату. Например: 05.2027, 31.05.2027 или 092027.' } : null)
+  }
+
   const onPhoto = async (file?: File) => {
     if (!file) return
     setMode('photo')
@@ -52,7 +72,9 @@ export function ExpiryInput({ value, onChange, hint }: { value: string | null; o
   return (
     <div className="field">
       <span>Годен до</span>
-      <input className="input" type="date" value={value ?? ''} onChange={e => { onChange(e.target.value || null); setNote(null) }} />
+      <input className="input" type="text" inputMode="decimal" autoComplete="off" aria-label="Годен до" placeholder="ММ.ГГГГ или ДД.ММ.ГГГГ"
+        value={typed ?? (value ? isoToDots(value) : '')}
+        onChange={e => onTyped(e.target.value)} onBlur={() => { if (typed !== null && (!typed.trim() || parseTyped(typed))) setTyped(null) }} />
       <div className="row wrap" style={{ gap: 8 }}>
         <button type="button" className="chip" onClick={() => fileRef.current?.click()} disabled={progress !== null}>
           <Camera size={15} />Сфотографировать срок

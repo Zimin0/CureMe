@@ -176,7 +176,7 @@ export function MedicineDetail() {
           <section className="card stack">
             <h2>От чего помогает</h2>
             {tags.length ? <div className="tag-cloud">{tags.map(t => <Link key={t} to={`/find?q=${encodeURIComponent(t)}`} className="chip">{t}</Link>)}</div>
-              : <p className="muted">Не указано. <Link to={`/medicines/${m.id}/edit`} style={{ color: 'var(--primary)' }}>Добавить</Link>, чтобы работал подбор.</p>}
+              : <p className="muted">Не указано. <Link to={`/medicines/${m.id}/edit?focus=indications`} style={{ color: 'var(--primary)' }}>Добавить</Link>, чтобы работал подбор.</p>}
             {m.contraindications && <div className="alert warn"><span><b>Внимание:</b> {m.contraindications}</span></div>}
           </section>
           <section className="card">

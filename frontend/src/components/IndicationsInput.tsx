@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import { api } from '../api'
 
 /** Быстрые подсказки к полю «От чего помогает». Список общий, его задаёт администратор. */
@@ -7,7 +8,14 @@ export function useIndicationHints() {
 }
 
 /** «От чего помогает»: текст через запятую плюс чипы с частыми болезнями. По этим словам работает подбор. */
-export function IndicationsInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label?: string }) {
+export function IndicationsInput({ value, onChange, label, autoFocus }: { value: string; onChange: (v: string) => void; label?: string; autoFocus?: boolean }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  // Пришли по кнопке «Добавить» из карточки: сразу ставим курсор в поле, чтобы открылась клавиатура.
+  useEffect(() => {
+    if (!autoFocus || !ref.current) return
+    ref.current.scrollIntoView?.({ block: 'center' })
+    ref.current.focus({ preventScroll: true })
+  }, [autoFocus])
   const hints = useIndicationHints().data ?? []
   const add = (t: string) => {
     const cur = value.split(',').map(s => s.trim()).filter(Boolean)
@@ -17,7 +25,7 @@ export function IndicationsInput({ value, onChange, label }: { value: string; on
     <>
       <label className="field">
         {label && <span>{label}</span>}
-        <textarea aria-label="От чего помогает" placeholder="Через запятую: головная боль, температура, зубная боль" value={value} onChange={e => onChange(e.target.value)} />
+        <textarea ref={ref} aria-label="От чего помогает" placeholder="Через запятую: головная боль, температура, зубная боль" value={value} onChange={e => onChange(e.target.value)} />
         <span className="hint">По этим словам работает подбор лекарства под болезнь</span>
       </label>
       {hints.length > 0 && (
