@@ -131,7 +131,7 @@ export function MedicineForm() {
               <input className="input" placeholder="200 мг" {...text('dosage')} />
             </label>
             <label className="field"><span>Действующее вещество</span>
-              <input className="input" placeholder="Ибупрофен" {...text('active_ingredient')} />
+              <input className="input" {...text('active_ingredient')} />
             </label>
             <label className="field"><span>Производитель</span>
               <input className="input" {...text('manufacturer')} />
