@@ -2,7 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
-import { ConsentGate, Join, Login, Register } from './pages/Auth'
+import { ClosedGate, ConsentGate, Join, Login, Register } from './pages/Auth'
 import { Consent, Privacy, Terms } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
@@ -20,6 +20,7 @@ function Protected() {
   const loc = useLocation()
   if (loading) return <PageLoader />
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
+  if (me.access_blocked) return <ClosedGate />
   if (me.consent_needed) return <ConsentGate />
   if (!familyId) return <NoFamily />
   return <Layout />

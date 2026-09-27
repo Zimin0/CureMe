@@ -106,3 +106,24 @@ describe('админка', () => {
     expect(await screen.findByText('Подсказки сохранены')).toBeInTheDocument()
   })
 })
+
+describe('админка: закрытый режим', () => {
+  it('включает режим и открывает доступ отмеченному человеку', async () => {
+    let body: unknown
+    server.use(
+      stats,
+      http.get('/api/admin/users', () => HttpResponse.json([
+        { id: 1, email: 'nikita@example.com', name: 'Никита', is_admin: true, created_at: '2026-09-26T10:00:00Z', families: [] },
+        { id: 2, email: 'mom@example.com', name: 'Мама', is_admin: false, created_at: '2026-09-26T11:00:00Z', families: [] },
+      ])),
+      http.get('/api/admin/access', () => HttpResponse.json({ closed: false, user_ids: [] })),
+      http.put('/api/admin/access', async ({ request }) => { const b = await request.json() as { closed: boolean; user_ids: number[] }; body = b; return HttpResponse.json(b) }),
+    )
+    const { user } = renderApp('/admin?tab=access', { me: ADMIN })
+    await user.click(await screen.findByRole('checkbox', { name: /Сайт в разработке/ }))
+    expect(screen.getByRole('checkbox', { name: 'Доступ: Никита' })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: 'Доступ: Мама' }))
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await waitFor(() => expect(body).toEqual({ closed: true, user_ids: [2] }))
+  })
+})

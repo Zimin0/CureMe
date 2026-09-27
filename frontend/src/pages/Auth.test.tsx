@@ -152,3 +152,30 @@ describe('согласие на обработку данных', () => {
     expect(body).toEqual({ password: 'secret123' })
   })
 })
+
+describe('закрытый режим', () => {
+  const closed = http.get('/api/auth/access', () => HttpResponse.json({ closed: true }))
+
+  it('гость видит «Сайт в разработке» с почтой, но может войти', async () => {
+    server.use(closed)
+    renderApp('/login', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: 'Сайт в разработке' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /@/ })).toHaveAttribute('href', expect.stringMatching(/^mailto:/))
+    expect(screen.getByRole('button', { name: 'Войти' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Зарегистрироваться' })).not.toBeInTheDocument()
+  })
+
+  it('регистрация закрыта', async () => {
+    server.use(closed)
+    renderApp('/register', { loggedIn: false })
+    expect(await screen.findByText('Регистрация пока закрыта')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Создать аккаунт' })).not.toBeInTheDocument()
+  })
+
+  it('вошедший без доступа может только удалить аккаунт или выйти', async () => {
+    renderApp('/', { me: { ...ME, access_blocked: true } })
+    expect(await screen.findByRole('heading', { name: 'Сайт в разработке' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Удалить аккаунт' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Выйти' })).toBeInTheDocument()
+  })
+})

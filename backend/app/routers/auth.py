@@ -3,13 +3,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import current_user
+from ..deps import signed_in_user
 from ..legal import CONSENT_VERSION
 from ..models import Family, Membership, User, utcnow
 from ..ratelimit import client_ip, limiter
-from ..schemas import ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
+from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
 from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
 from ..seed import ensure_default_categories
+from ..services import access_settings, has_access
 from .admin import _leave
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -23,11 +24,12 @@ def create_family(db: Session, name: str, owner: User) -> Family:
     return fam
 
 
-def me_out(user: User) -> MeOut:
+def me_out(user: User, db: Session) -> MeOut:
     fams = sorted(user.memberships, key=lambda m: m.joined_at)
     return MeOut(
         id=user.id, email=user.email, name=user.name, is_admin=user.is_admin,
         consent_needed=user.consent_version != CONSENT_VERSION,
+        access_blocked=not has_access(db, user),
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
     )
 
@@ -37,6 +39,8 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
     # Без согласия (152-ФЗ, ст. 9 и 10) хранить почту и сведения об аптечке нельзя.
     if not body.consent:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужно согласие на обработку персональных данных")
+    if access_settings(db)["closed"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Сайт в разработке, регистрация пока закрыта")
     limiter.hit(f"register:{client_ip(request)}", limit=10, window=3600)
     email = body.email.lower()
     if db.scalar(select(User).where(func.lower(User.email) == email)):
@@ -57,7 +61,7 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
         create_family(db, f"Семья {user.name}", user)
     db.commit()
     db.refresh(user)
-    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user))
+    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
 
 
 @router.post("/login", response_model=TokenOut)
@@ -71,16 +75,16 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         burn_password_check(body.password)
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверная почта или пароль")
-    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user))
+    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
 
 
 @router.get("/me", response_model=MeOut)
-def me(user: User = Depends(current_user)):
-    return me_out(user)
+def me(user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
+    return me_out(user, db)
 
 
 @router.patch("/me", response_model=MeOut)
-def update_me(body: UserUpdate, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def update_me(body: UserUpdate, user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
     if body.name:
         user.name = body.name.strip()
     token = None
@@ -91,21 +95,21 @@ def update_me(body: UserUpdate, user: User = Depends(current_user), db: Session 
         user.token_version += 1  # выходим на всех остальных устройствах
         token = create_token(user.id, user.token_version)
     db.commit()
-    return me_out(user).model_copy(update={"access_token": token})
+    return me_out(user, db).model_copy(update={"access_token": token})
 
 
 @router.post("/consent", response_model=MeOut)
-def give_consent(body: ConsentIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def give_consent(body: ConsentIn, user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
     """Согласие для тех, кто зарегистрировался раньше, или после смены его текста."""
     if not body.consent:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужно согласие на обработку персональных данных")
     user.consent_at, user.consent_version = utcnow(), CONSENT_VERSION
     db.commit()
-    return me_out(user)
+    return me_out(user, db)
 
 
 @router.delete("/me", status_code=204)
-def delete_me(body: DeleteAccountIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def delete_me(body: DeleteAccountIn, user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
     """Удаление аккаунта — это и отзыв согласия (152-ФЗ, ст. 9 и 21): данные стираются сразу.
 
     Из каждой семьи человек выходит как при «Покинуть семью»: семья без участников удаляется
@@ -122,3 +126,9 @@ def delete_me(body: DeleteAccountIn, user: User = Depends(current_user), db: Ses
     db.delete(user)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get("/access", response_model=AccessOut)
+def access(db: Session = Depends(get_db)):
+    """Открыт ли сайт для всех. Нужен страницам входа и регистрации до того, как человек вошёл."""
+    return AccessOut(closed=access_settings(db)["closed"])

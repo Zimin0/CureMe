@@ -13,6 +13,7 @@ const TABS = [
   { id: 'families', label: 'Семьи' },
   { id: 'categories', label: 'Категории' },
   { id: 'hints', label: 'Подсказки' },
+  { id: 'access', label: 'Доступ' },
 ] as const
 type Tab = typeof TABS[number]['id']
 
@@ -61,6 +62,7 @@ export function Admin() {
       {tab === 'families' && <FamiliesTab />}
       {tab === 'categories' && <CategoriesTab />}
       {tab === 'hints' && <HintsTab />}
+      {tab === 'access' && <AccessTab />}
     </div>
   )
 }
@@ -370,6 +372,66 @@ function HintsTab() {
       <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
         {dirty && <button className="btn ghost" onClick={() => setList(hints.data!)}>Отменить</button>}
         <button className="btn primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(list)}>
+          {save.isPending ? 'Сохраняем…' : 'Сохранить'}
+        </button>
+      </div>
+    </>
+  )
+}
+
+// ---------- закрытый режим ----------
+type Access = { closed: boolean; user_ids: number[] }
+
+/** Сайт «в разработке»: пользоваться могут только администраторы и отмеченные здесь аккаунты. */
+function AccessTab() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const access = useQuery({ queryKey: ['admin', 'access'], queryFn: () => api<Access>('/admin/access') })
+  const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminUser[]>('/admin/users') })
+  const [draft, setDraft] = useState<Access | null>(null)
+  useEffect(() => { if (access.data && draft === null) setDraft(access.data) }, [access.data, draft])
+
+  const save = useMutation({
+    mutationFn: (a: Access) => api<Access>('/admin/access', { method: 'PUT', body: a }),
+    onSuccess: a => {
+      setDraft(a)
+      qc.setQueryData(['admin', 'access'], a)
+      qc.setQueryData(['access'], { closed: a.closed })
+      toast(a.closed ? 'Сайт закрыт для остальных' : 'Сайт открыт для всех')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+
+  if (access.isLoading || users.isLoading || draft === null) return <PageLoader />
+  const dirty = JSON.stringify(draft) !== JSON.stringify(access.data)
+  const toggle = (id: number, on: boolean) =>
+    setDraft({ ...draft, user_ids: on ? [...draft.user_ids, id] : draft.user_ids.filter(x => x !== id) })
+
+  return (
+    <>
+      <label className="check card" style={{ padding: 16 }}>
+        <input type="checkbox" checked={draft.closed} onChange={e => setDraft({ ...draft, closed: e.target.checked })} />
+        <span>
+          <b>Сайт в разработке</b><br />
+          <span className="muted small">Регистрация закрывается, остальные видят страницу «Сайт в разработке» с вашей почтой. Войти, удалить аккаунт и прочитать документы они по-прежнему могут.</span>
+        </span>
+      </label>
+      <p className="muted small">Кому открыт сайт в этом режиме. Администраторы проходят всегда.</p>
+      <section className="card flush">
+        {(users.data ?? []).map(u => (
+          <label key={u.id} className="list-row check" style={{ padding: '12px 16px' }}>
+            <input type="checkbox" disabled={u.is_admin} checked={u.is_admin || draft.user_ids.includes(u.id)}
+              onChange={e => toggle(u.id, e.target.checked)} aria-label={`Доступ: ${u.name}`} />
+            <span className="grow">
+              <span style={{ fontWeight: 700 }}>{u.name}</span>{u.is_admin && <span className="muted"> (админ)</span>}<br />
+              <span className="small muted">{u.email}</span>
+            </span>
+          </label>
+        ))}
+      </section>
+      <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+        {dirty && <button className="btn ghost" onClick={() => setDraft(access.data!)}>Отменить</button>}
+        <button className="btn primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(draft)}>
           {save.isPending ? 'Сохраняем…' : 'Сохранить'}
         </button>
       </div>

@@ -5,6 +5,7 @@ import { api, Family, Me } from '../api'
 import { useAuth } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, useToast } from '../components/ui'
+import { OPERATOR } from '../legal'
 import { LegalLinks } from './Legal'
 
 type TokenOut = { access_token: string; user: Me }
@@ -25,7 +26,26 @@ function AuthShell({ title, sub, children }: { title: string; sub: string; child
   )
 }
 
+/** Закрыт ли сайт для всех, кроме участников теста (переключается в админке). */
+function useSiteClosed() {
+  const q = useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean }>('/auth/access'), staleTime: 60_000 })
+  return q.data?.closed ?? false
+}
+
+/** Объяснение для закрытого режима: что происходит и куда писать, в том числе чтобы удалить свои данные. */
+function ClosedNote() {
+  return (
+    <div className="alert info">
+      <span>
+        Капсулка пока открыта только для тестирования. Вопросы, предложения и просьбы удалить свои данные
+        присылайте на <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a> ({OPERATOR.name}).
+      </span>
+    </div>
+  )
+}
+
 export function Login() {
+  const closed = useSiteClosed()
   const { signIn } = useAuth()
   const nav = useNavigate()
   const [params] = useSearchParams()
@@ -37,7 +57,9 @@ export function Login() {
   })
   const submit = (e: FormEvent) => { e.preventDefault(); m.mutate() }
   return (
-    <AuthShell title="С возвращением" sub="Лекарства всей семьи в одном месте">
+    <AuthShell title={closed ? 'Сайт в разработке' : 'С возвращением'} sub="Лекарства всей семьи в одном месте">
+      {closed && <ClosedNote />}
+      {closed && <div className="divider">вход для участников теста</div>}
       <form className="stack" onSubmit={submit}>
         <label className="field"><span>Почта</span>
           <input className="input" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} />
@@ -48,13 +70,26 @@ export function Login() {
         {m.error && <div className="alert error">{m.error.message}</div>}
         <button className="btn primary block" disabled={m.isPending}>{m.isPending ? 'Входим…' : 'Войти'}</button>
       </form>
-      <div className="divider">нет аккаунта?</div>
-      <Link className="btn ghost block" to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}>Зарегистрироваться</Link>
+      {!closed && <div className="divider">нет аккаунта?</div>}
+      {!closed && <Link className="btn ghost block" to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}>Зарегистрироваться</Link>}
     </AuthShell>
   )
 }
 
 export function Register() {
+  const closed = useSiteClosed()
+  if (closed) {
+    return (
+      <AuthShell title="Сайт в разработке" sub="Регистрация пока закрыта">
+        <ClosedNote />
+        <Link className="btn ghost block" to="/login">Вход для участников теста</Link>
+      </AuthShell>
+    )
+  }
+  return <RegisterForm />
+}
+
+function RegisterForm() {
   const { signIn } = useAuth()
   const nav = useNavigate()
   const [params] = useSearchParams()
@@ -105,6 +140,7 @@ export function Register() {
 
 /** Ссылка-приглашение /join/:code — работает и для новых, и для уже вошедших. */
 export function Join() {
+  const closed = useSiteClosed()
   const { code = '' } = useParams()
   const { me, refresh, setFamilyId } = useAuth()
   const nav = useNavigate()
@@ -132,7 +168,7 @@ export function Join() {
         </>
       ) : (
         <>
-          <Link className="btn primary block" to={`/register?invite=${code}`}>Создать аккаунт и вступить</Link>
+          {closed ? <ClosedNote /> : <Link className="btn primary block" to={`/register?invite=${code}`}>Создать аккаунт и вступить</Link>}
           <Link className="btn ghost block" to={`/login?next=/join/${code}`}>У меня уже есть аккаунт</Link>
         </>
       )}
@@ -177,6 +213,18 @@ export function ConsentGate() {
         <button className="btn primary block" disabled={m.isPending}>Продолжить</button>
       </form>
       <div className="divider">не согласны?</div>
+      <DeleteAccountButton className="btn ghost block" />
+      <button className="btn ghost block" onClick={signOut}>Выйти</button>
+    </AuthShell>
+  )
+}
+
+/** Вошёл человек, которого нет среди участников теста: аптечка закрыта, но данные можно удалить. */
+export function ClosedGate() {
+  const { signOut } = useAuth()
+  return (
+    <AuthShell title="Сайт в разработке" sub="Ваш аккаунт сохранён, но пока сайт открыт только участникам теста">
+      <ClosedNote />
       <DeleteAccountButton className="btn ghost block" />
       <button className="btn ghost block" onClick={signOut}>Выйти</button>
     </AuthShell>

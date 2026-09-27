@@ -9,6 +9,31 @@ from .schemas import CategoryOut, MedicineDetail, MedicineOut, PackageOut, Stock
 from .seed import DEFAULT_INDICATION_HINTS
 
 INDICATION_HINTS = "indication_hints"
+ACCESS = "access"
+
+
+def access_settings(db: Session) -> dict:
+    """Закрытый режим: {"closed": bool, "user_ids": [...]}. По умолчанию сайт открыт для всех."""
+    row = db.get(AppSetting, ACCESS)
+    value = row.value if row else {}
+    return {"closed": bool(value.get("closed")), "user_ids": [int(i) for i in value.get("user_ids", [])]}
+
+
+def set_access_settings(db: Session, closed: bool, user_ids: list[int]) -> dict:
+    value = {"closed": closed, "user_ids": sorted(set(user_ids))}
+    row = db.get(AppSetting, ACCESS)
+    if row:
+        row.value = value
+    else:
+        db.add(AppSetting(key=ACCESS, value=value))
+    db.commit()
+    return value
+
+
+def has_access(db: Session, user) -> bool:
+    """В закрытом режиме пользоваться сайтом могут только администраторы и отмеченные ими аккаунты."""
+    acc = access_settings(db)
+    return not acc["closed"] or user.is_admin or user.id in acc["user_ids"]
 
 
 def indication_hints(db: Session) -> list[str]:
