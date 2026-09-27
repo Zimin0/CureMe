@@ -54,7 +54,7 @@ export function Home() {
         </p>
         <div className="actions">
           <Link to="/scan" className="btn white"><ScanLine size={18} />Сканировать</Link>
-          <Link to="/find" className="btn"><Stethoscope size={18} />Подобрать</Link>
+          <Link to="/find" className="btn"><Stethoscope size={18} />Что есть от…</Link>
           <Link to="/medicines/new" className="btn"><Plus size={18} />Вручную</Link>
         </div>
       </section>

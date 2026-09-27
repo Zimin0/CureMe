@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user
-from ..models import Family, Membership, User
-from ..schemas import FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
+from ..legal import CONSENT_VERSION
+from ..models import Family, Membership, User, utcnow
+from ..schemas import ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
 from ..security import create_token, hash_password, new_invite_code, verify_password
 from ..seed import ensure_default_categories
+from .admin import _leave
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -24,12 +26,16 @@ def me_out(user: User) -> MeOut:
     fams = sorted(user.memberships, key=lambda m: m.joined_at)
     return MeOut(
         id=user.id, email=user.email, name=user.name, is_admin=user.is_admin,
+        consent_needed=user.consent_version != CONSENT_VERSION,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
     )
 
 
 @router.post("/register", response_model=TokenOut, status_code=201)
 def register(body: RegisterIn, db: Session = Depends(get_db)):
+    # Без согласия (152-ФЗ, ст. 9 и 10) хранить почту и сведения об аптечке нельзя.
+    if not body.consent:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужно согласие на обработку персональных данных")
     email = body.email.lower()
     if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть")
@@ -40,7 +46,8 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден")
 
     first = db.scalar(select(User.id).limit(1)) is None  # первый аккаунт — администратор
-    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password), is_admin=first)
+    user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password), is_admin=first,
+                consent_at=utcnow(), consent_version=CONSENT_VERSION)
     db.add(user)
     if family:
         db.add(Membership(family=family, user=user, role="member"))
@@ -72,3 +79,31 @@ def update_me(body: UserUpdate, user: User = Depends(current_user), db: Session 
         user.password_hash = hash_password(body.password)
     db.commit()
     return me_out(user)
+
+
+@router.post("/consent", response_model=MeOut)
+def give_consent(body: ConsentIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Согласие для тех, кто зарегистрировался раньше, или после смены его текста."""
+    if not body.consent:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужно согласие на обработку персональных данных")
+    user.consent_at, user.consent_version = utcnow(), CONSENT_VERSION
+    db.commit()
+    return me_out(user)
+
+
+@router.delete("/me", status_code=204)
+def delete_me(body: DeleteAccountIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Удаление аккаунта — это и отзыв согласия (152-ФЗ, ст. 9 и 21): данные стираются сразу.
+
+    Из каждой семьи человек выходит как при «Покинуть семью»: семья без участников удаляется
+    вместе с аптечкой и фото, а общие лекарства остальных участников остаются.
+    """
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный пароль")
+    for m in list(user.memberships):
+        _leave(db, m)
+    db.flush()
+    db.expire(user, ["memberships"])
+    db.delete(user)
+    db.commit()
+    return Response(status_code=204)

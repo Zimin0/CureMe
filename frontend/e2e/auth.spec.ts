@@ -10,6 +10,8 @@ test('регистрация, выход и повторный вход', async 
   await page.getByLabel('Как вас зовут').fill('Никита')
   await page.getByLabel('Почта').fill(email)
   await page.getByLabel(/^Пароль/).fill('secret123')
+  await page.getByRole('checkbox', { name: /согласие на обработку/ }).check()
+  await page.getByRole('checkbox', { name: /пользовательское соглашение/ }).check()
   await page.getByRole('button', { name: 'Создать аккаунт' }).click()
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Никита')
@@ -31,12 +33,12 @@ test('регистрация, выход и повторный вход', async 
 
 test('после входа возвращает на страницу, куда шёл', async ({ page, request }) => {
   const email = uniqueEmail()
-  await request.post('/api/auth/register', { data: { email, name: 'Мама', password: 'secret123' } })
+  await request.post('/api/auth/register', { data: { email, name: 'Мама', password: 'secret123', consent: true } })
   await page.goto('/find?q=кашель')
   await expect(page).toHaveURL(/\/login\?next=/)
   await page.getByLabel('Почта').fill(email)
   await page.getByLabel('Пароль').fill('secret123')
   await page.getByRole('button', { name: 'Войти' }).click()
-  await expect(page.getByRole('heading', { name: 'Подобрать лекарство' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Что есть дома от…' })).toBeVisible()
   await expect(page).toHaveURL(/\/find\?q=/)
 })

@@ -83,7 +83,7 @@ def client(session_factory):
 
 
 def register(client, email="nikita@example.com", name="Никита", invite=None, password="secret123"):
-    r = client.post("/api/auth/register", json={"email": email, "name": name, "password": password, "invite_code": invite})
+    r = client.post("/api/auth/register", json={"email": email, "name": name, "password": password, "invite_code": invite, "consent": True})
     assert r.status_code == 201, r.text
     data = r.json()
     return {"Authorization": f"Bearer {data['access_token']}"}, data["user"]

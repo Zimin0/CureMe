@@ -27,12 +27,12 @@ def test_register_validation(client, body):
 
 def test_duplicate_email_is_case_insensitive(client):
     register(client, email="a@example.com")
-    r = client.post("/api/auth/register", json={"email": "A@EXAMPLE.COM", "name": "B", "password": "secret123"})
+    r = client.post("/api/auth/register", json={"email": "A@EXAMPLE.COM", "name": "B", "password": "secret123", "consent": True})
     assert r.status_code == 409
 
 
 def test_register_with_unknown_invite(client):
-    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "secret123", "invite_code": "NOPE1234"})
+    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "secret123", "invite_code": "NOPE1234", "consent": True})
     assert r.status_code == 400
     # аккаунт при этом не создан
     assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "secret123"}).status_code == 401
@@ -92,3 +92,65 @@ def test_health_and_conditions_are_public(client):
     assert client.get("/api/health").json() == {"ok": True}
     conds = client.get("/api/conditions").json()
     assert "Головная боль" in conds and len(conds) == len(set(conds))
+
+
+# --- согласие на обработку персональных данных и удаление аккаунта (152-ФЗ) ---
+def test_register_requires_consent(client):
+    body = {"email": "a@example.com", "name": "A", "password": "secret123"}
+    assert client.post("/api/auth/register", json=body).status_code == 422
+    assert client.post("/api/auth/register", json={**body, "consent": False}).status_code == 422
+    assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "secret123"}).status_code == 401
+
+
+def test_register_stores_consent(client, db):
+    from app.legal import CONSENT_VERSION
+    from app.models import User
+
+    _, u = register(client)
+    assert u["consent_needed"] is False
+    row = db.get(User, u["id"])
+    assert row.consent_version == CONSENT_VERSION and row.consent_at is not None
+
+
+def test_old_account_is_asked_for_consent(client, db):
+    from app.models import User
+
+    h, u = register(client)
+    row = db.get(User, u["id"])
+    row.consent_at, row.consent_version = None, None  # как у тех, кто зарегистрировался до появления согласия
+    db.commit()
+    assert client.get("/api/auth/me", headers=h).json()["consent_needed"] is True
+    assert client.post("/api/auth/consent", json={"consent": False}, headers=h).status_code == 422
+    r = client.post("/api/auth/consent", json={"consent": True}, headers=h)
+    assert r.status_code == 200 and r.json()["consent_needed"] is False
+    assert client.get("/api/auth/me", headers=h).json()["consent_needed"] is False
+
+
+def test_delete_account_needs_password(client):
+    h, _ = register(client)
+    assert client.request("DELETE", "/api/auth/me", json={"password": "wrong-pass"}, headers=h).status_code == 403
+    assert client.get("/api/auth/me", headers=h).status_code == 200
+
+
+def test_delete_account_removes_user_and_own_family(client):
+    h, u = register(client)
+    fam = u["families"][0]["id"]
+    client.post(f"/api/families/{fam}/medicines", json={"name": "Нурофен"}, headers=h)
+    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
+    assert client.get("/api/auth/me", headers=h).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "secret123"}).status_code == 401
+    # почта освободилась, а новый аккаунт начинает с пустой аптечки
+    h2, u2 = register(client)
+    assert client.get(f"/api/families/{u2['families'][0]['id']}/medicines", headers=h2).json() == []
+
+
+def test_delete_account_keeps_shared_family_for_others(client):
+    h, u = register(client)
+    fam = u["families"][0]["id"]
+    code = client.get(f"/api/families/{fam}", headers=h).json()["invite_code"]
+    h2, _ = register(client, "mom@example.com", "Мама", invite=code)
+    client.post(f"/api/families/{fam}/medicines", json={"name": "Нурофен"}, headers=h)
+    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
+    left = client.get(f"/api/families/{fam}", headers=h2).json()
+    assert [m["name"] for m in left["members"]] == ["Мама"] and left["members"][0]["role"] == "owner"
+    assert [m["name"] for m in client.get(f"/api/families/{fam}/medicines", headers=h2).json()] == ["Нурофен"]

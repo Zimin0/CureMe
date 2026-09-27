@@ -59,9 +59,11 @@ describe('регистрация', () => {
     await user.type(screen.getByLabelText('Как вас зовут'), 'Мама')
     await user.type(screen.getByLabelText('Почта'), 'mom@example.com')
     await user.type(screen.getByLabelText(/^Пароль/), 'secret123')
+    await user.click(screen.getByRole('checkbox', { name: /согласие на обработку/ }))
+    await user.click(screen.getByRole('checkbox', { name: /пользовательское соглашение/ }))
     await user.click(screen.getByRole('button', { name: 'Создать аккаунт' }))
     await waitFor(() => expect(location()).toBe('/'))
-    expect(body).toEqual({ name: 'Мама', email: 'mom@example.com', password: 'secret123', invite_code: 'ABCD2345' })
+    expect(body).toEqual({ name: 'Мама', email: 'mom@example.com', password: 'secret123', invite_code: 'ABCD2345', consent: true })
   })
 
   it('неверный код приглашения подсвечивается', async () => {
@@ -97,5 +99,56 @@ describe('ссылка-приглашение', () => {
     server.use(http.get('/api/invites/OLD', () => HttpResponse.json({ detail: 'нет' }, { status: 404 })))
     renderApp('/join/OLD', { loggedIn: false })
     expect(await screen.findByRole('heading', { name: 'Приглашение не найдено' })).toBeInTheDocument()
+  })
+})
+
+describe('согласие на обработку данных', () => {
+  it('без галочек аккаунт не создаётся', async () => {
+    let called = false
+    server.use(http.post('/api/auth/register', () => { called = true; return HttpResponse.json({}, { status: 201 }) }))
+    const { user } = renderApp('/register', { loggedIn: false })
+    await user.type(await screen.findByLabelText('Как вас зовут'), 'Мама')
+    await user.type(screen.getByLabelText('Почта'), 'mom@example.com')
+    await user.type(screen.getByLabelText(/^Пароль/), 'secret123')
+    expect(screen.getByRole('checkbox', { name: /согласие на обработку/ })).not.toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Создать аккаунт' }))
+    expect(called).toBe(false)
+    expect(screen.getByRole('link', { name: 'согласие на обработку персональных данных' })).toHaveAttribute('href', '/consent')
+  })
+
+  it('старый аккаунт сначала видит экран согласия', async () => {
+    let body: unknown
+    let me = { ...ME, consent_needed: true }
+    const { user } = renderApp('/', { me })
+    server.use(  // после renderApp, чтобы /auth/me отдавал свежие данные
+      http.get('/api/auth/me', () => HttpResponse.json(me)),
+      http.post('/api/auth/consent', async ({ request }) => { body = await request.json(); me = { ...ME, consent_needed: false }; return HttpResponse.json(me) }),
+      overview,
+    )
+    expect(await screen.findByRole('heading', { name: 'Нужно ваше согласие' })).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /согласие на обработку/ }))
+    await user.click(screen.getByRole('checkbox', { name: /пользовательское соглашение/ }))
+    await user.click(screen.getByRole('button', { name: 'Продолжить' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Нужно ваше согласие' })).not.toBeInTheDocument())
+    expect(body).toEqual({ consent: true })
+  })
+
+  it('документы открываются без входа', async () => {
+    renderApp('/privacy', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: 'Политика обработки персональных данных' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Пользовательское соглашение' })).toHaveAttribute('href', '/terms')
+  })
+
+  it('удаление аккаунта просит пароль и выходит', async () => {
+    let body: unknown
+    server.use(
+      http.delete('/api/auth/me', async ({ request }) => { body = await request.json(); return new HttpResponse(null, { status: 204 }) }),
+    )
+    const { user } = renderApp('/', { me: { ...ME, consent_needed: true } })
+    await user.click(await screen.findByRole('button', { name: 'Удалить аккаунт' }))
+    await user.type(screen.getByLabelText('Пароль для подтверждения'), 'secret123')
+    await user.click(screen.getByRole('button', { name: 'Удалить навсегда' }))
+    await waitFor(() => expect(location()).toMatch(/^\/login/))
+    expect(body).toEqual({ password: 'secret123' })
   })
 })
