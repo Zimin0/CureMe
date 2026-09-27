@@ -8,6 +8,8 @@ import { medicine, renderApp } from '../test/utils'
 
 // Камера и wasm-декодер в jsdom не работают — компонент камеры заменяем пустышкой.
 vi.mock('../components/Scanner', () => ({ Scanner: () => <div>камера</div> }))
+// Сжатие фото через canvas в jsdom недоступно — отдаём файл как есть.
+vi.mock('../image', () => ({ compressImage: async (f: File) => f }))
 
 const PARSED = { kind: 'ean13', raw: '4605077018932', gtin: '04605077018932', serial: null, batch: null, expiry: null }
 
@@ -66,5 +68,37 @@ describe('сканирование: ручной ввод кода', () => {
     expect(await screen.findByText('Не получилось распознать код товара.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Ещё раз' }))
     expect(screen.queryByText('Не получилось распознать код товара.')).not.toBeInTheDocument()
+  })
+
+  it('фото, снятое в окне сканирования, не теряется после «Заполнить подробнее»', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:scan-photo')
+    URL.revokeObjectURL = vi.fn()
+    scanReturns({ product: { gtin: '04605077018932', name: 'Ларингобакт', title: null, form: 'Таблетки', dosage: null, active_ingredient: null, manufacturer: null, unit: 'таб', pack_size: 30, blister_size: 10, source: 'internet' } })
+    let uploaded = false
+    server.use(
+      http.get('/api/families/7/categories', () => HttpResponse.json([])),
+      http.get('/api/families/7/medicines', () => HttpResponse.json([])),
+      http.post('/api/families/7/medicines', () => HttpResponse.json({ ...medicine({ id: 42, name: 'Ларингобакт' }), packages: [] }, { status: 201 })),
+      http.put('/api/families/7/medicines/42/photo', () => {
+        uploaded = true
+        return HttpResponse.json({ ...medicine({ id: 42, name: 'Ларингобакт', photo_url: '/uploads/42.jpg' }), packages: [] })
+      }),
+      http.get('/api/families/7/medicines/42', () => HttpResponse.json({ ...medicine({ id: 42, name: 'Ларингобакт' }), packages: [] })),
+    )
+    const { user, container } = renderApp('/scan')
+    await enterCode(user)
+    const dialog = await screen.findByRole('dialog', { name: 'Нашли лекарство' })
+    const photo = new File(['jpeg'], 'pack.jpg', { type: 'image/jpeg' })
+    await user.upload(container.ownerDocument.querySelector<HTMLInputElement>('input[type=file][capture]')!, photo)
+    expect(await within(dialog).findByAltText('Фото лекарства')).toHaveAttribute('src', 'blob:scan-photo')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Заполнить подробнее' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/new'))
+    // Превью фото видно в полной форме
+    expect(await screen.findByAltText('Фото лекарства')).toHaveAttribute('src', 'blob:scan-photo')
+
+    await user.click(screen.getByRole('button', { name: /Добавить в аптечку|Сохранить/ }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/42'))
+    expect(uploaded).toBe(true)
   })
 })

@@ -121,7 +121,7 @@ export function MedicineForm() {
       <form className="stack lg" onSubmit={submit}>
         <section className="card stack">
           <h2>Основное</h2>
-          <PhotoPicker current={existing.data?.photo_url ?? null} onChange={setPhoto} />
+          <PhotoPicker current={existing.data?.photo_url ?? null} picked={prefill.photo} onChange={setPhoto} />
           <label className="field"><span>Название *</span>
             <input className="input" required autoFocus={!f.name} placeholder="Например, Нурофен" {...text('name')} />
           </label>
