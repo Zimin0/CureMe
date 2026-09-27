@@ -16,9 +16,17 @@ function Harness({ unit = 'таб', initial = 20, blister = 10 as number | null,
 const total = () => screen.getByText(/^Итого:/).textContent
 
 describe('QuantityInput', () => {
-  it('для таблеток с размером блистера открывается режим «Блистерами»', () => {
+  it('по умолчанию открыт режим «Поштучно», даже если размер блистера известен', () => {
     render(<Harness />)
-    expect(screen.getByRole('tab', { name: 'Блистерами' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Поштучно (таб)' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('spinbutton', { name: 'Осталось, таб' })).toHaveValue(20)
+    expect(total()).toBe('Итого: 20 таб')
+  })
+
+  it('в режиме «Блистерами» количество пересчитывается в блистеры', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole('tab', { name: 'Блистерами' }))
     expect(screen.getByRole('spinbutton', { name: 'Осталось блистеров' })).toHaveValue(2)
     expect(total()).toBe('Итого: 20 таб')
   })
@@ -26,6 +34,7 @@ describe('QuantityInput', () => {
   it('кнопки + и − меняют число блистеров и итог', async () => {
     const user = userEvent.setup()
     render(<Harness />)
+    await user.click(screen.getByRole('tab', { name: 'Блистерами' }))
     const [more] = screen.getAllByRole('button', { name: 'Больше' })
     await user.click(more)
     expect(total()).toBe('Итого: 30 таб')
@@ -40,6 +49,7 @@ describe('QuantityInput', () => {
   it('размер блистера пересчитывает итог', async () => {
     const user = userEvent.setup()
     render(<Harness />)
+    await user.click(screen.getByRole('tab', { name: 'Блистерами' }))
     const per = screen.getByRole('spinbutton', { name: 'Таблеток в блистере' })
     await user.clear(per)
     await user.type(per, '14')
@@ -68,6 +78,7 @@ describe('QuantityInput', () => {
   it('дробные остатки: пол-блистера', async () => {
     const user = userEvent.setup()
     render(<Harness initial={15} />)
+    await user.click(screen.getByRole('tab', { name: 'Блистерами' }))
     expect(screen.getByRole('spinbutton', { name: 'Осталось блистеров' })).toHaveValue(1.5)
     await user.click(screen.getByRole('tab', { name: 'Поштучно (таб)' }))
     expect(screen.getByRole('spinbutton', { name: 'Осталось, таб' })).toHaveValue(15)
@@ -76,6 +87,7 @@ describe('QuantityInput', () => {
   it('кнопка «Целая пачка» ставит размер упаковки', async () => {
     const user = userEvent.setup()
     render(<Harness initial={3} packSize={30} />)
+    await user.click(screen.getByRole('tab', { name: 'Блистерами' }))
     await user.click(screen.getByRole('button', { name: 'Целая пачка: 30 таб' }))
     expect(total()).toBe('Итого: 30 таб')
     expect(screen.getByRole('spinbutton', { name: 'Осталось блистеров' })).toHaveValue(3)
@@ -91,6 +103,7 @@ describe('QuantityInput', () => {
 it('тап по подписи поля ничего не меняет (раньше срабатывала кнопка «−»)', async () => {
   const user = userEvent.setup()
   render(<Harness />)
+  await user.click(screen.getByRole('tab', { name: 'Блистерами' }))
   await user.click(screen.getByText('Осталось блистеров'))
   await user.click(screen.getByText('Таблеток в блистере'))
   expect(total()).toBe('Итого: 20 таб')

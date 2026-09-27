@@ -39,7 +39,8 @@ export function QuantityInput({ unit, quantity, onQuantity, blisterSize, onBlist
   packSize?: number | null
 }) {
   const countable = COUNTABLE.includes(unit)
-  const [mode, setMode] = useState<'blisters' | 'units'>(countable && blisterSize ? 'blisters' : 'units')
+  // Поштучно проще всего: сколько таблеток осталось, столько и вписать. Блистеры — по желанию.
+  const [mode, setMode] = useState<'blisters' | 'units'>('units')
   const per = blisterSize || 10
   const perLabel = `${unit === 'капс' ? 'Капсул' : 'Таблеток'} в блистере`
   const [blisters, setBlisters] = useState(() => Math.max(0, Math.round((quantity / per) * 2) / 2))
