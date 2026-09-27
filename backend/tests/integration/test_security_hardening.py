@@ -24,7 +24,7 @@ def login(client, email="nikita@example.com", password="secret123"):
 def test_long_cyrillic_password_is_a_clear_error_not_a_crash(client):
     """bcrypt 5 падает на паролях длиннее 72 байт; раньше это был ответ 500."""
     long_pw = "пароль" * 7  # 42 символа, 84 байта
-    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": long_pw})
+    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": long_pw, "consent": True})
     assert r.status_code == 422
     assert "72 байт" in r.text
 
@@ -35,7 +35,7 @@ def test_login_with_too_long_password_is_just_wrong_password(client):
 
 
 def test_new_password_needs_8_characters(client):
-    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "1234567"})
+    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "1234567", "consent": True})
     assert r.status_code == 422
 
 
@@ -115,10 +115,23 @@ def test_login_limit_per_email_survives_changing_ip(client, rate_limited):
 
 def test_registration_is_throttled(client, rate_limited):
     codes = [
-        client.post("/api/auth/register", json={"email": f"u{i}@example.com", "name": "U", "password": "secret123"}).status_code
+        client.post("/api/auth/register", json={"email": f"u{i}@example.com", "name": "U", "password": "secret123", "consent": True}).status_code
         for i in range(11)
     ]
     assert codes[:10] == [201] * 10 and codes[10] == 429
+
+
+def test_account_deletion_password_cannot_be_guessed(client, rate_limited):
+    """С украденным токеном нельзя перебором пароля стереть чужой аккаунт."""
+    h, _ = register(client)
+    codes = [client.request("DELETE", "/api/auth/me", headers=h, json={"password": f"g{i}"}).status_code for i in range(6)]
+    assert codes[:5] == [403] * 5 and codes[5] == 429
+    assert client.get("/api/auth/me", headers=h).status_code == 200
+
+
+def test_account_deletion_with_too_long_password_is_not_a_crash(client):
+    h, _ = register(client)
+    assert client.request("DELETE", "/api/auth/me", headers=h, json={"password": "я" * 100}).status_code == 403
 
 
 def test_invite_codes_cannot_be_enumerated(client, rate_limited):

@@ -3,7 +3,9 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, Family, Me } from '../api'
 import { useAuth } from '../auth'
+import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, useToast } from '../components/ui'
+import { LegalLinks } from './Legal'
 
 type TokenOut = { access_token: string; user: Me }
 
@@ -17,6 +19,7 @@ function AuthShell({ title, sub, children }: { title: string; sub: string; child
           <p className="muted">{sub}</p>
         </div>
         <div className="card stack">{children}</div>
+        <LegalLinks />
       </div>
     </div>
   )
@@ -57,6 +60,7 @@ export function Register() {
   const [params] = useSearchParams()
   const invite = params.get('invite') ?? ''
   const [form, setForm] = useState({ name: '', email: '', password: '', invite_code: invite })
+  const [agreed, setAgreed] = useState({ consent: false, terms: false })
   const inviteInfo = useQuery({
     queryKey: ['invite', form.invite_code],
     queryFn: () => api<{ family_name: string; members: number }>(`/invites/${form.invite_code.trim()}`),
@@ -64,7 +68,7 @@ export function Register() {
     retry: false,
   })
   const m = useMutation({
-    mutationFn: () => api<TokenOut>('/auth/register', { body: { ...form, invite_code: form.invite_code.trim() || null } }),
+    mutationFn: () => api<TokenOut>('/auth/register', { body: { ...form, invite_code: form.invite_code.trim() || null, consent: agreed.consent } }),
     onSuccess: d => { signIn(d.access_token, d.user); nav('/') },
   })
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value })
@@ -89,6 +93,7 @@ export function Register() {
           {inviteInfo.isError && <span className="hint" style={{ color: 'var(--danger)' }}>Такого кода нет</span>}
           {!form.invite_code && <span className="hint">Если вас позвали в семью, введите код из приглашения</span>}
         </label>
+        <ConsentChecks value={agreed} onChange={setAgreed} />
         {m.error && <div className="alert error">{m.error.message}</div>}
         <button className="btn primary block" disabled={m.isPending}>{m.isPending ? 'Создаём…' : 'Создать аккаунт'}</button>
       </form>
@@ -131,6 +136,49 @@ export function Join() {
           <Link className="btn ghost block" to={`/login?next=/join/${code}`}>У меня уже есть аккаунт</Link>
         </>
       )}
+    </AuthShell>
+  )
+}
+
+type Agreed = { consent: boolean; terms: boolean }
+
+/**
+ * Две отдельные галочки, обе пустые по умолчанию: согласие на обработку данных по 152-ФЗ
+ * нельзя смешивать с другими документами и нельзя ставить за человека.
+ */
+function ConsentChecks({ value, onChange }: { value: Agreed; onChange: (v: Agreed) => void }) {
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <label className="check">
+        <input type="checkbox" required checked={value.consent} onChange={e => onChange({ ...value, consent: e.target.checked })} />
+        <span>Даю <Link to="/consent" target="_blank">согласие на обработку персональных данных</Link>, включая сведения о здоровье</span>
+      </label>
+      <label className="check">
+        <input type="checkbox" required checked={value.terms} onChange={e => onChange({ ...value, terms: e.target.checked })} />
+        <span>Принимаю <Link to="/terms" target="_blank">пользовательское соглашение</Link> и понимаю, что Капсулка не заменяет врача</span>
+      </label>
+    </div>
+  )
+}
+
+/** Для тех, кто зарегистрировался до появления согласия или когда его текст поменялся. */
+export function ConsentGate() {
+  const { refresh, signOut } = useAuth()
+  const [agreed, setAgreed] = useState({ consent: false, terms: false })
+  const m = useMutation({
+    mutationFn: () => api<Me>('/auth/consent', { body: { consent: true } }),
+    onSuccess: () => refresh(),
+  })
+  return (
+    <AuthShell title="Нужно ваше согласие" sub="Мы обновили документы: теперь согласие на обработку данных оформляется отдельно, как требует закон">
+      <form className="stack" onSubmit={e => { e.preventDefault(); m.mutate() }}>
+        <ConsentChecks value={agreed} onChange={setAgreed} />
+        {m.error && <div className="alert error">{m.error.message}</div>}
+        <button className="btn primary block" disabled={m.isPending}>Продолжить</button>
+      </form>
+      <div className="divider">не согласны?</div>
+      <DeleteAccountButton className="btn ghost block" />
+      <button className="btn ghost block" onClick={signOut}>Выйти</button>
     </AuthShell>
   )
 }

@@ -35,6 +35,15 @@ class RegisterIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     password: NewPassword
     invite_code: str | None = Field(default=None, max_length=32)
+    consent: bool = False  # галочка «даю согласие на обработку персональных данных»
+
+
+class ConsentIn(BaseModel):
+    consent: bool
+
+
+class DeleteAccountIn(BaseModel):
+    password: AnyPassword
 
 
 class LoginIn(BaseModel):
@@ -56,6 +65,7 @@ class FamilyBrief(BaseModel):
 
 class MeOut(UserOut):
     is_admin: bool = False
+    consent_needed: bool = False  # согласия нет или оно старой редакции — показать экран согласия
     families: list[FamilyBrief]
     # Только после смены своего пароля: старый токен уже не действует, вот новый.
     access_token: str | None = None

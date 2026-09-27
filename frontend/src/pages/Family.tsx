@@ -4,8 +4,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, Category, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
+import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
+import { LegalLinks } from './Legal'
 
 export function Family() {
   const { me, familyId, setFamilyId, refresh, signOut } = useAuth()
@@ -144,7 +146,9 @@ export function Family() {
           <button className="btn ghost" onClick={() => setNewFamily('')}><Plus size={16} />Создать ещё одну семью</button>
           <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»?`) && removeMember.mutate(me!.id)}>Покинуть семью</button>
           <button className="btn danger" onClick={signOut}><LogOut size={16} />Выйти из аккаунта</button>
+          <DeleteAccountButton />
         </div>
+        <LegalLinks />
       </section>
 
       {rename !== null && (

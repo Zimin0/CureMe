@@ -2,7 +2,8 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
-import { Join, Login, Register } from './pages/Auth'
+import { ConsentGate, Join, Login, Register } from './pages/Auth'
+import { Consent, Privacy, Terms } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
 import { Family } from './pages/Family'
@@ -19,6 +20,7 @@ function Protected() {
   const loc = useLocation()
   if (loading) return <PageLoader />
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
+  if (me.consent_needed) return <ConsentGate />
   if (!familyId) return <NoFamily />
   return <Layout />
 }
@@ -30,6 +32,9 @@ export default function App() {
       <Route path="/login" element={me ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/register" element={me ? <Navigate to="/" replace /> : <Register />} />
       <Route path="/join/:code" element={<Join />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/consent" element={<Consent />} />
+      <Route path="/terms" element={<Terms />} />
       <Route element={<Protected />}>
         <Route index element={<Home />} />
         <Route path="medicines" element={<Medicines />} />
