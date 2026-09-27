@@ -6,7 +6,7 @@ const LINKS = [
   { to: '/', label: 'Главная', icon: House, end: true },
   { to: '/medicines', label: 'Аптечка', icon: Pill },
   { to: '/scan', label: 'Сканировать', icon: ScanLine },
-  { to: '/find', label: 'Подобрать', icon: Stethoscope },
+  { to: '/find', label: 'Найти', icon: Stethoscope },
   { to: '/family', label: 'Семья', icon: Users },
   { to: '/export', label: 'Экспорт', icon: FileDown },
 ]

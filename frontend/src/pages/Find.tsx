@@ -6,6 +6,7 @@ import { api, SuggestResult } from '../api'
 import { useFamilyPath } from '../auth'
 import { Empty, MedIcon, Spinner } from '../components/ui'
 import { fmtQty, subtitle } from '../format'
+import { MEDICAL_NOTE } from '../legal'
 
 export function Find() {
   const fam = useFamilyPath()
@@ -27,10 +28,12 @@ export function Find() {
     <div className="page" style={{ maxWidth: 820 }}>
       <div className="page-head">
         <div>
-          <h1>Подобрать лекарство</h1>
-          <p className="sub">Опишите, что беспокоит. Покажем, что есть дома, и первым то, что помогает именно вам.</p>
+          <h1>Что есть дома от…</h1>
+          <p className="sub">Напишите, что беспокоит. Покажем лекарства из вашей аптечки, в записях которых это упомянуто, и первым то, что вы отметили как помогающее.</p>
         </div>
       </div>
+
+      <div className="alert warn small"><Info size={18} style={{ flexShrink: 0 }} /><span>{MEDICAL_NOTE}</span></div>
 
       <form onSubmit={submit} className="row">
         <label className="search grow">

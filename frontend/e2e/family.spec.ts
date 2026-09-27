@@ -19,6 +19,8 @@ test('приглашение по ссылке: второй человек ви
   await mom.getByLabel('Как вас зовут').fill('Мама')
   await mom.getByLabel('Почта').fill(uniqueEmail('mom'))
   await mom.getByLabel(/^Пароль/).fill('secret123')
+  await mom.getByRole('checkbox', { name: /согласие на обработку/ }).check()
+  await mom.getByRole('checkbox', { name: /пользовательское соглашение/ }).check()
   await mom.getByRole('button', { name: 'Создать аккаунт' }).click()
   await expect(mom.getByRole('heading', { level: 1 })).toContainText('Мама')
 
