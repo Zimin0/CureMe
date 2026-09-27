@@ -6,7 +6,12 @@ import { compressImage } from '../image'
  * Выбор фото лекарства. Ничего не загружает сам: отдаёт наверх сжатый Blob
  * (или null, если фото убрали), а сохраняет его форма вместе с лекарством.
  */
-export function PhotoPicker({ current, onChange }: { current: string | null; onChange: (b: Blob | null) => void }) {
+export function PhotoPicker({ current, picked, onChange }: {
+  current: string | null
+  /** Фото, которое уже выбрали раньше (например, в окне сканирования), но ещё не сохранили. */
+  picked?: Blob | null
+  onChange: (b: Blob | null) => void
+}) {
   const input = useRef<HTMLInputElement>(null)
   // capture открывает сразу камеру телефона; на компьютере браузер его игнорирует и показывает выбор файла
   const camera = useRef<HTMLInputElement>(null)
@@ -15,6 +20,8 @@ export function PhotoPicker({ current, onChange }: { current: string | null; onC
   const [error, setError] = useState('')
 
   useEffect(() => () => { if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview) }, [preview])
+  // Ссылку на Blob создаём в эффекте, а не при первом рендере: иначе её отзовёт очистка эффекта выше.
+  useEffect(() => { if (picked) setPreview(URL.createObjectURL(picked)) }, [picked])
 
   const pick = async (file?: File) => {
     if (!file) return

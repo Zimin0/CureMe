@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Crown, House, Pill, Plus, Search, Shield, Tags, Trash2, UserPlus, Users } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowDown, ArrowUp, Crown, House, Lightbulb, Pill, Plus, Search, Shield, Tags, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { AdminFamily, AdminStats, AdminUser, api, Category } from '../api'
 import { useAuth } from '../auth'
@@ -12,6 +12,7 @@ const TABS = [
   { id: 'users', label: 'Люди' },
   { id: 'families', label: 'Семьи' },
   { id: 'categories', label: 'Категории' },
+  { id: 'hints', label: 'Подсказки' },
 ] as const
 type Tab = typeof TABS[number]['id']
 
@@ -38,7 +39,7 @@ export function Admin() {
       <div className="page-head">
         <div>
           <h1 className="row" style={{ gap: 10 }}><Shield size={26} />Администрирование</h1>
-          <p className="sub">Все аккаунты и семьи Капсулки и общий для всех список категорий.</p>
+          <p className="sub">Все аккаунты и семьи Капсулки, общий для всех список категорий и подсказок.</p>
         </div>
       </div>
 
@@ -59,6 +60,7 @@ export function Admin() {
       {tab === 'users' && <UsersTab meId={me.id} />}
       {tab === 'families' && <FamiliesTab />}
       {tab === 'categories' && <CategoriesTab />}
+      {tab === 'hints' && <HintsTab />}
     </div>
   )
 }
@@ -308,6 +310,69 @@ function CategoriesTab() {
         <CategoryEditor initial={edit} busy={save.isPending || remove.isPending}
           onSave={c => save.mutate(c)} onDelete={id => remove.mutate(id)} onClose={() => setEdit(null)} />
       )}
+    </>
+  )
+}
+
+// ---------- подсказки «От чего помогает» ----------
+function HintsTab() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const hints = useQuery({ queryKey: ['admin', 'indication-hints'], queryFn: () => api<string[]>('/admin/indication-hints') })
+  const [list, setList] = useState<string[] | null>(null)
+  const [draft, setDraft] = useState('')
+  useEffect(() => { if (hints.data && list === null) setList(hints.data) }, [hints.data, list])
+
+  const save = useMutation({
+    mutationFn: (h: string[]) => api<string[]>('/admin/indication-hints', { method: 'PUT', body: { hints: h } }),
+    onSuccess: h => {
+      setList(h)
+      qc.setQueryData(['admin', 'indication-hints'], h)
+      qc.setQueryData(['indication-hints'], h)
+      toast('Подсказки сохранены')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+
+  if (hints.isLoading || list === null) return <PageLoader />
+  const dirty = JSON.stringify(list) !== JSON.stringify(hints.data)
+  const add = (e: FormEvent) => {
+    e.preventDefault()
+    const t = draft.trim().replace(/\s+/g, ' ')
+    if (!t) return
+    if (list.some(h => h.toLowerCase() === t.toLowerCase())) { toast('Такая подсказка уже есть', 'error'); return }
+    setList([...list, t])
+    setDraft('')
+  }
+  const move = (i: number, d: -1 | 1) => {
+    const next = [...list]
+    ;[next[i], next[i + d]] = [next[i + d], next[i]]
+    setList(next)
+  }
+  return (
+    <>
+      <p className="muted small">Быстрые кнопки под полем «От чего помогает» при добавлении лекарства и сканировании. Список общий для всех семей.</p>
+      <form className="row" onSubmit={add}>
+        <input className="input grow" placeholder="Например, зубная боль" maxLength={60} value={draft} onChange={e => setDraft(e.target.value)} />
+        <button className="btn" disabled={!draft.trim()}><Plus size={16} />Добавить</button>
+      </form>
+      <section className="card flush">
+        {list.length === 0 && <Empty icon={<Lightbulb size={30} />} title="Подсказок нет" text="Добавьте первую: она появится кнопкой в форме лекарства." />}
+        {list.map((h, i) => (
+          <div key={h} className="list-row">
+            <span className="grow ellipsis" style={{ fontWeight: 600 }}>{h}</span>
+            <button className="icon-btn" title="Выше" disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} /></button>
+            <button className="icon-btn" title="Ниже" disabled={i === list.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} /></button>
+            <button className="icon-btn" title={`Убрать «${h}»`} onClick={() => setList(list.filter(x => x !== h))}><X size={16} /></button>
+          </div>
+        ))}
+      </section>
+      <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+        {dirty && <button className="btn ghost" onClick={() => setList(hints.data!)}>Отменить</button>}
+        <button className="btn primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(list)}>
+          {save.isPending ? 'Сохраняем…' : 'Сохранить'}
+        </button>
+      </div>
     </>
   )
 }

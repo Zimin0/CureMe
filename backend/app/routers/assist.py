@@ -13,7 +13,7 @@ from ..ratelimit import limiter
 from ..schemas import OverviewOut, ProductInfo, ScanIn, ScanOut, SuggestionOut, SuggestOut
 from ..search import best_match, expand_query
 from ..seed import COMMON_CONDITIONS
-from ..services import find_package_by_serial, load_medicines, medicine_out, member_names
+from ..services import find_package_by_serial, indication_hints, load_medicines, medicine_out, member_names
 
 router = APIRouter(prefix="/api", tags=["assist"])
 
@@ -26,6 +26,12 @@ DISCLAIMER = (
 @router.get("/conditions", response_model=list[str])
 def conditions():
     return COMMON_CONDITIONS
+
+
+@router.get("/indication-hints", response_model=list[str])
+def get_indication_hints(_: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Быстрые подсказки к полю «От чего помогает»; список задаёт администратор."""
+    return indication_hints(db)
 
 
 @router.get("/families/{family_id}/overview", response_model=OverviewOut)

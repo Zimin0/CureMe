@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .security import MAX_PASSWORD_BYTES
 
@@ -120,6 +120,22 @@ class CategoryIn(BaseModel):
 
 class CategoryOrderIn(BaseModel):
     ids: list[int] = Field(max_length=1000)
+
+
+class IndicationHintsIn(BaseModel):
+    hints: list[str] = Field(max_length=50)
+
+    @field_validator("hints")
+    @classmethod
+    def clean(cls, v: list[str]) -> list[str]:
+        """Убирает пустые строки и повторы (без учёта регистра), порядок сохраняет."""
+        out: list[str] = []
+        for h in (" ".join(x.split()) for x in v):
+            if len(h) > 60:
+                raise ValueError(f"Подсказка длиннее 60 символов: «{h[:20]}…»")
+            if h and h.lower() not in {o.lower() for o in out}:
+                out.append(h)
+        return out
 
 
 class CategoryOut(ORM):

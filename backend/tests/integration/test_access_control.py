@@ -98,6 +98,7 @@ def test_account_endpoints_require_login(client):
     assert client.patch("/api/auth/me", json={"name": "X"}).status_code == 401
     assert client.post("/api/families", json={"name": "X"}).status_code == 401
     assert client.post("/api/families/join", json={"code": "X"}).status_code == 401
+    assert client.get("/api/indication-hints").status_code == 401
 
 
 # --- админка -------------------------------------------------------------------
@@ -118,6 +119,8 @@ ADMIN_ENDPOINTS = [
     ("PUT", "/api/admin/categories/order", {"ids": []}),
     ("PUT", "/api/admin/categories/{c}", {"name": "Другое имя"}),
     ("DELETE", "/api/admin/categories/{c}", None),
+    ("GET", "/api/admin/indication-hints", None),
+    ("PUT", "/api/admin/indication-hints", {"hints": ["кашель"]}),
 ]
 ADMIN_IDS = [f"{m} {p}" for m, p, _ in ADMIN_ENDPOINTS]
 

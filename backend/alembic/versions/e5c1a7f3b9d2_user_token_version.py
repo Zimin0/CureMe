@@ -1,7 +1,7 @@
 """user token_version: смена пароля отзывает старые токены
 
 Revision ID: e5c1a7f3b9d2
-Revises: d4e7b2a91c55
+Revises: a7d3f9c2e14b
 Create Date: 2026-09-27 07:10:00
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'e5c1a7f3b9d2'
-down_revision: Union[str, Sequence[str], None] = 'd4e7b2a91c55'
+down_revision: Union[str, Sequence[str], None] = 'a7d3f9c2e14b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
