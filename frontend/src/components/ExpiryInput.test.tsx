@@ -23,12 +23,43 @@ beforeEach(() => {
 })
 
 describe('ExpiryInput', () => {
-  it('обычный выбор даты', async () => {
+  it('основное поле открывает цифровую клавиатуру, а не системный календарь', () => {
+    render(<Harness />)
+    const field = screen.getByRole('textbox', { name: 'Годен до' })
+    expect(field).toHaveAttribute('type', 'text')
+    expect(field).toHaveAttribute('inputmode', 'decimal')
+  })
+
+  it.each([
+    ['31.05.2027', '2027-05-31'],
+    ['05.2027', '2027-05-31'],
+    ['31052027', '2027-05-31'],
+    ['092027', '2027-09-30'],
+    ['202705', '2027-05-31'],
+  ])('ввод в основное поле: %s → %s', async (typed, want) => {
     const user = userEvent.setup()
-    const { container } = render(<Harness />)
-    const date = container.querySelector('input[type=date]')!
-    await user.type(date, '2027-05-31')
-    expect(value()).toBe('2027-05-31')
+    render(<Harness />)
+    await user.type(screen.getByRole('textbox', { name: 'Годен до' }), typed)
+    expect(value()).toBe(want)
+  })
+
+  it('основное поле показывает сохранённую дату и очищается', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const field = screen.getByRole('textbox', { name: 'Годен до' })
+    await user.type(field, '31.05.2027')
+    await user.tab()
+    expect(field).toHaveValue('31.05.2027')
+    await user.clear(field)
+    expect(value()).toBe('пусто')
+  })
+
+  it('непонятное в основном поле — подсказка', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.type(screen.getByRole('textbox', { name: 'Годен до' }), '99999')
+    expect(value()).toBe('пусто')
+    expect(screen.getByText(/Не понял дату/)).toBeInTheDocument()
   })
 
   it('ввод текстом как на упаковке', async () => {

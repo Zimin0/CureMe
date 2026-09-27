@@ -60,10 +60,10 @@ export function Home() {
       </section>
 
       <div className="stats">
-        <div className="stat"><span className="label"><Pill size={15} />Лекарств</span><span className="value">{data.total_medicines}</span></div>
-        <div className="stat"><span className="label"><PackageOpen size={15} />Упаковок</span><span className="value">{data.total_packages}</span></div>
-        <div className={`stat ${data.expiring.length ? 'warning' : ''}`}><span className="label"><CalendarClock size={15} />Скоро истекают</span><span className="value">{data.expiring.length}</span></div>
-        <div className={`stat ${data.expired.length ? 'danger' : ''}`}><span className="label"><AlertTriangle size={15} />Просрочено</span><span className="value">{data.expired.length}</span></div>
+        <Link to="/medicines" className="stat"><span className="label"><Pill size={15} />Лекарств</span><span className="value">{data.total_medicines}</span></Link>
+        <Link to="/medicines" className="stat"><span className="label"><PackageOpen size={15} />Упаковок</span><span className="value">{data.total_packages}</span></Link>
+        <Link to="/medicines?filter=attention" className={`stat ${data.expiring.length ? 'warning' : ''}`}><span className="label"><CalendarClock size={15} />Скоро истекают</span><span className="value">{data.expiring.length}</span></Link>
+        <Link to="/medicines?filter=expired" className={`stat ${data.expired.length ? 'danger' : ''}`}><span className="label"><AlertTriangle size={15} />Просрочено</span><span className="value">{data.expired.length}</span></Link>
       </div>
 
       <div className="two-col">

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { ExpiryInput } from '../components/ExpiryInput'
@@ -10,6 +10,7 @@ import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { PageLoader, useToast } from '../components/ui'
+import { fmtQty } from '../format'
 
 const FORMS = ['Таблетки', 'Капсулы', 'Сироп', 'Суспензия', 'Капли', 'Спрей', 'Мазь', 'Гель', 'Крем', 'Порошок', 'Раствор', 'Свечи', 'Пластырь', 'Ампулы']
 const UNITS = ['шт', 'таб', 'капс', 'мл', 'г', 'пак', 'амп', 'уп']
@@ -35,6 +36,7 @@ export function MedicineForm() {
   const qc = useQueryClient()
   const toast = useToast()
   const prefill = (useLocation().state ?? {}) as ScanPrefill
+  const focus = useSearchParams()[0].get('focus')
 
   const [f, setF] = useState<MedicineFields>({ ...EMPTY, ...prefill.fields })
   const [pkg, setPkg] = useState<PackageInput>({ quantity: 1, expiry_date: null, ...prefill.pkg })
@@ -150,7 +152,7 @@ export function MedicineForm() {
 
         <section className="card stack">
           <h2>От чего помогает</h2>
-          <IndicationsInput value={f.indications} onChange={v => set('indications', v)} />
+          <IndicationsInput value={f.indications} onChange={v => set('indications', v)} autoFocus={focus === 'indications'} />
           <label className="field"><span>Противопоказания и предупреждения</span>
             <textarea placeholder="Например: не давать детям до 6 лет" {...text('contraindications')} />
           </label>
@@ -161,6 +163,19 @@ export function MedicineForm() {
 
         <section className="card stack">
           <h2>Остаток</h2>
+          {editing && existing.data && (
+            <div className="row between wrap" style={{ gap: 8 }}>
+              <div>
+                <span className="muted small">Сейчас осталось</span>
+                <div className="qty" data-testid="current-stock">{fmtQty(existing.data.stock.total)}<small>{existing.data.unit}</small></div>
+                <span className="hint">
+                  {existing.data.packages.length === 0 ? 'Упаковок нет'
+                    : `Годного, во всех упаковках (${existing.data.packages.length})`}
+                </span>
+              </div>
+              <Link to={`/medicines/${id}`} className="btn ghost sm">Изменить в упаковках</Link>
+            </div>
+          )}
           <div className="grid-2">
             <label className="field"><span>Единица учёта</span>
               <input className="input" list="units" {...text('unit')} />

@@ -36,6 +36,16 @@ describe('parseExpiry', () => {
     expect(iso('Серия 1240')).toBeNull() // 2040 — слишком далеко для срока годности
   })
 
+  it('reads MMYYYY and YYYYMM without separator (092027, 202705)', () => {
+    expect(iso('092027')).toBe('2027-09-30')
+    expect(iso('Годен до 092027')).toBe('2027-09-30')
+    expect(iso('202705')).toBe('2027-05-31')
+    expect(iso('EXP 202705')).toBe('2027-05-31')
+    expect(iso('Произв. 092024\nГоден до 092027')).toBe('2027-09-30')
+    expect(iso('Серия 4602027051')).toBeNull() // часть длинного числа — не дата
+    expect(iso('132027')).toBeNull() // 13-го месяца нет
+  })
+
   // Настоящий вывод OCR с фото упаковок (английская модель читает кириллицу как латиницу).
   it('works on real OCR output from package photos', () => {
     expect(iso('SNFA8XJCIDOMY\n\nCepus:\n\n3589\n\nEh\n\nMpowuss.:\n\n0725\n\n[oper ao:\n\n0730\n\n||\n\nLL')).toBe('2030-07-31')
