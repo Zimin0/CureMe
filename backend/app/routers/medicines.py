@@ -62,7 +62,7 @@ def _remember(db: Session, med: Medicine) -> None:
 
 @router.get("", response_model=list[MedicineOut])
 def list_medicines(
-    q: str | None = None,
+    q: str | None = Query(default=None, max_length=200),
     category_id: int | None = None,
     filter: str | None = Query(default=None, pattern="^(favorites|helps_me|attention|expired|low)$"),
     fam: Family = Depends(get_family),

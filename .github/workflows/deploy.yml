@@ -12,6 +12,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Токену GITHUB_TOKEN хватает чтения кода: меньше прав — меньше вреда, если шаг сборки скомпрометирован.
+permissions:
+  contents: read
+
 concurrency:
   group: deploy
   cancel-in-progress: false

@@ -17,9 +17,10 @@ def signed_in_user(
 ) -> User:
     """Любой вошедший, даже без доступа в закрытом режиме: ему можно посмотреть профиль,
     дать согласие и удалить аккаунт (права по 152-ФЗ не зависят от закрытого режима)."""
-    user_id = decode_token(creds.credentials) if creds else None
-    user = db.get(User, user_id) if user_id else None
-    if not user:
+    claims = decode_token(creds.credentials) if creds else None
+    user = db.get(User, claims[0]) if claims else None
+    # Токен, выданный до смены пароля, больше не действует.
+    if not user or claims[1] != user.token_version:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужно войти в аккаунт")
     if not user.is_admin and user.email.lower() in {e.lower() for e in get_settings().admin_emails}:
         user.is_admin = True

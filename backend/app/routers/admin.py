@@ -99,6 +99,7 @@ def update_user(user_id: int, body: AdminUserUpdate, me: User = Depends(admin_us
         u.is_admin = body.is_admin
     if body.password:
         u.password_hash = hash_password(body.password)
+        u.token_version += 1  # человека выкинет со всех устройств: войти можно только с новым паролем
     db.commit()
     return _user_out(u)
 

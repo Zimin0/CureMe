@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..models import Family, Membership, User
+from ..ratelimit import client_ip, limiter
 from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, RoleIn
 from ..security import new_invite_code
 from .auth import create_family
@@ -98,7 +99,9 @@ def remove_member(user_id: int, m: Membership = Depends(family_membership), db: 
 
 
 @router.get("/invites/{code}", response_model=InviteInfo)
-def invite_info(code: str, db: Session = Depends(get_db)):
+def invite_info(code: str, request: Request, db: Session = Depends(get_db)):
+    # Код из 8 символов не подобрать, пока попыток мало.
+    limiter.hit(f"invite:{client_ip(request)}", limit=30, window=600)
     fam = db.scalar(select(Family).where(Family.invite_code == code.strip().upper()))
     if not fam:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено или устарело")
@@ -106,7 +109,8 @@ def invite_info(code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/families/join", response_model=FamilyOut)
-def join(body: JoinIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def join(body: JoinIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    limiter.hit(f"invite:{client_ip(request)}", limit=30, window=600)
     fam = db.scalar(select(Family).where(Family.invite_code == body.code.strip().upper()))
     if not fam:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено или устарело")

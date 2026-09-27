@@ -13,6 +13,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Токену GITHUB_TOKEN хватает чтения кода: меньше прав — меньше вреда, если шаг сборки скомпрометирован.
+permissions:
+  contents: read
+
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
@@ -119,5 +123,8 @@ jobs:
           curl -fsS http://localhost:8000/medicines | grep -q '<div id="root">'   # SPA: любой путь отдаёт index.html
           curl -fsS http://localhost:8000/api/conditions | grep -q 'Головная боль'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/auth/me)" = 401
+          curl -fsSI http://localhost:8000/ | grep -qi '^content-security-policy:'
+          # приложение работает не от root
+          test "$(docker exec cureme awk '/^Uid/{print $2}' /proc/1/status)" = 10001
       - if: failure()
         run: docker logs cureme

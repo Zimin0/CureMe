@@ -125,7 +125,7 @@ function UserSheet({ user, isMe, onClose }: { user: AdminUser; isMe: boolean; on
         <label className="field"><span>Имя</span><input className="input" required value={name} onChange={e => setName(e.target.value)} /></label>
         <label className="field"><span>Почта</span><input className="input" type="email" required value={email} onChange={e => setEmail(e.target.value)} /></label>
         <label className="field"><span>Новый пароль</span>
-          <input className="input" type="text" minLength={6} autoComplete="off" placeholder="Оставьте пустым, чтобы не менять" value={password} onChange={e => setPassword(e.target.value)} />
+          <input className="input" type="text" minLength={8} autoComplete="off" placeholder="Оставьте пустым, чтобы не менять" value={password} onChange={e => setPassword(e.target.value)} />
           <span className="hint">Если человек забыл пароль: задайте новый и передайте ему</span>
         </label>
         <label className="row" style={{ gap: 10, cursor: isMe ? 'default' : 'pointer' }}>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -6,8 +6,9 @@ from ..db import get_db
 from ..deps import signed_in_user
 from ..legal import CONSENT_VERSION
 from ..models import Family, Membership, User, utcnow
+from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
-from ..security import create_token, hash_password, new_invite_code, verify_password
+from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
 from ..seed import ensure_default_categories
 from ..services import access_settings, has_access
 from .admin import _leave
@@ -34,12 +35,13 @@ def me_out(user: User, db: Session) -> MeOut:
 
 
 @router.post("/register", response_model=TokenOut, status_code=201)
-def register(body: RegisterIn, db: Session = Depends(get_db)):
+def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
     # Без согласия (152-ФЗ, ст. 9 и 10) хранить почту и сведения об аптечке нельзя.
     if not body.consent:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужно согласие на обработку персональных данных")
     if access_settings(db)["closed"]:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Сайт в разработке, регистрация пока закрыта")
+    limiter.hit(f"register:{client_ip(request)}", limit=10, window=3600)
     email = body.email.lower()
     if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть")
@@ -59,15 +61,21 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         create_family(db, f"Семья {user.name}", user)
     db.commit()
     db.refresh(user)
-    return TokenOut(access_token=create_token(user.id), user=me_out(user, db))
+    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
 
 
 @router.post("/login", response_model=TokenOut)
-def login(body: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    email = body.email.lower()
+    # Перебор паролей: не больше 10 попыток в минуту с одного адреса и 20 за 15 минут на одну почту.
+    limiter.hit(f"login-ip:{client_ip(request)}", limit=10, window=60)
+    limiter.hit(f"login-email:{email}", limit=20, window=900)
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
+    if not user:
+        burn_password_check(body.password)
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверная почта или пароль")
-    return TokenOut(access_token=create_token(user.id), user=me_out(user, db))
+    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
 
 
 @router.get("/me", response_model=MeOut)
@@ -79,10 +87,15 @@ def me(user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
 def update_me(body: UserUpdate, user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
     if body.name:
         user.name = body.name.strip()
+    token = None
     if body.password:
+        if not body.current_password or not verify_password(body.current_password, user.password_hash):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Текущий пароль указан неверно")
         user.password_hash = hash_password(body.password)
+        user.token_version += 1  # выходим на всех остальных устройствах
+        token = create_token(user.id, user.token_version)
     db.commit()
-    return me_out(user, db)
+    return me_out(user, db).model_copy(update={"access_token": token})
 
 
 @router.post("/consent", response_model=MeOut)
@@ -102,6 +115,8 @@ def delete_me(body: DeleteAccountIn, user: User = Depends(signed_in_user), db: S
     Из каждой семьи человек выходит как при «Покинуть семью»: семья без участников удаляется
     вместе с аптечкой и фото, а общие лекарства остальных участников остаются.
     """
+    # С украденным токеном нельзя подбирать пароль, чтобы стереть чужой аккаунт.
+    limiter.hit(f"delete-me:{user.id}", limit=5, window=900)
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный пароль")
     for m in list(user.memberships):

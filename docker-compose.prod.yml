@@ -4,6 +4,12 @@ services:
   app:
     ports: !reset []
     expose: ["8000"]
+    environment:
+      # Настоящий адрес посетителя приходит от Caddy в X-Forwarded-For (нужен для лимитов попыток входа).
+      # Доверять заголовку безопасно: порт 8000 наружу не открыт, до приложения доходит только Caddy.
+      FORWARDED_ALLOW_IPS: "*"
+      CUREME_API_DOCS: "false"
+    security_opt: ["no-new-privileges:true"]
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
