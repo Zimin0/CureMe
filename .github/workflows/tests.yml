@@ -1,5 +1,9 @@
 # Тесты на каждый pull request и push в main. Отдельно от деплоя: деплой не ждёт этот workflow.
 #
+# В pull request запускается только то, что проверяет изменённый код: job changes смотрит
+# на git diff и решает (scripts/select_tests.py, разделы описаны в TESTING.md).
+# На push в main и при ручном запуске (Run workflow) всегда идёт полный прогон.
+#
 # Уровни (от быстрых к медленным):
 #   backend   — unit + интеграционные тесты API + миграции; на SQLite и на Postgres
 #   frontend  — проверка типов, unit и компонентные тесты (Vitest + Testing Library + MSW), сборка
@@ -18,8 +22,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: choose tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.select.outputs.backend }}
+      backend_tests: ${{ steps.select.outputs.backend_tests }}
+      frontend: ${{ steps.select.outputs.frontend }}
+      frontend_files: ${{ steps.select.outputs.frontend_files }}
+      e2e: ${{ steps.select.outputs.e2e }}
+      e2e_specs: ${{ steps.select.outputs.e2e_specs }}
+      docker: ${{ steps.select.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - name: check the section map is up to date
+        run: python -m pytest scripts -q
+      - id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python scripts/select_tests.py --base "$BASE_SHA" --github-output
+          else
+            python scripts/select_tests.py --full --github-output
+          fi
+
   backend:
     name: backend (${{ matrix.db }})
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -47,9 +85,13 @@ jobs:
       - name: pytest
         env:
           CUREME_TEST_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql+psycopg://cureme:cureme@localhost:5432/cureme_test' || '' }}
-        run: pytest --cov=app --cov-report=term-missing:skip-covered
+          # пусто — все тесты, иначе только выбранные файлы
+          TESTS: ${{ needs.changes.outputs.backend_tests }}
+        run: pytest $TESTS --cov=app --cov-report=term-missing:skip-covered
 
   frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -64,10 +106,17 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run test:coverage
+      - name: vitest
+        env:
+          FILES: ${{ needs.changes.outputs.frontend_files }}
+        # vitest related сам находит тесты, которые импортируют изменённые файлы (прямо или через другие модули)
+        run: |
+          if [ -n "$FILES" ]; then npx vitest related --run $FILES; else npm run test:coverage; fi
       - run: npm run build
 
   e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -90,7 +139,9 @@ jobs:
           npm run build
       - name: playwright
         working-directory: frontend
-        run: npm run test:e2e
+        env:
+          SPECS: ${{ needs.changes.outputs.e2e_specs }}
+        run: npm run test:e2e -- $SPECS
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -102,6 +153,8 @@ jobs:
 
   docker:
     name: docker smoke
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
