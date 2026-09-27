@@ -48,3 +48,11 @@ test('участник не видит кнопок владельца', async (
   await expect(page.getByRole('button', { name: 'Переименовать' })).toHaveCount(0)
   await expect(page.getByTitle('Сменить код')).toHaveCount(0)
 })
+
+test('версия приложения видна внизу раздела «Семья» и совпадает с сервером', async ({ page, request }) => {
+  const owner = await registerApi(request, 'Никита')
+  const { version } = await (await request.get('/api/version')).json()
+  expect(version).toMatch(/^\d+\.\d+\.\d+$/)
+  await loginAs(page, owner, '/family')
+  await expect(page.locator('.app-version')).toContainText(`Версия ${version}`)
+})

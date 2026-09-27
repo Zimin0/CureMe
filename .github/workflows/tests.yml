@@ -163,7 +163,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t cureme-app:test .
+      - run: docker build -t cureme-app:test --build-arg CUREME_COMMIT="${GITHUB_SHA::7}" .
       - name: start container and check it answers
         run: |
           docker run -d --name cureme -p 8000:8000 -e CUREME_SECRET_KEY=smoke-test-secret-smoke-test-secret cureme-app:test
@@ -172,6 +172,7 @@ jobs:
             sleep 2
           done
           curl -fsS http://localhost:8000/api/health | grep -q '"ok":true'
+          curl -fsS http://localhost:8000/api/version | grep -q "\"version\":\"$(cat VERSION)\",\"commit\":\"${GITHUB_SHA::7}\""
           curl -fsS http://localhost:8000/ | grep -q '<div id="root">'
           curl -fsS http://localhost:8000/medicines | grep -q '<div id="root">'   # SPA: любой путь отдаёт index.html
           curl -fsS http://localhost:8000/api/conditions | grep -q 'Головная боль'

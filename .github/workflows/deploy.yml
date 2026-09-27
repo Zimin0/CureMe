@@ -41,7 +41,10 @@ jobs:
 
       - name: Build images
         run: |
-          docker build -t cureme-app:latest .
+          # в образ вшиваем короткий коммит и время сборки: их показывает /api/version
+          docker build -t cureme-app:latest \
+            --build-arg CUREME_COMMIT="${GITHUB_SHA::7}" \
+            --build-arg CUREME_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" .
           docker pull "$CADDY_IMAGE"
           docker pull "$POSTGRES_IMAGE"
           docker save cureme-app:latest "$CADDY_IMAGE" "$POSTGRES_IMAGE" | gzip > images.tar.gz
