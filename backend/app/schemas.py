@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 MAX_CATEGORIES = 3  # сколько категорий можно поставить одному лекарству
 
@@ -96,6 +96,22 @@ class CategoryIn(BaseModel):
 
 class CategoryOrderIn(BaseModel):
     ids: list[int]
+
+
+class IndicationHintsIn(BaseModel):
+    hints: list[str] = Field(max_length=50)
+
+    @field_validator("hints")
+    @classmethod
+    def clean(cls, v: list[str]) -> list[str]:
+        """Убирает пустые строки и повторы (без учёта регистра), порядок сохраняет."""
+        out: list[str] = []
+        for h in (" ".join(x.split()) for x in v):
+            if len(h) > 60:
+                raise ValueError(f"Подсказка длиннее 60 символов: «{h[:20]}…»")
+            if h and h.lower() not in {o.lower() for o in out}:
+                out.append(h)
+        return out
 
 
 class CategoryOut(ORM):

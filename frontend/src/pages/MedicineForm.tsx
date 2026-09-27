@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { ExpiryInput } from '../components/ExpiryInput'
+import { IndicationsInput } from '../components/IndicationsInput'
 import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
@@ -12,7 +13,6 @@ import { PageLoader, useToast } from '../components/ui'
 
 const FORMS = ['Таблетки', 'Капсулы', 'Сироп', 'Суспензия', 'Капли', 'Спрей', 'Мазь', 'Гель', 'Крем', 'Порошок', 'Раствор', 'Свечи', 'Пластырь', 'Ампулы']
 const UNITS = ['шт', 'таб', 'капс', 'мл', 'г', 'пак', 'амп', 'уп']
-const INDICATION_HINTS = ['головная боль', 'температура', 'простуда', 'насморк', 'кашель', 'боль в горле', 'аллергия', 'изжога', 'диарея', 'порез', 'ожог', 'ушиб']
 
 export interface ScanPrefill {
   fields?: Partial<MedicineFields>
@@ -100,10 +100,6 @@ export function MedicineForm() {
     value: (f[k] as string | null) ?? '',
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => set(k, e.target.value as never),
   })
-  const addIndication = (t: string) => {
-    const cur = f.indications.split(',').map(s => s.trim()).filter(Boolean)
-    if (!cur.includes(t)) set('indications', [...cur, t].join(', '))
-  }
 
   if (editing && existing.isLoading) return <PageLoader />
   const submit = (e: FormEvent) => { e.preventDefault(); save.mutate() }
@@ -154,13 +150,7 @@ export function MedicineForm() {
 
         <section className="card stack">
           <h2>От чего помогает</h2>
-          <label className="field">
-            <textarea placeholder="Через запятую: головная боль, температура, зубная боль" {...text('indications')} />
-            <span className="hint">По этим словам работает подбор лекарства под болезнь</span>
-          </label>
-          <div className="chips wrap">
-            {INDICATION_HINTS.map(t => <button type="button" key={t} className="chip" onClick={() => addIndication(t)}>+ {t}</button>)}
-          </div>
+          <IndicationsInput value={f.indications} onChange={v => set('indications', v)} />
           <label className="field"><span>Противопоказания и предупреждения</span>
             <textarea placeholder="Например: не давать детям до 6 лет" {...text('contraindications')} />
           </label>
