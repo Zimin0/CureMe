@@ -86,3 +86,18 @@ it('на странице лекарства «Принял» — одно на�
   expect(bodies).toEqual([{ amount: 1, comment: '' }, { amount: 1, comment: 'после тренировки' }])
   expect(screen.queryByRole('dialog')).toBeNull()
 })
+
+it('в меню «История приёма» вместо «Экспорт», а экспорт — кнопкой в аптечке', async () => {
+  server.use(
+    http.get('/api/families/7/intakes', () => HttpResponse.json([])),
+    http.get('/api/families/7/medicines', () => HttpResponse.json([])),
+    http.get('/api/families/7/categories', () => HttpResponse.json([])),
+  )
+  const { user } = renderApp('/medicines')
+  const nav = await screen.findByRole('navigation', { name: 'Навигация' })
+  expect(within(nav).getByRole('link', { name: 'История приёма' })).toHaveAttribute('href', '/history')
+  expect(within(nav).getByText('История')).toBeInTheDocument()  // на телефоне короткая подпись
+  expect(within(nav).queryByRole('link', { name: 'Экспорт' })).toBeNull()
+  await user.click(await screen.findByRole('link', { name: 'Экспорт' }))
+  expect(location()).toBe('/export')
+})

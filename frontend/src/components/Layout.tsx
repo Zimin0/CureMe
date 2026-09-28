@@ -1,14 +1,15 @@
-import { FileDown, History, House, LogOut, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
+import { History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 
-const LINKS = [
+// short — подпись в нижней панели на телефоне, если полная не помещается.
+const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/', label: 'Главная', icon: House, end: true },
   { to: '/medicines', label: 'Аптечка', icon: Pill },
   { to: '/scan', label: 'Сканировать', icon: ScanLine },
   { to: '/find', label: 'Найти', icon: Stethoscope },
   { to: '/family', label: 'Семья', icon: Users },
-  { to: '/export', label: 'Экспорт', icon: FileDown },
+  { to: '/history', label: 'История приёма', short: 'История', icon: History },
 ]
 
 export function Layout() {
@@ -22,8 +23,6 @@ export function Layout() {
             <Icon size={20} />{label}
           </NavLink>
         ))}
-        {/* На телефоне нижняя панель уже полная: туда история попадает с главной и со страницы лекарства. */}
-        <NavLink to="/history" className="side-link"><History size={20} />История приёма</NavLink>
         {me?.is_admin && (
           <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
         )}
@@ -48,14 +47,14 @@ export function Layout() {
       <main className="main"><Outlet /></main>
 
       <nav className="bottom-nav six" aria-label="Навигация">
-        {LINKS.map(({ to, label, icon: Icon, end }) =>
+        {LINKS.map(({ to, label, short, icon: Icon, end }) =>
           to === '/scan' ? (
             <NavLink key={to} to={to} className="scan-link" aria-label={label}>
               <span className="scan-fab"><Icon size={26} /></span>
             </NavLink>
           ) : (
-            <NavLink key={to} to={to} end={end}>
-              <Icon size={22} />{label}
+            <NavLink key={to} to={to} end={end} aria-label={label}>
+              <Icon size={22} />{short ?? label}
             </NavLink>
           ),
         )}
