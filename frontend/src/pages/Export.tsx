@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { Copy, Download, Share2 } from 'lucide-react'
+import { ArrowLeft, Copy, Download, Share2 } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { fetchText } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Empty, Spinner, useToast } from '../components/ui'
@@ -37,6 +38,7 @@ export function Export() {
 
   return (
     <div className="page" style={{ maxWidth: 720 }}>
+      <Link to="/medicines" className="btn ghost sm" style={{ alignSelf: 'flex-start' }}><ArrowLeft size={16} />Аптечка</Link>
       <div className="page-head">
         <div>
           <h1>Экспорт</h1>
