@@ -38,7 +38,8 @@ def test_bump_updates_every_file(tmp_path):
     assert rel.package_versions(tmp_path) == [new] * 3
     text = changelog.read_text(encoding="utf-8")
     assert f"## [{new}] — 2026-10-01" in text
-    assert rel.changelog_notes(new, tmp_path) == "### Исправлено\n- Кнопка"
+    # то, что уже лежит в «Не выпущено» на main, тоже переезжает в новую версию — оно идёт после
+    assert rel.changelog_notes(new, tmp_path).startswith("### Исправлено\n- Кнопка")
     assert rel.changelog_notes(old, tmp_path) == rel.changelog_notes(old)  # старые записи не тронуты
     # в lock-файле версии зависимостей не задеты
     before = (rel.ROOT / "frontend/package-lock.json").read_text(encoding="utf-8").splitlines()

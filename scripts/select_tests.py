@@ -53,8 +53,12 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/medicines.py", "services.py"],
         "tests": [
             "unit/test_services.py", "integration/test_medicines.py", "integration/test_api.py",
-            "integration/test_categories.py", "integration/test_access_control.py",
+            "integration/test_categories.py", "integration/test_intakes.py", "integration/test_access_control.py",
         ],
+    },
+    "История приёма лекарств": {
+        "sources": ["routers/intakes.py"],
+        "tests": ["integration/test_intakes.py", "integration/test_access_control.py"],
     },
     "Категории": {
         "sources": ["routers/categories.py"],

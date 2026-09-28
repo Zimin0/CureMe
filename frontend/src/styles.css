@@ -450,3 +450,14 @@ button.list-row:hover { background: var(--surface-2); }
 .legal h1 { font-size: 26px; }
 .legal h2 { font-size: 18px; margin-top: 8px; }
 .legal ul { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ---------- история приёма ---------- */
+.intake-day + .intake-day { margin-top: 14px; }
+.intake-day-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: capitalize; margin-bottom: 4px; }
+.intake { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.intake-day-title + .intake { border-top: none; }
+.intake-time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); min-width: 44px; padding-top: 1px; }
+.intake-med { font-weight: 700; }
+a.intake-med { color: var(--primary); }
+.intake-comment { margin: 4px 0 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.intake .icon-btn { width: 34px; height: 34px; flex: none; }

@@ -8,6 +8,7 @@ from .security import MAX_PASSWORD_BYTES
 
 MAX_CATEGORIES = 3  # сколько категорий можно поставить одному лекарству
 TEXT_MAX = 5000     # длинные текстовые поля: показания, заметки
+COMMENT_MAX = 1000  # комментарий к приёму лекарства
 
 
 def _password_bytes(value: str) -> str:
@@ -325,6 +326,25 @@ class MedicineDetail(MedicineOut):
 
 class ConsumeIn(BaseModel):
     amount: float = Field(default=1, gt=0, le=1_000_000)
+    comment: str = Field(default="", max_length=COMMENT_MAX)  # необязательно: «почему принял»
+
+
+class IntakeOut(BaseModel):
+    id: int
+    medicine_id: int | None       # None — лекарство уже удалили из аптечки
+    medicine_name: str
+    unit: str
+    user_id: int
+    user_name: str
+    mine: bool
+    amount: float
+    comment: str                  # только свои; у чужих записей пусто
+    taken_at: datetime
+    last_at: datetime
+
+
+class IntakeUpdate(BaseModel):
+    comment: str = Field(max_length=COMMENT_MAX)
 
 
 class SuggestionOut(BaseModel):

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Heart, MapPin, Minus, Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { ArrowLeft, Heart, MapPin, MessageSquarePlus, Minus, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { CSSProperties, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { api, MedicineDetail as Detail, Package, PackageInput, uploadFile } from '../api'
+import { api, Intake, MedicineDetail as Detail, Package, PackageInput, uploadFile } from '../api'
 import { ExpiryInput } from '../components/ExpiryInput'
+import { CommentSheet, IntakeList } from '../components/IntakeList'
 import { useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
@@ -21,12 +22,17 @@ export function MedicineDetail() {
   const initial = (useLocation().state ?? {}) as DetailState
   const key = ['medicine', fam(''), id]
   const { data: m, isLoading, error } = useQuery({ queryKey: key, queryFn: () => api<Detail>(fam(`/medicines/${id}`)) })
+  const intakes = useQuery({
+    queryKey: ['intakes', fam(''), `medicine_id=${id}&limit=5`],
+    queryFn: () => api<Intake[]>(fam(`/intakes?medicine_id=${id}&limit=5`)),
+  })
 
   const [pkgSheet, setPkgSheet] = useState<{ edit?: Package; init?: PackageInput } | null>(
     initial.addPackage ? { init: initial.addPackage } : null,
   )
   const [dose, setDose] = useState(1)
   const [photoOpen, setPhotoOpen] = useState(false)
+  const [commentOpen, setCommentOpen] = useState(false)
 
   const onSaved = (d: Detail, msg?: string) => {
     qc.setQueryData(key, d)
@@ -40,9 +46,15 @@ export function MedicineDetail() {
     mutationFn: (body: { is_favorite?: boolean; helps_me?: boolean }) => api<Detail>(fam(`/medicines/${id}/mark`), { method: 'PUT', body }),
     onSuccess: d => onSaved(d), onError,
   })
+  // Обычно «Принял» — одно нажатие; комментарий пишут только когда хотят (отдельная кнопка рядом).
   const consume = useMutation({
-    mutationFn: () => api<Detail>(fam(`/medicines/${id}/consume`), { body: { amount: dose } }),
-    onSuccess: d => onSaved(d, `Списано ${fmtQty(dose)} ${d.unit}. Осталось ${fmtQty(d.stock.total)}`), onError,
+    mutationFn: (comment: string = '') => api<Detail>(fam(`/medicines/${id}/consume`), { body: { amount: dose, comment } }),
+    onSuccess: d => {
+      qc.invalidateQueries({ queryKey: ['intakes'] })
+      setCommentOpen(false)
+      onSaved(d, `Списано ${fmtQty(dose)} ${d.unit}. Осталось ${fmtQty(d.stock.total)}`)
+    },
+    onError,
   })
   const savePhoto = useMutation({
     mutationFn: (b: Blob | null) => b
@@ -129,11 +141,25 @@ export function MedicineDetail() {
                 <input type="number" min={0.5} step="any" value={dose} onChange={e => setDose(Math.max(0, Number(e.target.value)))} />
                 <button type="button" onClick={() => setDose(d => d + 1)}><Plus size={16} /></button>
               </div>
-              <button className="btn primary grow" disabled={s.total <= 0 || consume.isPending || dose <= 0} onClick={() => consume.mutate()}>
+              <button className="btn primary grow" disabled={s.total <= 0 || consume.isPending || dose <= 0} onClick={() => consume.mutate('')}>
                 Принял(а) {fmtQty(dose)} {m.unit}
+              </button>
+              <button className="icon-btn" title="Принять с комментарием" aria-label="Принять с комментарием"
+                disabled={s.total <= 0 || consume.isPending || dose <= 0} onClick={() => setCommentOpen(true)}>
+                <MessageSquarePlus size={19} />
               </button>
             </div>
             <p className="faint small" style={{ marginTop: 8 }}>Списываем из упаковки, у которой срок кончается раньше</p>
+          </section>
+
+          <section className="card">
+            <div className="card-head">
+              <h2>История приёма</h2>
+              {!!intakes.data?.length && <Link to={`/history?medicine=${m.id}`} className="btn ghost sm">Вся история</Link>}
+            </div>
+            {intakes.data?.length
+              ? <IntakeList items={intakes.data} />
+              : <p className="muted small">Здесь появится, кто и когда принимал это лекарство.</p>}
           </section>
 
           <section className="card">
@@ -185,7 +211,6 @@ export function MedicineDetail() {
               <dt>Вещество</dt><dd>{m.active_ingredient || '—'}</dd>
               <dt>Производитель</dt><dd>{m.manufacturer || '—'}</dd>
               <dt>Штрихкод</dt><dd>{m.gtin ? m.gtin.replace(/^0/, '') : '—'}</dd>
-              <dt>Напомнить при</dt><dd>{m.min_quantity != null ? `${fmtQty(m.min_quantity)} ${m.unit}` : '—'}</dd>
               {m.notes && <><dt>Заметки</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{m.notes}</dd></>}
             </dl>
           </section>
@@ -203,6 +228,11 @@ export function MedicineDetail() {
             {m.photo_url && <button className="btn danger" disabled={savePhoto.isPending} onClick={() => savePhoto.mutate(null)}><Trash2 size={16} />Удалить фото</button>}
           </div>
         </Sheet>
+      )}
+
+      {commentOpen && (
+        <CommentSheet title={`Принял(а) ${fmtQty(dose)} ${m.unit}`} submitLabel="Принял(а) и сохранить"
+          pending={consume.isPending} onSubmit={c => consume.mutate(c)} onClose={() => setCommentOpen(false)} />
       )}
 
       {pkgSheet && (

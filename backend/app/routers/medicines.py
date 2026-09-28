@@ -14,7 +14,7 @@ from ..schemas import (
 )
 from ..search import best_match
 from .files import _drop_photo
-from ..services import consume, load_medicines, medicine_out, member_names
+from ..services import consume, load_medicines, medicine_out, member_names, record_intake
 
 router = APIRouter(prefix="/api/families/{family_id}/medicines", tags=["medicines"])
 
@@ -171,6 +171,7 @@ def consume_medicine(
     short = consume(med, body.amount)
     if short >= body.amount:
         raise HTTPException(400, "В аптечке не осталось годных упаковок")
+    record_intake(db, med, user.id, body.amount - short, body.comment)
     db.commit()
     return _detail(db, fam, medicine_id, user)
 

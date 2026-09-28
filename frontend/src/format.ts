@@ -47,3 +47,18 @@ export function splitTags(s: string) {
 
 const AVATAR_COLORS = ['#0f9d8a', '#3e63dd', '#d6409f', '#f76b15', '#8e4ec6', '#30a46c', '#e5484d']
 export function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length] }
+
+/** «Сегодня», «Вчера» или дата: заголовки дней в истории приёма. */
+export function dayTitle(iso: string, now = new Date()) {
+  const d = new Date(iso)
+  const key = (x: Date) => x.toLocaleDateString('sv-SE')
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (key(d) === key(now)) return 'Сегодня'
+  if (key(d) === key(yesterday)) return 'Вчера'
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric', weekday: 'short' })
+}
+
+export function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}

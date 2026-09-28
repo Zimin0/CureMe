@@ -1,4 +1,4 @@
-import { FileDown, House, LogOut, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
+import { FileDown, History, House, LogOut, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 
@@ -22,6 +22,8 @@ export function Layout() {
             <Icon size={20} />{label}
           </NavLink>
         ))}
+        {/* На телефоне нижняя панель уже полная: туда история попадает с главной и со страницы лекарства. */}
+        <NavLink to="/history" className="side-link"><History size={20} />История приёма</NavLink>
         {me?.is_admin && (
           <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
         )}
