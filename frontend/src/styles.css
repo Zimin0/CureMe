@@ -395,6 +395,9 @@ a.list-row:hover { background: var(--surface-2); }
 
 .segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); }
 .segmented button { height: 38px; border: none; border-radius: 11px; background: transparent; font-weight: 700; color: var(--muted); cursor: pointer; }
+/* Много вкладок (админка): на узком экране переносятся на вторую строку, а не растягивают страницу вбок. */
+.segmented.wrap { display: flex; flex-wrap: wrap; }
+.segmented.wrap button { flex: 1 1 auto; padding: 0 14px; }
 .segmented button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
 .found { padding: 14px; border-radius: 14px; background: var(--primary-soft); display: flex; flex-direction: column; gap: 4px; }
 .found .t { font-weight: 800; font-size: 16px; }

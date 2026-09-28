@@ -26,3 +26,16 @@ test('администратор добавляет категорию, и её 
   await expect(other).toHaveURL(/\/$/)
   await ctx.close()
 })
+
+test('ни одна страница не шире экрана: вкладки админки и меню помещаются на телефоне', async ({ page, request }) => {
+  const admin = await adminApi(request)
+  await page.setViewportSize({ width: 360, height: 780 })  // узкий телефон: самые частые Android
+  await loginAs(page, admin, '/')
+  for (const path of ['/', '/medicines', '/find', '/family', '/history', '/export', '/admin']) {
+    await page.goto(path)
+    await page.locator('main h1').first().waitFor()
+    const [scroll, width] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth])
+    expect(scroll, `${path}: страница шире экрана`).toBeLessThanOrEqual(width)
+  }
+  await expect(page.getByRole('tab', { name: 'Доступ' })).toBeInViewport()
+})

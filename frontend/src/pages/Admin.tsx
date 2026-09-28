@@ -51,7 +51,7 @@ export function Admin() {
         <div className="stat"><span className="label"><Tags size={15} />Категорий</span><span className="value">{s?.categories ?? '…'}</span></div>
       </div>
 
-      <div className="segmented" role="tablist">
+      <div className="segmented wrap" role="tablist">
         {TABS.map(t => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''}
             onClick={() => setParams({ tab: t.id }, { replace: true })}>{t.label}</button>
