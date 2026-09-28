@@ -8,6 +8,7 @@ import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
 import { Family } from './pages/Family'
 import { Find } from './pages/Find'
+import { History } from './pages/History'
 import { Home } from './pages/Home'
 import { MedicineDetail } from './pages/MedicineDetail'
 import { MedicineForm } from './pages/MedicineForm'
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="medicines/:id/edit" element={<MedicineForm />} />
         <Route path="scan" element={<Scan />} />
         <Route path="find" element={<Find />} />
+        <Route path="history" element={<History />} />
         <Route path="family" element={<Family />} />
         <Route path="export" element={<Export />} />
         <Route path="admin" element={<Admin />} />

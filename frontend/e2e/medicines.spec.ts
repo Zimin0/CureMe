@@ -27,6 +27,14 @@ test('лекарство: добавить вручную → принять →
 
   await page.getByRole('button', { name: /Принял\(а\) 1 таб/ }).click()
   await expect(page.locator('.qty').first()).toHaveText('11таб')
+  // второе нажатие в ту же минуту складывается с первым; комментарий — по отдельной кнопке
+  await page.getByRole('button', { name: 'Принять с комментарием' }).click()
+  await page.getByLabel('Комментарий', { exact: true }).fill('болела голова')
+  await page.getByRole('button', { name: 'Принял(а) и сохранить' }).click()
+  await expect(page.locator('.qty').first()).toHaveText('10таб')
+  await expect(page.locator('.intake')).toHaveCount(1)
+  await expect(page.locator('.intake')).toContainText('2 таб')
+  await expect(page.locator('.intake')).toContainText('болела голова')
 
   await page.getByRole('button', { name: 'Отметить: помогает мне' }).click()
   await expect(page.getByRole('button', { name: 'Помогает мне' })).toBeVisible()

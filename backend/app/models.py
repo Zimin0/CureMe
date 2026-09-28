@@ -168,6 +168,32 @@ class UserMark(Base):
     personal_note: Mapped[str] = mapped_column(Text, default="")
 
 
+class Intake(Base):
+    """Запись в истории приёма: кто, когда и сколько принял.
+
+    Повторные нажатия «Принял» одного лекарства одним человеком в течение минуты
+    складываются в одну запись (amount растёт, last_at сдвигается).
+    Название лекарства копируется, чтобы история не пропала, если лекарство удалят.
+    """
+
+    __tablename__ = "intakes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
+    medicine_id: Mapped[int | None] = mapped_column(ForeignKey("medicines.id", ondelete="SET NULL"), index=True)
+    medicine_name: Mapped[str] = mapped_column(String(200))
+    unit: Mapped[str] = mapped_column(String(20), default="шт")
+    # Удалил аккаунт — удаляется и его история приёма (это его личные данные).
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    amount: Mapped[float] = mapped_column(Float)
+    # Комментарий видит только тот, кто его написал: как личная заметка в UserMark.
+    comment: Mapped[str] = mapped_column(Text, default="", server_default="")
+    taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)  # последнее нажатие
+
+    user: Mapped[User] = relationship()
+
+
 class ProductCode(Base):
     """Общий справочник «код товара → название». Пополняется, когда кто-то сохраняет лекарство с кодом."""
 

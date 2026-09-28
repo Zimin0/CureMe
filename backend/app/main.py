@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
-from .routers import admin, assist, auth, categories, families, files, medicines
+from .routers import admin, assist, auth, categories, families, files, intakes, medicines
 from .version import app_version
 
 settings = get_settings()
@@ -57,7 +57,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for r in (auth, families, categories, medicines, assist, files, admin):
+for r in (auth, families, categories, medicines, intakes, assist, files, admin):
     app.include_router(r.router)
 
 

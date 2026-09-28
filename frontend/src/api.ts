@@ -66,6 +66,21 @@ export interface Medicine extends MedicineFields {
 
 export interface MedicineDetail extends Medicine { packages: Package[] }
 
+/** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */
+export interface Intake {
+  id: number
+  medicine_id: number | null  // null — лекарство удалили из аптечки
+  medicine_name: string
+  unit: string
+  user_id: number
+  user_name: string
+  mine: boolean
+  amount: number
+  comment: string  // видно только автору
+  taken_at: string
+  last_at: string
+}
+
 export interface PackageInput {
   quantity: number
   expiry_date?: string | null

@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
-from .models import AppSetting, Medicine, MedicineCategory, Membership, Package, UserMark
-from .schemas import CategoryOut, MedicineDetail, MedicineOut, PackageOut, StockOut
+from .models import AppSetting, Intake, Medicine, MedicineCategory, Membership, Package, UserMark
+from .schemas import CategoryOut, IntakeOut, MedicineDetail, MedicineOut, PackageOut, StockOut
 from .seed import DEFAULT_INDICATION_HINTS
 
 INDICATION_HINTS = "indication_hints"
@@ -150,6 +150,49 @@ def consume(med: Medicine, amount: float) -> float:
         if left <= 0:
             break
     return max(left, 0)
+
+
+MERGE_WINDOW = timedelta(minutes=1)
+
+
+def _aware(dt: datetime) -> datetime:
+    """SQLite отдаёт время без часового пояса; у нас везде UTC."""
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def record_intake(
+    db: Session, med: Medicine, user_id: int, amount: float, comment: str = "", now: datetime | None = None
+) -> Intake:
+    """Пишет приём в историю. Если тот же человек нажал «Принял» у этого лекарства меньше минуты
+    назад (считая от последнего нажатия), дописывает количество в ту же запись."""
+    now = now or datetime.now(timezone.utc)
+    comment = comment.strip()
+    last = db.scalar(
+        select(Intake).where(Intake.medicine_id == med.id, Intake.user_id == user_id)
+        .order_by(Intake.last_at.desc(), Intake.id.desc()).limit(1)
+    )
+    if last and now - _aware(last.last_at) <= MERGE_WINDOW:
+        last.amount = round(last.amount + amount, 4)
+        last.last_at = now
+        if comment:
+            last.comment = f"{last.comment}\n{comment}" if last.comment else comment
+        return last
+    intake = Intake(
+        family_id=med.family_id, medicine_id=med.id, medicine_name=med.name, unit=med.unit,
+        user_id=user_id, amount=round(amount, 4), comment=comment, taken_at=now, last_at=now,
+    )
+    db.add(intake)
+    return intake
+
+
+def intake_out(i: Intake, user_id: int, names: dict[int, str]) -> IntakeOut:
+    mine = i.user_id == user_id
+    return IntakeOut(
+        id=i.id, medicine_id=i.medicine_id, medicine_name=i.medicine_name, unit=i.unit,
+        user_id=i.user_id, user_name=names.get(i.user_id) or i.user.name, mine=mine,
+        amount=i.amount, comment=i.comment if mine else "",
+        taken_at=_aware(i.taken_at), last_at=_aware(i.last_at),
+    )
 
 
 def find_package_by_serial(db: Session, family_id: int, gtin: str, serial: str) -> Package | None:

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CalendarClock, Heart, PackageOpen, Pill, Plus, ScanLine, Stethoscope } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Heart, History, PackageOpen, Pill, Plus, ScanLine, Stethoscope } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api, Medicine, Overview } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
@@ -56,6 +56,7 @@ export function Home() {
           <Link to="/scan" className="btn white"><ScanLine size={18} />Сканировать</Link>
           <Link to="/find" className="btn"><Stethoscope size={18} />Что есть от…</Link>
           <Link to="/medicines/new" className="btn"><Plus size={18} />Вручную</Link>
+          <Link to="/history" className="btn"><History size={18} />История приёма</Link>
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { avatarColor, daysText, fmtDate, fmtQty, plural, splitTags, STATUS_LABEL, subtitle, todayISO } from './format'
+import { avatarColor, dayTitle, daysText, fmtDate, fmtQty, plural, splitTags, STATUS_LABEL, subtitle, todayISO } from './format'
 import { medicine } from './test/utils'
 
 describe('plural — русские окончания', () => {
@@ -61,4 +61,14 @@ it('avatarColor стабилен и циклится', () => {
 
 it('у каждого статуса есть подпись', () => {
   expect(Object.keys(STATUS_LABEL).sort()).toEqual(['expired', 'expiring', 'low', 'ok', 'out'])
+})
+
+describe('dayTitle', () => {
+  const now = new Date(2026, 8, 28, 12, 0)
+  it('сегодня и вчера словами, остальное датой', () => {
+    expect(dayTitle(new Date(2026, 8, 28, 0, 5).toISOString(), now)).toBe('Сегодня')
+    expect(dayTitle(new Date(2026, 8, 27, 23, 55).toISOString(), now)).toBe('Вчера')
+    expect(dayTitle(new Date(2026, 8, 20, 9, 0).toISOString(), now)).toMatch(/20 сентября/)
+    expect(dayTitle(new Date(2025, 11, 31, 9, 0).toISOString(), now)).toMatch(/2025/)
+  })
 })

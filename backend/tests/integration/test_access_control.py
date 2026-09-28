@@ -10,7 +10,8 @@ from tests.conftest import fid, register
 
 JPEG = b"\xff\xd8\xff\xe0" + b"0" * 32
 
-# (метод, путь, тело). {f} — семья, {m} — лекарство, {p} — упаковка, {u} — участник.
+# (метод, путь, тело). {f} — семья, {m} — лекарство, {p} — упаковка, {u} — участник,
+# {i} — запись в истории приёма (её сделал владелец).
 FAMILY_ENDPOINTS = [
     ("GET", "/api/families/{f}", None),
     ("PATCH", "/api/families/{f}", {"name": "X"}),
@@ -26,6 +27,8 @@ FAMILY_ENDPOINTS = [
     ("DELETE", "/api/families/{f}/medicines/{m}", None),
     ("PUT", "/api/families/{f}/medicines/{m}/mark", {"is_favorite": True}),
     ("POST", "/api/families/{f}/medicines/{m}/consume", {"amount": 1}),
+    ("GET", "/api/families/{f}/intakes", None),
+    ("PATCH", "/api/families/{f}/intakes/{i}", {"comment": "X"}),
     ("POST", "/api/families/{f}/medicines/{m}/packages", {"quantity": 1}),
     ("PATCH", "/api/families/{f}/medicines/{m}/packages/{p}", {"quantity": 1}),
     ("DELETE", "/api/families/{f}/medicines/{m}/packages/{p}", None),
@@ -49,7 +52,9 @@ def world(client):
     h_stranger, stranger = register(client, "stranger@example.com", "Чужой")
     med = client.post(f"/api/families/{f}/medicines", headers=h_owner,
                       json={"name": "Нурофен", "packages": [{"quantity": 5}]}).json()
-    ids = {"f": f, "m": med["id"], "p": med["packages"][0]["id"], "u": member["id"]}
+    client.post(f"/api/families/{f}/medicines/{med['id']}/consume", headers=h_owner, json={"amount": 1})
+    intake = client.get(f"/api/families/{f}/intakes", headers=h_owner).json()[0]
+    ids = {"f": f, "m": med["id"], "p": med["packages"][0]["id"], "u": member["id"], "i": intake["id"]}
     return {"owner": h_owner, "member": h_member, "stranger": h_stranger, "stranger_family": fid(stranger), "ids": ids}
 
 
@@ -74,21 +79,23 @@ def test_stranger_gets_404(client, world, method, path, body):
 
 OWNER_ONLY = {"PATCH /api/families/{f}", "POST /api/families/{f}/invite", "POST /api/families/{f}/members",
               "PATCH /api/families/{f}/members/{u}"}
+# Комментарий к приёму меняет только тот, кто принимал (в world это владелец).
+AUTHOR_ONLY = {"PATCH /api/families/{f}/intakes/{i}"}
 
 
 @pytest.mark.parametrize("method, path, body", FAMILY_ENDPOINTS, ids=IDS)
 def test_member_rights(client, world, method, path, body):
     r = call(client, method, path, body, world["member"], world["ids"])
-    if f"{method} {path}" in OWNER_ONLY:
+    if f"{method} {path}" in OWNER_ONLY | AUTHOR_ONLY:
         assert r.status_code == 403
     else:
         assert r.status_code < 400, r.text  # участник ведёт общую аптечку наравне с владельцем
 
 
-@pytest.mark.parametrize("method, path, body", [e for e in FAMILY_ENDPOINTS if "{m}" in e[1]],
-                         ids=[i for i, e in zip(IDS, FAMILY_ENDPOINTS) if "{m}" in e[1]])
+@pytest.mark.parametrize("method, path, body", [e for e in FAMILY_ENDPOINTS if "{m}" in e[1] or "{i}" in e[1]],
+                         ids=[i for i, e in zip(IDS, FAMILY_ENDPOINTS) if "{m}" in e[1] or "{i}" in e[1]])
 def test_foreign_objects_via_own_family(client, world, method, path, body):
-    """Подставить id чужого лекарства в адрес своей семьи тоже не выйдет."""
+    """Подставить id чужого лекарства или чужой записи о приёме в адрес своей семьи тоже не выйдет."""
     ids = {**world["ids"], "f": world["stranger_family"]}
     assert call(client, method, path, body, world["stranger"], ids).status_code == 404
 
