@@ -135,7 +135,7 @@ describe('согласие на обработку данных', () => {
 
   it('документы открываются без входа', async () => {
     renderApp('/privacy', { loggedIn: false })
-    expect(await screen.findByRole('heading', { name: 'Политика обработки персональных данных' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Политика в отношении обработки персональных данных' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Пользовательское соглашение' })).toHaveAttribute('href', '/terms')
   })
 
