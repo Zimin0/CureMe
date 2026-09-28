@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Search } from 'lucide-react'
+import { FileDown, Plus, Search } from 'lucide-react'
 import { useDeferredValue } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, Category, Medicine } from '../api'
@@ -48,7 +48,10 @@ export function Medicines() {
           <h1>Аптечка</h1>
           <p className="sub">{meds.data ? `${meds.data.length} в списке` : ' '}</p>
         </div>
-        <Link to="/medicines/new" className="btn primary"><Plus size={18} />Добавить</Link>
+        <div className="row" style={{ gap: 8 }}>
+          <Link to="/export" className="btn ghost"><FileDown size={18} />Экспорт</Link>
+          <Link to="/medicines/new" className="btn primary"><Plus size={18} />Добавить</Link>
+        </div>
       </div>
 
       <label className="search">
