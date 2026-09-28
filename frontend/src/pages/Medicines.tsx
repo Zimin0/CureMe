@@ -49,8 +49,8 @@ export function Medicines() {
           <p className="sub">{meds.data ? `${meds.data.length} в списке` : ' '}</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <Link to="/export" className="btn ghost"><FileDown size={18} />Экспорт</Link>
           <Link to="/medicines/new" className="btn primary"><Plus size={18} />Добавить</Link>
+          <Link to="/export" className="btn ghost"><FileDown size={18} />Экспорт</Link>
         </div>
       </div>
 
