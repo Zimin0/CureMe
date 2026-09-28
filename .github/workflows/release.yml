@@ -1,0 +1,31 @@
+# Релизы: когда в main приходит новая версия (файл VERSION), ставим git-тег vX.Y.Z
+# и создаём GitHub Release с заметками из CHANGELOG.md. Если тег уже есть — ничего не делаем,
+# поэтому обычные push без смены версии релизов не плодят.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION, CHANGELOG.md]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # нужно, чтобы создать тег и релиз
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(python3 scripts/release.py version)"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Релиз $TAG уже есть"; exit 0
+          fi
+          python3 scripts/release.py notes > notes.md
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Капсулка $VERSION" --notes-file notes.md

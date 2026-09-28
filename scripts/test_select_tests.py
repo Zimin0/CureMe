@@ -193,3 +193,9 @@ def test_relative_imports_are_resolved():
     assert "app.routers.families" in rev["app.routers.auth"]   # from .auth import create_family
     assert "app.routers.medicines" in rev["app.codes"]          # from ..codes import parse_code
     assert "app.main" in rev["app.routers.admin"]               # from .routers import admin, ...
+
+
+def test_version_bump_runs_version_checks_frontend_and_docker():
+    s = st.select(["VERSION"])
+    assert s.backend and s.backend_tests == ["integration/test_version.py"]
+    assert s.frontend and not s.frontend_files and s.docker

@@ -86,6 +86,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["models.py", "db.py", "sqlite_import.py"],
         "tests": ["migrations/test_alembic.py", "migrations/test_sqlite_import.py"],
     },
+    "Версия приложения": {
+        "sources": ["version.py"],
+        "tests": ["integration/test_version.py"],
+    },
     # Модули, на которых держится всё приложение: их правка запускает весь бэкенд.
     "Ядро": {
         "sources": ["main.py", "config.py", "deps.py", "schemas.py", "seed.py", "__init__.py", "routers/__init__.py"],
@@ -103,19 +107,20 @@ FULL_RUN = [
 BACKEND_MIGRATIONS = ["backend/alembic/*", "backend/alembic.ini"]
 # Фронтенд: всё, что влияет на сборку или тесты целиком (иначе Vitest сам найдёт связанные тесты).
 FRONTEND_ALL = [
-    "frontend/vitest.config.ts", "frontend/src/test/setup.ts", "frontend/vite.config.ts", "frontend/tsconfig.json", "frontend/index.html",
+    "VERSION", "frontend/vitest.config.ts", "frontend/src/test/setup.ts", "frontend/vite.config.ts", "frontend/buildInfo.ts", "frontend/tsconfig.json", "frontend/index.html",
 ]
 # Что проверяют e2e: любой код приложения и сама обвязка e2e.
 E2E_TRIGGERS = [
     "backend/app/*", "backend/alembic/*", "frontend/src/*", "frontend/public/*", "frontend/index.html",
-    "frontend/vite.config.ts", "frontend/playwright.config.ts", "frontend/e2e/*",
+    "frontend/vite.config.ts", "frontend/buildInfo.ts", "frontend/playwright.config.ts", "frontend/e2e/*",
 ]
 E2E_SPEC = "frontend/e2e/*.spec.ts"
 # Что проверяет docker-smoke: образ, его зависимости и старт сервера.
 DOCKER_TRIGGERS = [
-    "Dockerfile", ".dockerignore", "docker-compose*.yml", "deploy/*", "backend/requirements.txt",
+    "Dockerfile", "VERSION", ".dockerignore", "docker-compose*.yml", "deploy/*", "backend/requirements.txt",
     "backend/alembic/*", "backend/alembic.ini", "backend/app/main.py", "backend/app/config.py",
-    "frontend/package.json", "frontend/package-lock.json", "frontend/vite.config.ts", "frontend/index.html",
+    "frontend/package.json", "frontend/package-lock.json", "frontend/vite.config.ts", "frontend/buildInfo.ts",
+    "frontend/index.html",
 ]
 
 
@@ -281,6 +286,9 @@ def select(changed: list[str], full: bool = False, root: Path = ROOT) -> Selecti
         if match(p, BACKEND_MIGRATIONS):
             tests |= set(SECTIONS["Схема базы, миграции, перенос из SQLite"]["tests"])
             sections.add("Схема базы, миграции, перенос из SQLite")
+        if p == "VERSION":  # номер версии читает version.py
+            tests |= set(SECTIONS["Версия приложения"]["tests"])
+            sections.add("Версия приложения")
     if tests:
         s.backend = True
         s.backend_sections = sorted(sections)

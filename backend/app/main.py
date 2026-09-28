@@ -5,11 +5,12 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .routers import admin, assist, auth, categories, families, files, medicines
+from .version import app_version
 
 settings = get_settings()
 docs = settings.api_docs  # на сервере выключено: незачем показывать всем карту API
 app = FastAPI(
-    title="Капсулка", version="1.0.0", description="Домашняя аптечка для всей семьи",
+    title="Капсулка", version=app_version()["version"], description="Домашняя аптечка для всей семьи",
     docs_url="/docs" if docs else None, redoc_url="/redoc" if docs else None,
     openapi_url="/openapi.json" if docs else None,
 )
@@ -63,6 +64,12 @@ for r in (auth, families, categories, medicines, assist, files, admin):
 @app.get("/api/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/api/version")
+def version():
+    """Какая версия работает на сервере: номер из VERSION, коммит и время сборки (их задаёт деплой)."""
+    return app_version()
 
 
 # Собранный фронтенд отдаём тем же сервером: одно приложение — один адрес.

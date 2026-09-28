@@ -1,8 +1,10 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
+import { buildDefines } from './buildInfo'
 
 // Отдельный конфиг для тестов: без PWA и копирования OCR-файлов из vite.config.ts.
 export default defineConfig({
+  define: buildDefines(),
   plugins: [react()],
   test: {
     environment: 'jsdom',

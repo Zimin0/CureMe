@@ -2,6 +2,7 @@ import react from '@vitejs/plugin-react'
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { buildDefines } from './buildInfo'
 
 // Распознавание текста (срок годности на фото) работает в браузере через tesseract.js.
 // Его воркер, wasm-ядро и языковую модель кладём к себе в public/ocr, чтобы не зависеть от CDN.
@@ -23,6 +24,7 @@ function ocrAssets(): Plugin {
 }
 
 export default defineConfig({
+  define: buildDefines(),
   plugins: [
     ocrAssets(),
     react(),

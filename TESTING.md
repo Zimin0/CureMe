@@ -74,6 +74,7 @@ PYTHON=../backend/.venv/bin/python npm run test:e2e   # если зависим�
 | Фото и экспорт | `routers/files.py` | `test_files`, `test_access_control` |
 | Администрирование | `routers/admin.py` | `test_admin`, `test_closed_mode`, `test_access_control` |
 | Схема базы и миграции | `models.py`, `db.py`, `sqlite_import.py`, `alembic/` | `test_alembic`, `test_sqlite_import` |
+| Версия приложения | `version.py` (и файл `VERSION`) | `test_version` |
 | Ядро | `main.py`, `config.py`, `deps.py`, `schemas.py`, `seed.py` | все тесты бэкенда |
 
 Раздел — только начало. Дальше скрипт сам расширяет выбор двумя способами:

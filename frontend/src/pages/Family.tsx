@@ -7,6 +7,7 @@ import { useAuth, useFamilyPath } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
+import { versionLabel } from '../version'
 import { LegalLinks } from './Legal'
 
 export function Family() {
@@ -149,6 +150,7 @@ export function Family() {
           <DeleteAccountButton />
         </div>
         <LegalLinks />
+        <p className="app-version">{versionLabel()}</p>
       </section>
 
       {rename !== null && (
