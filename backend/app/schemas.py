@@ -208,6 +208,38 @@ class AdminFamilyOut(BaseModel):
     created_at: datetime
     medicine_count: int
     members: list[MemberOut]
+    plan: str = "free"
+    plus_until: datetime | None = None
+    plus_active: bool = False  # Плюс оплачен и не истёк
+
+
+# --- тарифы (plans.py) ---
+class BillingSettings(BaseModel):
+    enabled: bool = False  # платная версия включена: у семей без Плюса действуют лимиты
+
+
+class AdminPlanIn(BaseModel):
+    plan: str = Field(pattern="^(free|plus)$")
+    plus_until: datetime | None = None  # пусто — Плюс бессрочно
+
+
+class PlanFeatureOut(BaseModel):
+    key: str
+    title: str
+    description: str
+    available: bool
+
+
+class PlanOut(BaseModel):
+    plan: str                          # free | plus — что записано у семьи
+    plus_until: datetime | None        # до какого момента Плюс; пусто — бессрочно
+    plus_active: bool                  # Плюс оплачен и не истёк
+    billing_enabled: bool              # платная версия включена администратором
+    has_plus: bool                     # семье доступно всё из Плюса (Плюс или платная версия выключена)
+    limits: dict[str, int | None]      # действующие лимиты семьи; None — без ограничений
+    free_limits: dict[str, int]        # лимиты бесплатной версии — для сравнения на странице «Плюс»
+    usage: dict[str, int]              # сколько уже есть: members, medicines
+    features: list[PlanFeatureOut]
 
 
 class AdminMemberIn(BaseModel):

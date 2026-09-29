@@ -7,11 +7,12 @@ from ..db import get_db
 from ..deps import admin_user
 from ..models import Category, Family, Medicine, MedicineCategory, Membership, User
 from ..schemas import (
-    AccessSettings,
+    AccessSettings, AdminPlanIn, BillingSettings,
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
     CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
+from ..plans import billing_settings, plus_active, set_billing_settings
 from ..security import hash_password
 from ..services import access_settings, indication_hints, set_access_settings, set_indication_hints
 from .files import _drop_photo
@@ -48,6 +49,7 @@ def _family_out(db: Session, f: Family) -> AdminFamilyOut:
             MemberOut(user_id=m.user_id, name=m.user.name, email=m.user.email, role=m.role, joined_at=m.joined_at)
             for m in members
         ],
+        plan=f.plan, plus_until=f.plus_until, plus_active=plus_active(f),
     )
 
 
@@ -155,6 +157,16 @@ def delete_family(family_id: int, db: Session = Depends(get_db)):
     _delete_family(db, _family(db, family_id))
     db.commit()
     return Response(status_code=204)
+
+
+@router.put("/families/{family_id}/plan", response_model=AdminFamilyOut)
+def set_plan(family_id: int, body: AdminPlanIn, db: Session = Depends(get_db)):
+    """Ручное включение Плюса (оплаты пока нет). Бесплатный тариф сбрасывает и срок."""
+    f = _family(db, family_id)
+    f.plan = body.plan
+    f.plus_until = body.plus_until if body.plan == "plus" else None
+    db.commit()
+    return _family_out(db, f)
 
 
 @router.post("/families/{family_id}/members", response_model=AdminFamilyOut)
@@ -277,3 +289,14 @@ def get_access(db: Session = Depends(get_db)):
 def put_access(body: AccessSettings, db: Session = Depends(get_db)):
     known = set(db.scalars(select(User.id).where(User.id.in_(body.user_ids))))
     return set_access_settings(db, body.closed, [i for i in body.user_ids if i in known])
+
+
+# --- платная версия ---
+@router.get("/billing", response_model=BillingSettings)
+def get_billing(db: Session = Depends(get_db)):
+    return billing_settings(db)
+
+
+@router.put("/billing", response_model=BillingSettings)
+def put_billing(body: BillingSettings, db: Session = Depends(get_db)):
+    return set_billing_settings(db, body)
