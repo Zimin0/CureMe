@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..models import Family, Membership, User
+from ..plans import plan_out
 from ..ratelimit import client_ip, limiter
-from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, RoleIn
+from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, PlanOut, RoleIn
 from ..security import new_invite_code
 from .auth import create_family
 
@@ -34,6 +35,12 @@ def new_family(body: FamilyIn, user: User = Depends(current_user), db: Session =
 @router.get("/families/{family_id}", response_model=FamilyOut)
 def get_family(m: Membership = Depends(family_membership)):
     return family_out(m.family, m.role)
+
+
+@router.get("/families/{family_id}/plan", response_model=PlanOut)
+def get_plan(m: Membership = Depends(family_membership), db: Session = Depends(get_db)):
+    """Тариф семьи, её лимиты, что уже набрано и какие функции Плюса доступны."""
+    return plan_out(db, m.family)
 
 
 @router.patch("/families/{family_id}", response_model=FamilyOut)

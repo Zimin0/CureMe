@@ -38,6 +38,7 @@ FAMILY_ENDPOINTS = [
     ("GET", "/api/families/{f}/suggest?condition=боль", None),
     ("POST", "/api/families/{f}/scan", {"raw": "4601669002013"}),
     ("GET", "/api/families/{f}/export.txt", None),
+    ("GET", "/api/families/{f}/plan", None),
 ]
 IDS = [f"{m} {p}" for m, p, _ in FAMILY_ENDPOINTS]
 
@@ -128,6 +129,9 @@ ADMIN_ENDPOINTS = [
     ("DELETE", "/api/admin/categories/{c}", None),
     ("GET", "/api/admin/indication-hints", None),
     ("PUT", "/api/admin/indication-hints", {"hints": ["кашель"]}),
+    ("PUT", "/api/admin/families/{f}/plan", {"plan": "plus"}),
+    ("GET", "/api/admin/billing", None),
+    ("PUT", "/api/admin/billing", {"enabled": False}),
 ]
 ADMIN_IDS = [f"{m} {p}" for m, p, _ in ADMIN_ENDPOINTS]
 
