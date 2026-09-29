@@ -136,6 +136,7 @@ class JoinIn(BaseModel):
 class InviteInfo(BaseModel):
     family_name: str
     members: int
+    full: bool = False  # в бесплатной семье уже предел участников: вступить не получится
 
 
 # --- категории ---
