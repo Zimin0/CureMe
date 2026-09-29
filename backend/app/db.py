@@ -17,6 +17,8 @@ def make_engine(url: str):
         @event.listens_for(engine, "connect")
         def _fk_on(dbapi_conn, _):  # SQLite по умолчанию не проверяет внешние ключи
             dbapi_conn.execute("PRAGMA foreign_keys=ON")
+            # Встроенный lower() в SQLite понимает только латиницу; поиску по истории нужна и кириллица.
+            dbapi_conn.create_function("lower", 1, lambda s: s.lower() if isinstance(s, str) else s, deterministic=True)
     return engine
 
 

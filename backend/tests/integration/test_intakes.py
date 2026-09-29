@@ -149,3 +149,34 @@ def test_paging_and_account_deletion(client, db, owner, med):
     r = client.request("DELETE", "/api/auth/me", headers=h_mom, json={"password": "secret123"})
     assert r.status_code == 204, r.text
     assert [i["user_name"] for i in history(client, h, f)] == ["Никита"]
+
+
+def test_search_by_text_member_and_dates(client, db, owner, med):
+    h, f, mid = med
+    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
+    h_mom, mom = register(client, "mom@example.com", "Мама", invite=code)
+    other = client.post(f"/api/families/{f}/medicines", headers=h,
+                        json={"name": "Пенталгин", "packages": [{"quantity": 5}]}).json()["id"]
+    take(client, h, f, mid, comment="Болела ГОЛОВА ёлки")
+    age(db, 3 * 24 * 60)  # три дня назад
+    take(client, h_mom, f, other, comment="голова тоже")
+    take(client, h, f, other)
+
+    names = lambda items: sorted((i["medicine_name"], i["user_name"]) for i in items)  # noqa: E731
+    # название — без учёта регистра, кириллица тоже
+    assert names(history(client, h, f, q="нурОФ")) == [("Нурофен", "Никита")]
+    # свой комментарий ищется (и «е» находит «ё»), чужой — нет: его содержимое скрыто
+    assert names(history(client, h, f, q="голова")) == [("Нурофен", "Никита")]
+    assert names(history(client, h, f, q="елки")) == [("Нурофен", "Никита")]
+    assert names(history(client, h_mom, f, q="голова")) == [("Пенталгин", "Мама")]
+    # символы шаблона LIKE ищутся как обычный текст
+    assert history(client, h, f, q="%") == []
+    # кто принимал
+    assert names(history(client, h, f, user_id=mom["id"])) == [("Пенталгин", "Мама")]
+    # период [since, until)
+    now = datetime.now(timezone.utc)
+    recent = history(client, h, f, since=(now - timedelta(days=1)).isoformat())
+    assert names(recent) == [("Пенталгин", "Мама"), ("Пенталгин", "Никита")]
+    old = history(client, h, f, until=(now - timedelta(days=1)).isoformat())
+    assert names(old) == [("Нурофен", "Никита")]
+    assert client.get(f"/api/families/{f}/intakes", headers=h, params={"q": "x" * 101}).status_code == 422
