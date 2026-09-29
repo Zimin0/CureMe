@@ -39,7 +39,7 @@ function ClosedNote() {
     <div className="alert info">
       <span>
         Капсулка пока открыта только для тестирования. Вопросы, предложения и просьбы удалить свои данные
-        присылайте на <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a> ({OPERATOR.name}).
+        присылайте на <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>.
       </span>
     </div>
   )
