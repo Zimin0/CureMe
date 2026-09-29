@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import signed_in_user
+from ..email_verification import issue_token, mark_verified, needs_verification, send_verification, user_by_token, verification_link
 from ..legal import CONSENT_VERSION
 from ..models import Family, Membership, User, utcnow
 from ..ratelimit import client_ip, limiter
-from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate
+from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
 from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
 from ..seed import ensure_default_categories
 from ..services import access_settings, has_access
@@ -30,12 +31,14 @@ def me_out(user: User, db: Session) -> MeOut:
         id=user.id, email=user.email, name=user.name, is_admin=user.is_admin,
         consent_needed=user.consent_version != CONSENT_VERSION,
         access_blocked=not has_access(db, user),
+        email_verified=user.email_verified_at is not None,
+        verification_needed=needs_verification(user),
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
     )
 
 
 @router.post("/register", response_model=TokenOut, status_code=201)
-def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
+def register(body: RegisterIn, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     # Без согласия (152-ФЗ, ст. 9 и 10) хранить почту и сведения об аптечке нельзя.
     if not body.consent:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нужно согласие на обработку персональных данных")
@@ -59,8 +62,12 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
         db.add(Membership(family=family, user=user, role="member"))
     else:
         create_family(db, f"Семья {user.name}", user)
+    token = issue_token(user) if needs_verification(user) else None
     db.commit()
     db.refresh(user)
+    if token:
+        # Письмо уходит уже после ответа: человек не ждёт почтовый сервер.
+        background.add_task(send_verification, user.email, user.name, verification_link(request, token))
     return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
 
 
@@ -124,6 +131,36 @@ def delete_me(body: DeleteAccountIn, user: User = Depends(signed_in_user), db: S
     db.flush()
     db.expire(user, ["memberships"])
     db.delete(user)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/verify-email/resend", status_code=204)
+def resend_verification(request: Request, background: BackgroundTasks,
+                        user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
+    """Отправить письмо со ссылкой ещё раз. Старая ссылка перестаёт работать."""
+    if user.email_verified_at:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Почта уже подтверждена")
+    # Чтобы через нас нельзя было засыпать чей-то ящик письмами: раз в минуту и не больше 5 в час.
+    limiter.hit(f"verify-resend-min:{user.id}", limit=1, window=60)
+    limiter.hit(f"verify-resend-hour:{user.id}", limit=5, window=3600)
+    token = issue_token(user)
+    db.commit()
+    background.add_task(send_verification, user.email, user.name, verification_link(request, token))
+    return Response(status_code=204)
+
+
+@router.post("/verify-email", status_code=204)
+def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(get_db)):
+    """Переход по ссылке из письма. Входить не нужно: ссылку часто открывают в почтовом
+    приложении на телефоне, где человек в Капсулку не входил."""
+    limiter.hit(f"verify-email:{client_ip(request)}", limit=30, window=600)
+    user, expired = user_by_token(db, body.token)
+    if not user:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Ссылка недействительна или уже использована")
+    if expired:
+        raise HTTPException(status.HTTP_410_GONE, "Ссылка устарела. Войдите и отправьте письмо ещё раз")
+    mark_verified(user)
     db.commit()
     return Response(status_code=204)
 

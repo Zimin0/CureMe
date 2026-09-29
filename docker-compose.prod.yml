@@ -9,6 +9,16 @@ services:
       # Доверять заголовку безопасно: порт 8000 наружу не открыт, до приложения доходит только Caddy.
       FORWARDED_ALLOW_IPS: "*"
       CUREME_API_DOCS: "false"
+      # Ссылки в письмах ведут на основной домен, а не на тот, что пришёл в заголовке Host.
+      CUREME_PUBLIC_URL: https://${CUREME_DOMAIN}
+      # Почта для писем «Подтвердите почту». Значения берутся из /opt/cureme/.env (см. DEPLOY.md, раздел 7).
+      # Пока CUREME_SMTP_HOST пуст, письма не отправляются и подтверждение почты выключено.
+      CUREME_SMTP_HOST: ${CUREME_SMTP_HOST:-}
+      CUREME_SMTP_PORT: ${CUREME_SMTP_PORT:-465}
+      CUREME_SMTP_SECURITY: ${CUREME_SMTP_SECURITY:-ssl}
+      CUREME_SMTP_USER: ${CUREME_SMTP_USER:-}
+      CUREME_SMTP_PASSWORD: ${CUREME_SMTP_PASSWORD:-}
+      CUREME_MAIL_FROM: ${CUREME_MAIL_FROM:-}
     security_opt: ["no-new-privileges:true"]
   caddy:
     image: caddy:2-alpine

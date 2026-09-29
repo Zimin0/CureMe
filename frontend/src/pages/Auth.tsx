@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { FormEvent, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { MailCheck } from 'lucide-react'
+import { FormEvent, useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, Family, Me } from '../api'
 import { useAuth } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
@@ -227,6 +228,73 @@ export function ClosedGate() {
       <ClosedNote />
       <DeleteAccountButton className="btn ghost block" />
       <button className="btn ghost block" onClick={signOut}>Выйти</button>
+    </AuthShell>
+  )
+}
+
+/** Аккаунт создан, но почта ещё не подтверждена: ждём перехода по ссылке из письма. */
+export function VerifyGate() {
+  const { me, refresh, signOut } = useAuth()
+  const [sent, setSent] = useState(false)
+  // Ссылку обычно открывают в почте или в другой вкладке: вернулись сюда — проверяем, подтвердилась ли почта.
+  useEffect(() => {
+    const check = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => { document.removeEventListener('visibilitychange', check); window.removeEventListener('focus', check) }
+  }, [refresh])
+  const resend = useMutation({
+    mutationFn: () => api('/auth/verify-email/resend', { method: 'POST' }),
+    onSuccess: () => setSent(true),
+  })
+  const check = useMutation({ mutationFn: () => refresh() })
+  return (
+    <AuthShell title="Проверьте почту" sub="Осталось подтвердить, что почта ваша">
+      <div className="alert info">
+        <MailCheck size={18} style={{ flexShrink: 0 }} />
+        <span>Мы отправили письмо на <b>{me?.email}</b>. Откройте ссылку из него, и аптечка откроется.</span>
+      </div>
+      <button className="btn primary block" disabled={check.isPending} onClick={() => check.mutate()}>
+        {check.isPending ? 'Проверяем…' : 'Я подтвердил(а) почту'}
+      </button>
+      <p className="muted small">Письма нет? Проверьте папку «Спам» или отправьте его ещё раз. Ссылка из прошлого письма после этого перестанет работать.</p>
+      {sent && !resend.isPending && <div className="alert ok">Отправили новое письмо</div>}
+      {resend.error && <div className="alert error">{resend.error.message}</div>}
+      <button className="btn ghost block" disabled={resend.isPending} onClick={() => resend.mutate()}>
+        {resend.isPending ? 'Отправляем…' : 'Отправить письмо ещё раз'}
+      </button>
+      <div className="divider">ошиблись в адресе?</div>
+      <p className="muted small">Удалите этот аккаунт и зарегистрируйтесь заново с правильной почтой.</p>
+      <DeleteAccountButton className="btn ghost block" />
+      <button className="btn ghost block" onClick={signOut}>Выйти</button>
+    </AuthShell>
+  )
+}
+
+/** Страница, на которую ведёт ссылка из письма: /verify-email#<токен>. Входить для неё не нужно. */
+export function VerifyEmail() {
+  const { me, refresh } = useAuth()
+  const { hash } = useLocation()
+  const token = hash.replace(/^#/, '')
+  // useQuery, а не useEffect: запрос уйдёт один раз, даже если React смонтирует страницу дважды,
+  // а ссылка одноразовая — второй запрос ответил бы «уже использована».
+  const q = useQuery({
+    queryKey: ['verify-email', token],
+    queryFn: () => api('/auth/verify-email', { body: { token } }).then(() => true),
+    enabled: !!token,
+    retry: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  useEffect(() => { if (q.isSuccess && me) refresh() }, [q.isSuccess])
+  if (token && q.isLoading) return <PageLoader />
+  // Ссылка уже использована, но почта подтверждена (открыли письмо второй раз) — это тоже успех.
+  const ok = q.isSuccess || (me?.email_verified ?? false)
+  return (
+    <AuthShell title={ok ? 'Почта подтверждена' : 'Не получилось подтвердить'} sub={ok ? 'Спасибо! Теперь аптечка доступна' : 'Ссылка не подошла'}>
+      {!ok && <div className="alert error">{q.error?.message ?? 'В ссылке нет кода подтверждения. Откройте её из письма целиком.'}</div>}
+      {!ok && me && <p className="muted small">Войдите и нажмите «Отправить письмо ещё раз», чтобы получить новую ссылку.</p>}
+      <Link className="btn primary block" to={me ? '/' : '/login'}>{me ? 'Открыть аптечку' : 'Войти'}</Link>
     </AuthShell>
   )
 }

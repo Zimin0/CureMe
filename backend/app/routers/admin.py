@@ -11,6 +11,7 @@ from ..schemas import (
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
     CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
+from ..email_verification import mark_verified
 from ..security import hash_password
 from ..services import access_settings, indication_hints, set_access_settings, set_indication_hints
 from .files import _drop_photo
@@ -32,7 +33,8 @@ def _get_user(db: Session, user_id: int) -> User:
 def _user_out(u: User) -> AdminUserOut:
     fams = sorted(u.memberships, key=lambda m: m.joined_at)
     return AdminUserOut(
-        id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, created_at=u.created_at,
+        id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, email_verified=u.email_verified_at is not None,
+        created_at=u.created_at,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
     )
 
@@ -93,6 +95,12 @@ def update_user(user_id: int, body: AdminUserUpdate, me: User = Depends(admin_us
         if db.scalar(select(User.id).where(func.lower(User.email) == body.email.lower(), User.id != u.id)):
             raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть")
         u.email = body.email.lower()
+        mark_verified(u)  # почту вписал администратор — он за неё и ручается
+    if body.email_verified is not None and body.email_verified != (u.email_verified_at is not None):
+        if body.email_verified:
+            mark_verified(u)
+        else:
+            u.email_verified_at = None
     if body.name:
         u.name = body.name.strip()
     if body.is_admin is not None:
