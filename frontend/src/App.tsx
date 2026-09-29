@@ -2,7 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
-import { ClosedGate, ConsentGate, Join, Login, Register } from './pages/Auth'
+import { ClosedGate, ConsentGate, Join, Login, Register, VerifyEmail, VerifyGate } from './pages/Auth'
 import { Consent, Privacy, Terms } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
@@ -23,6 +23,7 @@ function Protected() {
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   if (me.access_blocked) return <ClosedGate />
   if (me.consent_needed) return <ConsentGate />
+  if (me.verification_needed) return <VerifyGate />
   if (!familyId) return <NoFamily />
   return <Layout />
 }
@@ -34,6 +35,7 @@ export default function App() {
       <Route path="/login" element={me ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/register" element={me ? <Navigate to="/" replace /> : <Register />} />
       <Route path="/join/:code" element={<Join />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/consent" element={<Consent />} />
       <Route path="/terms" element={<Terms />} />

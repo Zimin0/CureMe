@@ -179,3 +179,48 @@ describe('закрытый режим', () => {
     expect(screen.getByRole('button', { name: 'Выйти' })).toBeInTheDocument()
   })
 })
+
+describe('подтверждение почты', () => {
+  const UNVERIFIED = { ...ME, email_verified: false, verification_needed: true }
+
+  it('без подтверждения вместо аптечки — экран «Проверьте почту», письмо можно отправить снова', async () => {
+    let resent = 0
+    server.use(http.post('/api/auth/verify-email/resend', () => { resent++; return new HttpResponse(null, { status: 204 }) }))
+    const { user } = renderApp('/', { me: UNVERIFIED })
+    expect(await screen.findByRole('heading', { name: 'Проверьте почту' })).toBeInTheDocument()
+    expect(screen.getByText('nikita@example.com')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Отправить письмо ещё раз' }))
+    expect(await screen.findByText('Отправили новое письмо')).toBeInTheDocument()
+    expect(resent).toBe(1)
+  })
+
+  it('после подтверждения кнопка «Я подтвердил(а)» открывает аптечку', async () => {
+    let verified = false
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(verified ? { ...ME, email_verified: true } : UNVERIFIED)),
+      overview,
+    )
+    localStorage.setItem('cureme.token', 'test-token')
+    const { user } = renderApp('/', { loggedIn: false })
+    await user.click(await screen.findByRole('button', { name: 'Я подтвердил(а) почту' }))
+    verified = true
+    await user.click(screen.getByRole('button', { name: 'Я подтвердил(а) почту' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Проверьте почту' })).not.toBeInTheDocument())
+  })
+
+  it('ссылка из письма подтверждает почту без входа, токен берётся из #', async () => {
+    let body: unknown
+    server.use(http.post('/api/auth/verify-email', async ({ request }) => { body = await request.json(); return new HttpResponse(null, { status: 204 }) }))
+    renderApp('/verify-email#tok-123', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: 'Почта подтверждена' })).toBeInTheDocument()
+    expect(body).toEqual({ token: 'tok-123' })
+    expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login')
+  })
+
+  it('устаревшая ссылка — сообщение сервера', async () => {
+    server.use(http.post('/api/auth/verify-email', () => HttpResponse.json({ detail: 'Ссылка устарела. Войдите и отправьте письмо ещё раз' }, { status: 410 })))
+    renderApp('/verify-email#old', { loggedIn: false })
+    expect(await screen.findByText('Ссылка устарела. Войдите и отправьте письмо ещё раз')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Не получилось подтвердить' })).toBeInTheDocument()
+  })
+})

@@ -68,6 +68,8 @@ class MeOut(UserOut):
     is_admin: bool = False
     consent_needed: bool = False  # согласия нет или оно старой редакции — показать экран согласия
     access_blocked: bool = False  # закрытый режим, а этого аккаунта нет в списке тестировщиков
+    email_verified: bool = False
+    verification_needed: bool = False  # почта не подтверждена, а проверка включена — показать экран «Проверьте почту»
     families: list[FamilyBrief]
     # Только после смены своего пароля: старый токен уже не действует, вот новый.
     access_token: str | None = None
@@ -75,6 +77,10 @@ class MeOut(UserOut):
 
 class AccessOut(BaseModel):
     closed: bool
+
+
+class VerifyEmailIn(BaseModel):
+    token: str = Field(min_length=1, max_length=100)
 
 
 class AccessSettings(BaseModel):
@@ -181,6 +187,7 @@ class AdminUserOut(BaseModel):
     email: str
     name: str
     is_admin: bool
+    email_verified: bool
     created_at: datetime
     families: list[FamilyBrief]
 
@@ -189,6 +196,8 @@ class AdminUserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     email: EmailStr | None = None
     is_admin: bool | None = None
+    # Подтвердить почту за человека, например если письмо не доходит.
+    email_verified: bool | None = None
     password: NewPassword | None = None
 
 

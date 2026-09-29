@@ -3,13 +3,13 @@ export type Role = 'owner' | 'member'
 export type StockStatus = 'ok' | 'low' | 'out' | 'expiring' | 'expired'
 
 export interface FamilyBrief { id: number; name: string; role: Role }
-export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; families: FamilyBrief[] }
+export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[] }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 export interface Family { id: number; name: string; invite_code: string; role: Role; members: Member[] }
 export interface Category { id: number; name: string; icon: string; color: string; medicine_count: number }
 
 export interface AdminStats { users: number; admins: number; families: number; medicines: number; categories: number }
-export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; created_at: string; families: FamilyBrief[] }
+export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[] }
 export interface AdminFamily { id: number; name: string; invite_code: string; created_at: string; medicine_count: number; members: Member[] }
 
 export interface Stock {

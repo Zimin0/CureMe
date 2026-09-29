@@ -89,6 +89,7 @@ function UsersTab({ meId }: { meId: number }) {
               <div className="small muted ellipsis">{u.email}</div>
               <div className="small faint ellipsis">{u.families.length ? u.families.map(f => f.name).join(', ') : 'Ни в одной семье'}</div>
             </div>
+            {!u.email_verified && <span className="badge low" title="Человек ещё не перешёл по ссылке из письма">Почта не подтверждена</span>}
             {u.is_admin && <span className="badge accent"><Shield size={12} />Админ</span>}
           </button>
         ))}
@@ -105,11 +106,12 @@ function UserSheet({ user, isMe, onClose }: { user: AdminUser; isMe: boolean; on
   const [email, setEmail] = useState(user.email)
   const [password, setPassword] = useState('')
   const [isAdmin, setIsAdmin] = useState(user.is_admin)
+  const [verified, setVerified] = useState(user.email_verified)
   const onError = (e: Error) => toast(e.message, 'error')
 
   const save = useMutation({
     mutationFn: () => api<AdminUser>(`/admin/users/${user.id}`, {
-      method: 'PATCH', body: { name, email, is_admin: isAdmin, password: password || null },
+      method: 'PATCH', body: { name, email, is_admin: isAdmin, email_verified: verified, password: password || null },
     }),
     onSuccess: () => { refresh(); toast(password ? 'Сохранено, пароль изменён' : 'Сохранено'); onClose() }, onError,
   })
@@ -127,6 +129,10 @@ function UserSheet({ user, isMe, onClose }: { user: AdminUser; isMe: boolean; on
         <label className="field"><span>Новый пароль</span>
           <input className="input" type="text" minLength={8} autoComplete="off" placeholder="Оставьте пустым, чтобы не менять" value={password} onChange={e => setPassword(e.target.value)} />
           <span className="hint">Если человек забыл пароль: задайте новый и передайте ему</span>
+        </label>
+        <label className="row" style={{ gap: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={verified} disabled={isMe && user.email_verified} onChange={e => setVerified(e.target.checked)} />
+          <span>Почта подтверждена{!user.email_verified && <span className="muted small"> (отметьте, если письмо не доходит)</span>}</span>
         </label>
         <label className="row" style={{ gap: 10, cursor: isMe ? 'default' : 'pointer' }}>
           <input type="checkbox" checked={isAdmin} disabled={isMe} onChange={e => setIsAdmin(e.target.checked)} />
