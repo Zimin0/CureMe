@@ -61,6 +61,12 @@ CUREME_SECRET_KEY=$(openssl rand -hex 32) docker compose up --build   # http://l
 | `CUREME_MEDIA_DIR` | `./media` | Папка для фото лекарств (в Docker — `/data/media`) |
 | `CUREME_EXPIRING_SOON_DAYS` | `30` | С какого момента срок считается «скоро истекает» |
 | `CUREME_ADMIN_EMAILS` | пусто | Почты, которые всегда получают права администратора, в формате JSON: `["me@example.com"]`. Запасной вход, если первый аккаунт потерян |
+| `CUREME_SMTP_HOST` | пусто | SMTP-сервер для писем, например `smtp.yandex.ru`. Пока пусто, письма пишутся в лог, а подтверждение почты выключено |
+| `CUREME_SMTP_PORT` / `CUREME_SMTP_SECURITY` | `465` / `ssl` | Порт и шифрование: `ssl` для 465, `starttls` для 587 |
+| `CUREME_SMTP_USER` / `CUREME_SMTP_PASSWORD` | пусто | Логин и пароль SMTP (у Яндекса — пароль приложения) |
+| `CUREME_MAIL_FROM` | = `CUREME_SMTP_USER` | Адрес отправителя |
+| `CUREME_PUBLIC_URL` | из запроса | Адрес сайта для ссылок в письмах. На сервере `https://<домен>` |
+| `CUREME_EMAIL_VERIFICATION` | авто | Требовать подтверждения почты. По умолчанию включено, только если задан `CUREME_SMTP_HOST` |
 | `CUREME_REMOTE_LOOKUP` | `true` | Искать незнакомые штрихкоды в интернете (поисковики, затем Open Food Facts) |
 
 ## Устройство
@@ -72,6 +78,8 @@ backend/
   app/codes.py       разбор GS1 DataMatrix / EAN-13, проверка контрольной цифры
   app/websearch.py   поиск лекарства по штрихкоду через поисковики и разбор заголовков аптек
   app/search.py      подбор по болезни: нормализация, грубый стемминг, синонимы
+  app/mailer.py      отправка писем по SMTP (без настроек — в лог)
+  app/email_verification.py  подтверждение почты: одноразовая ссылка, в базе только хеш токена
   alembic/           миграции схемы
   tests/             pytest: unit/ (функции), integration/ (API на настоящей базе), migrations/ (Alembic)
 frontend/

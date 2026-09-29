@@ -28,6 +28,28 @@ class Settings(BaseSettings):
     # Интерактивная документация API (/docs, /openapi.json). На сервере выключена.
     api_docs: bool = True
 
+    # Адрес сайта для ссылок в письмах, например https://kapsulka.ru. Пусто — берём из запроса.
+    public_url: str = ""
+    # Почта (SMTP). Пока smtp_host пуст, письма не отправляются, а пишутся в лог приложения.
+    smtp_host: str = ""
+    smtp_port: int = 465
+    # ssl — шифрование сразу (порт 465), starttls — после приветствия (порт 587), none — без шифрования.
+    smtp_security: str = "ssl"
+    smtp_user: str = ""
+    smtp_password: str = ""
+    # Отправитель, например noreply@kapsulka.ru. Пусто — smtp_user.
+    mail_from: str = ""
+    mail_from_name: str = "Капсулка"
+    # Требовать подтверждения почты. Не задано — требуем, только если настроен SMTP:
+    # без него письмо не дойдёт, и новые люди застряли бы на экране «Подтвердите почту».
+    email_verification: bool | None = None
+    # Сколько часов действует ссылка из письма.
+    email_token_ttl_hours: int = 24
+
+    @property
+    def email_verification_required(self) -> bool:
+        return self.email_verification if self.email_verification is not None else bool(self.smtp_host)
+
 
 @lru_cache
 def get_settings() -> Settings:
