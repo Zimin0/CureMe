@@ -28,6 +28,7 @@ FAMILY_ENDPOINTS = [
     ("PUT", "/api/families/{f}/medicines/{m}/mark", {"is_favorite": True}),
     ("POST", "/api/families/{f}/medicines/{m}/consume", {"amount": 1}),
     ("GET", "/api/families/{f}/intakes", None),
+    ("GET", "/api/families/{f}/intakes/older", None),
     ("PATCH", "/api/families/{f}/intakes/{i}", {"comment": "X"}),
     ("POST", "/api/families/{f}/medicines/{m}/packages", {"quantity": 1}),
     ("PATCH", "/api/families/{f}/medicines/{m}/packages/{p}", {"quantity": 1}),

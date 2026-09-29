@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session, selectinload
 from ..db import get_db
 from ..deps import current_user, get_family
 from ..models import Family, Intake, User
-from ..schemas import IntakeOut, IntakeUpdate
-from ..services import intake_out, member_names
+from ..plans import history_since
+from ..schemas import IntakeOut, IntakeUpdate, OlderHistoryOut
+from ..services import _aware, intake_out, member_names
 
 router = APIRouter(prefix="/api/families/{family_id}/intakes", tags=["intakes"])
 
@@ -34,6 +35,8 @@ def list_intakes(
 
     Фильтры: лекарство, кто принимал (mine или user_id), текст q (название лекарства или свой
     комментарий), период [since, until). before — для подгрузки следующей страницы.
+    Без Плюса видны только последние 30 дней: более ранние записи не удаляются, а скрываются,
+    и снова видны, как только у семьи появится Плюс.
     """
     query = (
         select(Intake).where(Intake.family_id == fam.id).options(selectinload(Intake.user))
@@ -56,8 +59,25 @@ def list_intakes(
         query = query.where(Intake.taken_at < until)
     if before is not None:
         query = query.where(Intake.taken_at < before)
+    if (cutoff := history_since(db, fam)) is not None:
+        query = query.where(Intake.taken_at >= cutoff)
     names = member_names(db, fam.id)
     return [intake_out(i, user.id, names) for i in db.scalars(query)]
+
+
+@router.get("/older", response_model=OlderHistoryOut)
+def older_history(
+    medicine_id: int | None = None,
+    fam: Family = Depends(get_family), db: Session = Depends(get_db),
+):
+    """Сколько записей скрыто, потому что они старше бесплатного лимита. Для замочка «доступно в Плюсе»."""
+    cutoff = history_since(db, fam)
+    if cutoff is None:
+        return OlderHistoryOut(history_since=None, hidden=0)
+    q = select(func.count()).select_from(Intake).where(Intake.family_id == fam.id, Intake.taken_at < cutoff)
+    if medicine_id is not None:
+        q = q.where(Intake.medicine_id == medicine_id)
+    return OlderHistoryOut(history_since=cutoff, hidden=db.scalar(q) or 0)
 
 
 @router.patch("/{intake_id}", response_model=IntakeOut)
@@ -67,7 +87,9 @@ def update_intake(
 ):
     """Комментарий можно дописать и позже, но только к своей записи."""
     i = db.get(Intake, intake_id)
-    if not i or i.family_id != fam.id:
+    cutoff = history_since(db, fam)
+    # Скрытую без Плюса запись нельзя и изменить: для пользователя её сейчас нет.
+    if not i or i.family_id != fam.id or (cutoff is not None and _aware(i.taken_at) < cutoff):
         raise HTTPException(404, "Запись не найдена")
     if i.user_id != user.id:
         raise HTTPException(403, "Комментарий может менять только тот, кто принимал лекарство")
