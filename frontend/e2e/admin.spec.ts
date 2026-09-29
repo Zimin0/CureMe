@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { adminApi, loginAs, registerApi } from './helpers'
+import { addMedicineApi, adminApi, loginAs, registerApi } from './helpers'
 
 test('администратор добавляет категорию, и её сразу видят все семьи', async ({ page, request, browser }) => {
   const admin = await adminApi(request)
@@ -38,4 +38,13 @@ test('ни одна страница не шире экрана: вкладки 
     expect(scroll, `${path}: страница шире экрана`).toBeLessThanOrEqual(width)
   }
   await expect(page.getByRole('tab', { name: 'Доступ' })).toBeInViewport()
+
+  // карточка лекарства: надпись «Принял(а) …» целиком помещается в кнопку
+  const med = await addMedicineApi(request, admin, { name: 'Лизобакт', unit: 'таб', packages: [{ quantity: 9 }] })
+  await page.goto(`/medicines/${med.id}`)
+  const take = page.getByRole('button', { name: /Принял\(а\) 1 таб/ })
+  await expect(take).toBeInViewport()
+  const [inner, outer] = await take.evaluate(b => [b.scrollWidth, b.clientWidth])
+  expect(inner, 'надпись вылезает за кнопку').toBeLessThanOrEqual(outer)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
 })
