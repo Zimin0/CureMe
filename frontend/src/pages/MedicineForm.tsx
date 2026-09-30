@@ -198,6 +198,11 @@ export function MedicineForm() {
                   value={f.blister_size ?? ''} onChange={e => set('blister_size', e.target.value === '' ? null : Number(e.target.value))} />
               </label>
             )}
+            <label className="field"><span>Напомнить, когда останется</span>
+              <input className="input" type="number" min={0} step="any" placeholder="Например, 5"
+                value={f.min_quantity ?? ''} onChange={e => set('min_quantity', e.target.value === '' ? null : Number(e.target.value))} />
+              <span className="hint">Пришлём в Telegram или на почту: включите в «Семья» → «Напоминания»</span>
+            </label>
           </div>
           {!editing && (
             <>

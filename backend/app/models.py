@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import (
-    JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
+    JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -202,6 +202,46 @@ class Intake(Base):
     last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)  # последнее нажатие
 
     user: Mapped[User] = relationship()
+
+
+class NotificationPrefs(Base):
+    """Настройки напоминаний человека: куда слать (почта, Telegram) и о чём.
+
+    Строки нет — напоминания выключены. Telegram привязывается по одноразовой ссылке на бота:
+    в базе, как и для писем, хранится только хеш кода из ссылки.
+    """
+
+    __tablename__ = "notification_prefs"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    telegram_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    telegram_name: Mapped[str | None] = mapped_column(String(100))   # @username, чтобы показать, куда привязано
+    telegram_code_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    telegram_code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Когда человек дал отдельное согласие на трансграничную передачу данных в Telegram (ст. 12 152-ФЗ).
+    telegram_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notify_low: Mapped[bool] = mapped_column(Boolean, default=True)      # «скоро закончится»
+    notify_expiry: Mapped[bool] = mapped_column(Boolean, default=True)   # «истекает срок» и «срок истёк»
+    expiry_days: Mapped[int] = mapped_column(Integer, default=30)        # за сколько дней предупреждать о сроке
+
+
+class ReminderSent(Base):
+    """Какие напоминания человек уже получил, чтобы не повторять их каждый день.
+
+    kind: low (ref_id — лекарство), expiring и expired (ref_id — упаковка).
+    Запись о «low» удаляется, когда остаток пополнили: в следующий раз напомним снова.
+    """
+
+    __tablename__ = "reminders_sent"
+    __table_args__ = (UniqueConstraint("user_id", "kind", "ref_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    ref_id: Mapped[int] = mapped_column(Integer)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class ProductCode(Base):

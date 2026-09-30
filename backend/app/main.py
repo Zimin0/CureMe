@@ -1,18 +1,33 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import reminders
 from .config import get_settings
-from .routers import admin, assist, auth, categories, families, files, intakes, medicines
+from .db import SessionLocal
+from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications
 from .version import app_version
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Фоновые потоки: ежедневные напоминания и Telegram-бот (см. reminders.py). В тестах выключены.
+    stop = reminders.start_background(SessionLocal) if settings.background_jobs else None
+    yield
+    if stop:
+        stop.set()
+
+
 docs = settings.api_docs  # на сервере выключено: незачем показывать всем карту API
 app = FastAPI(
     title="Капсулка", version=app_version()["version"], description="Домашняя аптечка для всей семьи",
     docs_url="/docs" if docs else None, redoc_url="/redoc" if docs else None,
-    openapi_url="/openapi.json" if docs else None,
+    openapi_url="/openapi.json" if docs else None, lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
@@ -57,7 +72,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for r in (auth, families, categories, medicines, intakes, assist, files, admin):
+for r in (auth, families, categories, medicines, intakes, assist, files, admin, notifications):
     app.include_router(r.router)
 
 
