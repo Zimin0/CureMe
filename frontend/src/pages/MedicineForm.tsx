@@ -11,6 +11,8 @@ import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { PageLoader, useToast } from '../components/ui'
 import { fmtQty } from '../format'
+import { useLimitReached } from '../limits'
+import { LimitCounter } from '../plan'
 
 const FORMS = ['Таблетки', 'Капсулы', 'Сироп', 'Суспензия', 'Капли', 'Спрей', 'Мазь', 'Гель', 'Крем', 'Порошок', 'Раствор', 'Свечи', 'Пластырь', 'Ампулы']
 const UNITS = ['шт', 'таб', 'капс', 'мл', 'г', 'пак', 'амп', 'уп']
@@ -34,6 +36,7 @@ export function MedicineForm() {
   const fam = useFamilyPath()
   const nav = useNavigate()
   const qc = useQueryClient()
+  const full = useLimitReached('medicines')
   const toast = useToast()
   const prefill = (useLocation().state ?? {}) as ScanPrefill
   const focus = useSearchParams()[0].get('focus')
@@ -70,6 +73,7 @@ export function MedicineForm() {
       qc.invalidateQueries({ queryKey: ['medicines'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
       qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['plan'] })
       qc.setQueryData(['medicine', fam(''), String(m.id)], m)
       toast(editing ? 'Сохранено' : `«${m.name}» в аптечке`)
       nav(`/medicines/${m.id}`, { replace: true })
@@ -112,9 +116,16 @@ export function MedicineForm() {
         <div>
           <h1>{editing ? 'Редактирование' : 'Новое лекарство'}</h1>
           {prefill.source && <p className="sub">{prefill.source}</p>}
+          {!editing && <p className="sub"><LimitCounter name="medicines" /></p>}
         </div>
         {!editing && <Link to="/scan" className="btn ghost"><ScanLine size={18} />Сканировать</Link>}
       </div>
+
+      {!editing && full && (
+        <div className="alert warn">
+          <span>Место в бесплатной версии закончилось. Удалите ненужные лекарства или подключите <Link to="/plus">Капсулку Плюс</Link>: в ней ограничений нет.</span>
+        </div>
+      )}
 
       <form className="stack lg" onSubmit={submit}>
         <section className="card stack">
