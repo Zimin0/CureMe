@@ -102,6 +102,32 @@ export interface NotificationPrefs {
   expiry_days: number
 }
 
+// --- расписание приёма: backend/app/routers/schedule.py ---
+export interface ScheduleSlot { id: number; weekday: number; minute: number }  // weekday 0 — понедельник; minute — от полуночи по Москве
+export interface Schedule {
+  id: number
+  medicine_id: number | null  // null — лекарство удалили из аптечки
+  medicine_name: string
+  unit: string
+  amount: number
+  start_date: string
+  end_date: string | null
+  every_weeks: number
+  slots: ScheduleSlot[]
+}
+export interface Occurrence {
+  schedule_id: number
+  slot_id: number
+  medicine_id: number | null
+  medicine_name: string
+  unit: string
+  amount: number
+  date: string
+  minute: number
+  taken: boolean
+  taken_at: string | null
+}
+
 export interface MedicineDetail extends Medicine { packages: Package[] }
 
 /** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */
