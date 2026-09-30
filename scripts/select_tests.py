@@ -101,6 +101,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["plans.py"],
         "tests": ["integration/test_plans.py", "integration/test_access_control.py"],
     },
+    "Лимиты бесплатной версии": {
+        "sources": ["limits.py"],
+        "tests": ["integration/test_limits.py"],
+    },
     "Схема базы, миграции, перенос из SQLite": {
         "sources": ["models.py", "db.py", "sqlite_import.py"],
         "tests": ["migrations/test_alembic.py", "migrations/test_sqlite_import.py"],
