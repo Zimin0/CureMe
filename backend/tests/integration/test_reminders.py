@@ -339,3 +339,14 @@ def test_daily_due(hour, last, due):
 def test_nudge_without_background_thread_is_noop():
     reminders.nudge(1)
     assert reminders._queue.empty()
+
+
+def test_fresh_package_window():
+    class P:
+        def __init__(self, added_at):
+            self.added_at = added_at
+
+    now = datetime(2026, 9, 30, 12, tzinfo=timezone.utc)
+    assert reminders._is_fresh(P(now - timedelta(hours=11, minutes=59)), now)
+    assert not reminders._is_fresh(P(now - reminders.NEW_PACKAGE_DELAY), now)
+    assert reminders._is_fresh(P(datetime(2026, 9, 30, 6)), now)  # без часового пояса = UTC
