@@ -46,14 +46,20 @@ export function Reminders() {
     <section className="card stack" data-testid="reminders">
       <div className="card-head">
         <h2><Bell size={18} style={{ verticalAlign: -3 }} /> Напоминания</h2>
-        {locked && <Link to="/plus" className="badge"><Lock size={12} />Плюс</Link>}
       </div>
       <p className="muted small">
         Раз в день пришлём одно сообщение, если лекарство заканчивается или у него скоро истекает срок.
         Об одном и том же повторять не будем.
       </p>
       {locked && (
-        <p className="small">Напоминания доступны в <Link to="/plus">Капсулке Плюс</Link>. Уже включённые можно выключить.</p>
+        <div className="plus-banner" data-testid="plus-banner">
+          <Lock size={32} />
+          <div>
+            <strong>Напоминания — в Капсулке Плюс</strong>
+            <p>Подключите Плюс, и мы сами напомним о лекарствах, которые заканчиваются или портятся. Уже включённые напоминания можно выключить.</p>
+          </div>
+          <Link to="/plus" className="btn plus-btn">Узнать про Плюс</Link>
+        </div>
       )}
 
       <h3>Куда</h3>
