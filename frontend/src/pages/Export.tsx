@@ -6,6 +6,7 @@ import { fetchText } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Empty, Spinner, useToast } from '../components/ui'
 import { plural } from '../format'
+import { copyText } from '../clipboard'
 import { canShare, saveFile, shareFile } from '../files'
 
 export function Export() {
@@ -60,7 +61,7 @@ export function Export() {
               <div className="row wrap">
                 <button className="btn primary grow" onClick={download}><Download size={18} />Скачать .txt</button>
                 {canShareFile && <button className="btn" onClick={share}><Share2 size={18} />Отправить</button>}
-                <button className="btn ghost" onClick={() => navigator.clipboard.writeText(text!).then(() => toast('Список скопирован'))}><Copy size={18} />Копировать</button>
+                <button className="btn ghost" onClick={async () => { const ok = await copyText(text!); toast(ok ? 'Список скопирован' : 'Не удалось скопировать', ok ? undefined : 'error') }}><Copy size={18} />Копировать</button>
               </div>
             </>
           )}
