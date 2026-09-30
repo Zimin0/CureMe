@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .email_verification import hash_token
+from .services import telegram_active
 from .models import NotificationPrefs, User, utcnow
 
 log = logging.getLogger("cureme.telegram")
@@ -148,6 +149,11 @@ def poll_forever(session_factory, stop: threading.Event) -> None:
     """Фоновый поток: забирает сообщения боту и отвечает на них."""
     offset = None
     while not stop.is_set():
+        with session_factory() as db:
+            on = telegram_active(db)
+        if not on:  # админ выключил Telegram: бота не опрашиваем, ждём минуту и смотрим снова
+            stop.wait(60)
+            continue
         try:
             updates = call("getUpdates", http_timeout=POLL_TIMEOUT + 10, offset=offset,
                            timeout=POLL_TIMEOUT, allowed_updates=["message"])

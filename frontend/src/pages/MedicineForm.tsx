@@ -36,6 +36,7 @@ export function MedicineForm() {
   const fam = useFamilyPath()
   const nav = useNavigate()
   const qc = useQueryClient()
+  const tgOn = !!useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean; telegram?: boolean }>('/auth/access'), staleTime: 60_000 }).data?.telegram
   const full = useLimitReached('medicines')
   const toast = useToast()
   const prefill = (useLocation().state ?? {}) as ScanPrefill
@@ -201,7 +202,7 @@ export function MedicineForm() {
             <label className="field"><span>Напомнить, когда останется</span>
               <input className="input" type="number" min={0} step="any" placeholder="Например, 5"
                 value={f.min_quantity ?? ''} onChange={e => set('min_quantity', e.target.value === '' ? null : Number(e.target.value))} />
-              <span className="hint">Пришлём в Telegram или на почту: включите в «Семья» → «Напоминания»</span>
+              <span className="hint">Пришлём {tgOn ? 'в Telegram или ' : ''}на почту: включите в «Семья» → «Напоминания»</span>
             </label>
           </div>
           {!editing && (
