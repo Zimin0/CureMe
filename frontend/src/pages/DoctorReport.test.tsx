@@ -78,12 +78,15 @@ it('свой период: кнопки выключены, пока начал�
   expect(screen.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
 })
 
-it('без Плюса: замочек у заголовка, 402 открывает шторку и ничего не скачивает', async () => {
+it('без Плюса: блок заблокирован, баннер открывает шторку, ничего не скачивается', async () => {
   const { clicks } = setup()
   server.use(http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false, billing_enabled: true }))))
   const { user } = await openReport()
   expect(await screen.findByRole('button', { name: /Доступно в Плюсе/ })).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: /^Excel$/ }))
+  expect(screen.getByRole('button', { name: /^Excel$/ })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
+  expect(screen.getByRole('tab', { name: 'Год' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: /Доступно в Плюсе/ }))
   expect(await screen.findByText('Доступно в Капсулке Плюс')).toBeInTheDocument()
   expect(clicks).toEqual([])
 })
