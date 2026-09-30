@@ -15,6 +15,7 @@ import { MedicineForm } from './pages/MedicineForm'
 import { Medicines } from './pages/Medicines'
 import { Scan } from './pages/Scan'
 import { NoFamily } from './pages/NoFamily'
+import { Plus } from './pages/Plus'
 
 function Protected() {
   const { me, loading, familyId } = useAuth()
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="find" element={<Find />} />
         <Route path="history" element={<History />} />
         <Route path="family" element={<Family />} />
+        <Route path="plus" element={<Plus />} />
         <Route path="export" element={<Export />} />
         <Route path="admin" element={<Admin />} />
       </Route>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Crown, LogOut, Pencil, Plus, RefreshCw, Settings, Share2, Shield, Trash2, UserPlus } from 'lucide-react'
+import { ChevronRight, Copy, Crown, LogOut, Pencil, Plus, RefreshCw, Settings, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, Category, Family as FamilyT } from '../api'
@@ -7,6 +7,7 @@ import { useAuth, useFamilyPath } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
+import { LimitCounter, planLabel, usePlan } from '../plan'
 import { versionLabel } from '../version'
 import { LegalLinks } from './Legal'
 
@@ -18,6 +19,7 @@ export function Family() {
   const key = ['family', familyId]
   const { data: f, isLoading } = useQuery({ queryKey: key, queryFn: () => api<FamilyT>(fam('')) })
   const cats = useQuery({ queryKey: ['categories', fam('')], queryFn: () => api<Category[]>(fam('/categories')) })
+  const { plan } = usePlan()
 
   const [email, setEmail] = useState('')
   const [rename, setRename] = useState<string | null>(null)
@@ -75,6 +77,15 @@ export function Family() {
         {owner && <button className="btn ghost" onClick={() => setRename(f.name)}><Pencil size={16} />Переименовать</button>}
       </div>
 
+      <Link to="/plus" className="card list-row plus-link" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Sparkles size={22} style={{ color: 'var(--plus)', flex: 'none' }} />
+        <div className="grow">
+          <div style={{ fontWeight: 700 }}>Капсулка Плюс</div>
+          <div className="small muted">{planLabel(plan) || 'Тариф семьи'}</div>
+        </div>
+        <ChevronRight size={18} className="muted" />
+      </Link>
+
       <section className="card stack">
         <h2>Пригласить в семью</h2>
         <p className="muted small">Отправьте ссылку. По ней можно создать аккаунт или войти в существующий, и аптечка сразу станет общей.</p>
@@ -98,7 +109,7 @@ export function Family() {
       </section>
 
       <section className="card flush">
-        <div style={{ padding: '18px 18px 6px' }}><h2>Участники</h2></div>
+        <div className="row between" style={{ padding: '18px 18px 6px' }}><h2>Участники</h2><LimitCounter name="members" /></div>
         {f.members.map(m => (
           <div key={m.user_id} className="list-row">
             <div className="avatar" style={{ background: avatarColor(m.user_id) }}>{m.name.slice(0, 1).toUpperCase()}</div>

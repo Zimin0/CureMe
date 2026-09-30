@@ -10,7 +10,25 @@ export interface Category { id: number; name: string; icon: string; color: strin
 
 export interface AdminStats { users: number; admins: number; families: number; medicines: number; categories: number }
 export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[] }
-export interface AdminFamily { id: number; name: string; invite_code: string; created_at: string; medicine_count: number; members: Member[] }
+export interface AdminFamily { id: number; name: string; invite_code: string; created_at: string; medicine_count: number; members: Member[]; plan: PlanName; plus_until: string | null; plus_active: boolean }
+
+// --- тарифы: backend/app/plans.py ---
+export type PlanName = 'free' | 'plus'
+/** Функции Плюса. Ключи совпадают с FEATURES на бэкенде. */
+export type PlusFeature = 'reminders' | 'full_history' | 'export_pdf' | 'cabinets' | 'no_limits'
+export type LimitName = 'members' | 'medicines' | 'own_families' | 'history_days'
+export interface PlanFeature { key: PlusFeature; title: string; description: string; available: boolean }
+export interface Plan {
+  plan: PlanName
+  plus_until: string | null
+  plus_active: boolean       // Плюс оплачен и не истёк
+  billing_enabled: boolean   // платная версия включена администратором
+  has_plus: boolean          // семье доступно всё из Плюса
+  limits: Record<LimitName, number | null>  // null — без ограничений
+  free_limits: Record<LimitName, number>
+  usage: { members: number; medicines: number }
+  features: PlanFeature[]
+}
 
 export interface Stock {
   total: number
@@ -143,11 +161,22 @@ export function setToken(token: string | null) {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message) }
+  /** plusFeature — какая функция Плюса нужна (ответ 402 с заголовком X-Plus-Feature). */
+  constructor(public status: number, message: string, public plusFeature: PlusFeature | null = null) { super(message) }
 }
 
 let onUnauthorized: () => void = () => {}
 export function setUnauthorizedHandler(fn: () => void) { onUnauthorized = fn }
+// Ответ 402: функция доступна только в Плюсе. PlusProvider открывает шторку.
+let onPlusRequired: (feature: PlusFeature) => void = () => {}
+export function setPlusRequiredHandler(fn: (feature: PlusFeature) => void) { onPlusRequired = fn }
+
+function plusFeatureOf(res: Response): PlusFeature | null {
+  if (res.status !== 402) return null
+  const feature = (res.headers.get('X-Plus-Feature') ?? 'no_limits') as PlusFeature
+  onPlusRequired(feature)
+  return feature
+}
 
 export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
   const headers: Record<string, string> = {}
@@ -176,7 +205,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
     const msg = typeof detail === 'string'
       ? detail
       : own ?? (Array.isArray(detail) ? 'Проверьте заполнение полей' : `Ошибка ${res.status}`)
-    throw new ApiError(res.status, msg)
+    throw new ApiError(res.status, msg, plusFeatureOf(res))
   }
   return data as T
 }
@@ -189,7 +218,7 @@ function authHeaders(): Record<string, string> {
 async function failure(res: Response): Promise<never> {
   const data = await res.json().catch(() => null)
   if (res.status === 401) onUnauthorized()
-  throw new ApiError(res.status, typeof data?.detail === 'string' ? data.detail : `Ошибка ${res.status}`)
+  throw new ApiError(res.status, typeof data?.detail === 'string' ? data.detail : `Ошибка ${res.status}`, plusFeatureOf(res))
 }
 
 /** Загрузка файла формой multipart (браузер сам выставит Content-Type с boundary). */
