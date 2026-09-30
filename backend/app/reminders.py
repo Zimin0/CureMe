@@ -174,6 +174,10 @@ def remind_user(db: Session, user: User, today: date | None = None, kinds: set[s
     """Проверяет поводы одного человека и отправляет новые. Возвращает, сколько поводов отправлено."""
     prefs = db.get(NotificationPrefs, user.id)
     if not prefs or not has_channel(user, prefs, telegram_active(db)):
+        if prefs and (prefs.email_enabled or prefs.telegram_enabled):
+            # человек включил напоминания, но канал не работает: раньше это молчало, теперь видно в логе
+            log.warning("Напоминания для пользователя %s включены, но канала нет (почта: SMTP=%s, подтверждена=%s)",
+                        user.id, bool(get_settings().smtp_host), not needs_verification(user))
         return 0
     today = today or datetime.now(MSK).date()
     current = reasons_for(db, user, prefs, today, now)
@@ -220,17 +224,30 @@ def run_family(db: Session, family_id: int) -> int:
 
 # --- фоновый поток ---
 
-_queue: "queue.Queue[int]" = queue.Queue(maxsize=1000)
+_queue: "queue.Queue[tuple[str, int]]" = queue.Queue(maxsize=1000)
 _running = threading.Event()
+
+
+def _put(item: tuple[str, int]) -> None:
+    if _running.is_set():
+        try:
+            _queue.put_nowait(item)
+        except queue.Full:
+            pass
 
 
 def nudge(family_id: int) -> None:
     """Попросить проверить семью прямо сейчас (после «Принял(а)»). Без фонового потока — ничего не делает."""
-    if _running.is_set():
-        try:
-            _queue.put_nowait(family_id)
-        except queue.Full:
-            pass
+    _put(("family", family_id))
+
+
+def nudge_user(user_id: int) -> None:
+    """Проверить одного человека сразу: он только что включил напоминания или поменял их настройки.
+
+    Иначе первое письмо пришло бы лишь в ближайшую ежедневную сводку (завтра в 10:00 по Москве),
+    и человек решил бы, что напоминания не работают.
+    """
+    _put(("user", user_id))
 
 
 def _last_run(db: Session) -> str | None:
@@ -266,15 +283,21 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                     log.exception("Ежедневные напоминания упали")
                     db.rollback()
             try:
-                families = {_queue.get(timeout=60)}
+                items = {_queue.get(timeout=60)}
             except queue.Empty:
                 continue
             while not _queue.empty():
-                families.add(_queue.get_nowait())
+                items.add(_queue.get_nowait())
             with session_factory() as db:
-                for fid in families:
-                    if db.get(Family, fid):
-                        run_family(db, fid)
+                for what, pk in items:
+                    try:
+                        if what == "user":
+                            remind_users(db, [pk])
+                        elif db.get(Family, pk):
+                            run_family(db, pk)
+                    except Exception:  # noqa: BLE001
+                        log.exception("Проверка напоминаний (%s %s) упала", what, pk)
+                        db.rollback()
     finally:
         _running.clear()
 
