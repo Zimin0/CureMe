@@ -50,7 +50,7 @@ it('экспорт аптечки: только список, выписки д�
   expect(screen.queryByText('Для врача: PDF и Excel')).toBeNull()
 })
 
-it('выписка для врача на странице истории: чья история, период, аптечка — и скачивание PDF', async () => {
+it('выписка для врача на странице истории: чья история, период — и скачивание PDF', async () => {
   const { asked, clicks } = setup()
   const { user } = await openReport()
   expect(await screen.findByText('Для врача: PDF и Excel')).toBeInTheDocument()
@@ -58,13 +58,11 @@ it('выписка для врача на странице истории: чь�
   await user.selectOptions(await screen.findByLabelText('Чья история'), '2')
   expect(screen.getByText(/Комментарии к приёму видит только их автор/)).toBeInTheDocument()
   await user.click(screen.getByRole('tab', { name: '90 дней' }))
-  await user.click(screen.getByLabelText('Добавить, что сейчас есть в аптечке'))
   await user.click(screen.getByRole('button', { name: /^PDF$/ }))
 
   await waitFor(() => expect(clicks).toEqual(['kapsulka-dlya-vracha-x.pdf']))
   const q = asked[0].searchParams
   expect(q.get('member')).toBe('2')
-  expect(q.get('cabinet')).toBe('true')
   expect(q.get('tz')).toBeTruthy()
   const days = (Date.parse(q.get('to')!) - Date.parse(q.get('from')!)) / 86_400_000
   expect(days).toBe(89)

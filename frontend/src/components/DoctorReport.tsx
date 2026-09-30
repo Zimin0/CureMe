@@ -22,7 +22,6 @@ export function DoctorReport() {
   const [period, setPeriod] = useState<Period>('30')
   const [from, setFrom] = useState(daysAgo(29))
   const [to, setTo] = useState(isoDay(new Date()))
-  const [cabinet, setCabinet] = useState(false)
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
   const [ready, setReady] = useState<File | null>(null)
 
@@ -33,7 +32,6 @@ export function DoctorReport() {
   const get = async (fmt: 'pdf' | 'xlsx') => {
     const qs = new URLSearchParams({ ...range, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Moscow' })
     if (who && who !== me?.id) qs.set('member', String(who))
-    if (cabinet) qs.set('cabinet', 'true')
     setBusy(fmt)
     setReady(null)
     try {
@@ -81,11 +79,6 @@ export function DoctorReport() {
           <label className="field grow"><span>По</span><input className="input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></label>
         </div>
       )}
-
-      <label className="check">
-        <input type="checkbox" checked={cabinet} onChange={e => setCabinet(e.target.checked)} />
-        <span>Добавить, что сейчас есть в аптечке</span>
-      </label>
 
       <div className="row wrap">
         <button className="btn primary grow" disabled={badRange || busy !== null} onClick={() => get('pdf')}>

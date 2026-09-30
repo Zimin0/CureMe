@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Family, Intake, Medicine, User
-from .services import load_medicines, stock_of
+from .services import load_medicines
 
 FONTS = Path(__file__).parent / "fonts"
 BRAND = "Капсулка"
@@ -29,7 +29,6 @@ DISCLAIMER = (
 )
 NO_COMMENTS_NOTE = "Комментарии к приёму видит только их автор, поэтому в выписке по другому участнику их нет."
 
-STATUS = {"ok": "есть", "low": "заканчивается", "out": "закончилось", "expiring": "скоро истекает", "expired": "есть просроченное"}
 
 
 @dataclass
@@ -56,18 +55,6 @@ class SummaryRow:
 
 
 @dataclass
-class CabinetRow:
-    medicine: str
-    dosage: str
-    form: str
-    active_ingredient: str
-    left: float
-    unit: str
-    nearest_expiry: date | None
-    status: str
-
-
-@dataclass
 class Report:
     family: str
     patient: str
@@ -78,7 +65,6 @@ class Report:
     with_comments: bool
     intakes: list[IntakeRow] = field(default_factory=list)
     summary: list[SummaryRow] = field(default_factory=list)
-    cabinet: list[CabinetRow] | None = None
 
     @property
     def period(self) -> str:
@@ -92,7 +78,7 @@ class Report:
 
 def collect(
     db: Session, fam: Family, viewer: User, patient: User,
-    date_from: date, date_to: date, tz: ZoneInfo, cabinet: bool = False,
+    date_from: date, date_to: date, tz: ZoneInfo,
 ) -> Report:
     start = datetime.combine(date_from, time.min, tz).astimezone(timezone.utc)
     end = datetime.combine(date_to + timedelta(days=1), time.min, tz).astimezone(timezone.utc)
@@ -132,14 +118,6 @@ def collect(
             row.total += i.amount
             row.last = at
     report.summary = sorted(groups.values(), key=lambda r: r.medicine.lower())
-    if cabinet:
-        report.cabinet = []
-        for med in meds.values():
-            s = stock_of(med)
-            report.cabinet.append(CabinetRow(
-                med.name, med.dosage or "", med.form or "", med.active_ingredient or "",
-                s.total, med.unit, s.nearest_expiry, STATUS.get(s.status, s.status),
-            ))
     return report
 
 
@@ -239,15 +217,6 @@ def render_pdf(r: Report) -> bytes:
                   [[_dt(i.taken_at), f"{i.medicine} {i.dosage}".strip(), f"{num(i.amount)} {i.unit}"]
                    for i in r.intakes])
 
-    if r.cabinet is not None:
-        section(f"Лекарства в аптечке «{r.family}»", "Что есть дома сейчас, по данным приложения.")
-        if r.cabinet:
-            table((56, 24, 36, 22, 22, 22),
-                  ["Лекарство", "Дозировка", "Действующее вещество", "Осталось", "Годен до", "Статус"],
-                  [[c.medicine, c.dosage, c.active_ingredient, f"{num(c.left)} {c.unit}",
-                    f"{c.nearest_expiry:%d.%m.%Y}" if c.nearest_expiry else "", c.status] for c in r.cabinet])
-        else:
-            pdf.cell(0, 6, "Аптечка пуста.", new_x="LMARGIN", new_y="NEXT")
     return bytes(pdf.output())
 
 
@@ -262,7 +231,7 @@ def render_xlsx(r: Report) -> bytes:
     bold = Font(bold=True)
     fill = PatternFill("solid", fgColor="EAF0EE")
     wrap = Alignment(wrap_text=True, vertical="top")
-    DT, D = "DD.MM.YYYY HH:MM", "DD.MM.YYYY"
+    DT = "DD.MM.YYYY HH:MM"
 
     def sheet(ws, title, headings, widths, rows, formats=None, note=""):
         ws.title = title
@@ -302,14 +271,6 @@ def render_xlsx(r: Report) -> bytes:
         [[i.taken_at, i.medicine, i.dosage, i.amount, i.unit] + ([i.comment] if r.with_comments else []) for i in r.intakes],
         {1: DT}, note="" if r.with_comments else NO_COMMENTS_NOTE,
     )
-    if r.cabinet is not None:
-        sheet(
-            wb.create_sheet(), "Аптечка",
-            ["Лекарство", "Дозировка", "Форма", "Действующее вещество", "Осталось", "Ед.", "Годен до", "Статус"],
-            [30, 14, 14, 26, 10, 8, 12, 18],
-            [[c.medicine, c.dosage, c.form, c.active_ingredient, c.left, c.unit, c.nearest_expiry, c.status] for c in r.cabinet],
-            {7: D},
-        )
     wb.properties.creator = BRAND
     wb.properties.title = f"Для врача — {r.patient}"
     buf = BytesIO()
