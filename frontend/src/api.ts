@@ -128,6 +128,22 @@ export interface Occurrence {
   taken_at: string | null
 }
 
+// --- уведомления по расписанию: backend/app/routers/schedule_notify.py ---
+export type TrustedStatus = 'pending' | 'confirmed' | 'declined' | 'revoked'
+export interface Trusted { name: string; email: string; status: TrustedStatus; confirmed_at: string | null }
+export interface SchedulePrefs {
+  available: boolean        // есть семья с Плюсом (или платная версия выключена)
+  email: string
+  email_possible: boolean   // на сайте настроена почта, адрес подтверждён
+  enabled: boolean
+  lead_minutes: number      // напомнить за сколько минут до приёма
+  repeat_minutes: number    // напомнить снова через сколько минут после приёма, если он не отмечен
+  escalate_enabled: boolean
+  escalate_minutes: number  // письмо доверенному: через сколько минут после повторного напоминания
+  share_medicine_name: boolean
+  trusted: Trusted | null
+}
+
 export interface MedicineDetail extends Medicine { packages: Package[] }
 
 /** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { api, Occurrence, Schedule as ScheduleT, ScheduleSlot } from '../api'
 import { useFamilyPath } from '../auth'
 import { ScheduleEditor } from '../components/ScheduleEditor'
+import { ScheduleNotify } from '../components/ScheduleNotify'
 import { ScheduleRemove } from '../components/ScheduleRemove'
 import { SlotSheet } from '../components/SlotSheet'
 import { Empty, PageLoader, useToast } from '../components/ui'
@@ -152,6 +153,8 @@ export function Schedule() {
           </section>
         </>
       )}
+
+      <ScheduleNotify />
 
       {editor && <ScheduleEditor schedule={editor === 'new' ? undefined : editor} onClose={() => setEditor(null)} />}
       {removeTarget && <ScheduleRemove schedule={removeTarget} onClose={() => setRemoving(null)} />}

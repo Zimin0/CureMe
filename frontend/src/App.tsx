@@ -16,6 +16,7 @@ import { MedicineDetail } from './pages/MedicineDetail'
 import { MedicineForm } from './pages/MedicineForm'
 import { Medicines } from './pages/Medicines'
 import { Scan } from './pages/Scan'
+import { Trusted } from './pages/Trusted'
 import { Schedule } from './pages/Schedule'
 import { NoFamily } from './pages/NoFamily'
 import { Plus } from './pages/Plus'
@@ -50,6 +51,7 @@ export default function App() {
       <Route path="/register" element={me ? <Navigate to="/" replace /> : <Register />} />
       <Route path="/join/:code" element={<Join />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/trusted" element={<Trusted />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/consent" element={<Consent />} />
       <Route path="/terms" element={<Terms />} />

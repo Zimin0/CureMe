@@ -117,6 +117,11 @@ def test_account_endpoints_require_login(client):
     assert client.post("/api/notifications/telegram/link", json={"consent": True}).status_code == 401
     assert client.delete("/api/notifications/telegram").status_code == 401
     assert client.post("/api/notifications/test").status_code == 401
+    assert client.get("/api/schedule-notifications").status_code == 401
+    assert client.put("/api/schedule-notifications", json={"enabled": True}).status_code == 401
+    assert client.post("/api/schedule-notifications/trusted", json={"name": "X", "email": "x@example.com", "attest": True}).status_code == 401
+    assert client.post("/api/schedule-notifications/trusted/resend").status_code == 401
+    assert client.delete("/api/schedule-notifications/trusted").status_code == 401
 
 
 # --- админка -------------------------------------------------------------------

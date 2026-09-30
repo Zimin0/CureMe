@@ -270,11 +270,18 @@ def daily_due(now: datetime, last_run: str | None) -> bool:
 
 
 def work_forever(session_factory, stop: threading.Event) -> None:
+    from .schedule_notify import run_due  # здесь, чтобы не зациклить импорты: schedule_notify сам берёт отсюда MSK
+
     _running.set()
     try:
         while not stop.is_set():
             now = datetime.now(MSK)
             with session_factory() as db:
+                try:
+                    run_due(db)  # уведомления о приёме по расписанию: проверяем раз в минуту
+                except Exception:  # noqa: BLE001
+                    log.exception("Уведомления по расписанию упали")
+                    db.rollback()
                 try:
                     if daily_due(now, _last_run(db)):
                         _save_last_run(db, now.date().isoformat())  # сначала отметка: сбой не зациклит рассылку

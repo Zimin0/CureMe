@@ -606,3 +606,66 @@ class OccurrenceOut(BaseModel):
     minute: int
     taken: bool
     taken_at: datetime | None
+
+
+# --- уведомления по расписанию и доверенный человек ---
+class TrustedOut(BaseModel):
+    name: str
+    email: str
+    status: str                   # pending | confirmed | declined | revoked
+    confirmed_at: datetime | None
+
+
+class SchedulePrefsOut(BaseModel):
+    available: bool               # есть семья с Плюсом (или платная версия выключена)
+    email: str
+    email_possible: bool          # на сайте настроена почта, адрес подтверждён
+    enabled: bool
+    lead_minutes: int
+    repeat_minutes: int
+    escalate_enabled: bool
+    escalate_minutes: int
+    share_medicine_name: bool
+    trusted: TrustedOut | None
+
+
+class SchedulePrefsIn(BaseModel):
+    enabled: bool | None = None
+    lead_minutes: int | None = Field(default=None, ge=1, le=120)
+    repeat_minutes: int | None = Field(default=None, ge=1, le=60)
+    escalate_enabled: bool | None = None
+    escalate_minutes: int | None = Field(default=None, ge=1, le=120)
+    share_medicine_name: bool | None = None
+
+    @model_validator(mode="after")
+    def no_nulls(self):
+        for k in self.model_fields_set:
+            if getattr(self, k) is None:
+                raise ValueError(f"{k}: нужно значение")
+        return self
+
+
+class TrustedIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    # Человек подтверждает, что сообщил доверенному и тот не против: почта третьего лица — его ответственность.
+    attest: bool
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Укажите, как зовут этого человека")
+        return v
+
+
+class TrustedTokenIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+
+
+class TrustedPublicOut(BaseModel):
+    """Что видит доверенный человек на странице по ссылке из письма: только имя того, кто его указал."""
+
+    user_name: str
+    status: str

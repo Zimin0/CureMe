@@ -244,6 +244,61 @@ class ScheduleSlot(Base):
     schedule: Mapped[Schedule] = relationship(back_populates="slots")
 
 
+class SchedulePrefs(Base):
+    """Уведомления о приёме по расписанию: себе на почту и доверенному человеку. Строки нет — выключено."""
+
+    __tablename__ = "schedule_prefs"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)              # письма себе
+    lead_minutes: Mapped[int] = mapped_column(Integer, default=10)             # напомнить за сколько минут до приёма
+    repeat_minutes: Mapped[int] = mapped_column(Integer, default=10)           # напомнить снова через сколько минут, если приём не отмечен
+    escalate_enabled: Mapped[bool] = mapped_column(Boolean, default=False)     # сообщать доверенному человеку
+    escalate_minutes: Mapped[int] = mapped_column(Integer, default=10)         # через сколько минут после повторного напоминания
+    share_medicine_name: Mapped[bool] = mapped_column(Boolean, default=False)  # называть лекарство в письме доверенному
+
+
+class TrustedContact(Base):
+    """Доверенный человек: узнаёт, что приём не отмечен. Почта и имя — персональные данные третьего лица.
+
+    Письма ему уходят только после его согласия (status = confirmed). Ссылка из письма отдаёт и согласие,
+    и отказ, и отписку. Токен ссылки не хранится: это id и подпись HMAC от секретного ключа сайта и nonce,
+    поэтому старые ссылки в письмах работают всегда, а смена nonce (новая почта) гасит их все.
+    Аккаунт удаляется — удаляется и эта строка.
+    status: pending — ждём ответа, confirmed — согласился, declined — отказался, revoked — отписался.
+    """
+
+    __tablename__ = "trusted_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
+    email: Mapped[str] = mapped_column(String(254))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    nonce: Mapped[str] = mapped_column(String(32))
+    consent_version: Mapped[str | None] = mapped_column(String(32))  # какую редакцию текста согласия он принял
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    request_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ScheduleNotified(Base):
+    """Какие уведомления по расписанию уже ушли, чтобы не повторять их каждую минуту.
+
+    stage: pre — за N минут, repeat — повтор себе, trusted — письмо доверенному.
+    """
+
+    __tablename__ = "schedule_notified"
+    __table_args__ = (UniqueConstraint("slot_id", "day", "stage"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    slot_id: Mapped[int] = mapped_column(ForeignKey("schedule_slots.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date)
+    stage: Mapped[str] = mapped_column(String(16))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class NotificationPrefs(Base):
     """Настройки напоминаний человека: куда слать (почта, Telegram) и о чём.
 
