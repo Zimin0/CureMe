@@ -44,7 +44,10 @@ export function Layout() {
         </div>
       </aside>
 
-      <main className="main"><Outlet /></main>
+      <main className="main">
+        <header className="topbar"><div className="brand"><img src="/icon.svg" alt="" />Капсулка</div></header>
+        <Outlet />
+      </main>
 
       <nav className="bottom-nav six" aria-label="Навигация">
         {LINKS.map(({ to, label, short, icon: Icon, end }) =>
