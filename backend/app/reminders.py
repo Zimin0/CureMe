@@ -9,7 +9,9 @@
 Каждый повод человек получает один раз: отправленные лежат в reminders_sent. Когда повода
 больше нет (остаток пополнили, упаковку выбросили), запись удаляется — и в следующий раз
 напомним снова. Все новые поводы собираются в одно сообщение: одно письмо и одно сообщение
-в Telegram в день, а не по штуке на лекарство.
+в Telegram в день, а не по штуке на лекарство. Про просрочку и скорый срок пишем только в
+ежедневной сводке (после «Принял(а)» — лишь про остаток), а про упаковку, добавленную менее
+12 часов назад, молчим до следующей сводки.
 
 Когда проверяем:
 - раз в день в CUREME_REMINDERS_HOUR по Москве — все семьи;
@@ -42,6 +44,7 @@ from .services import stock_of
 log = logging.getLogger("cureme.reminders")
 MSK = timezone(timedelta(hours=3))  # в Москве нет перехода на летнее время
 LAST_RUN = "reminders_last_run"
+NEW_PACKAGE_DELAY = timedelta(hours=12)  # про срок только что добавленной упаковки молчим первые 12 часов
 QUIET_FROM = 22  # после 22:00 по Москве пропущенную ежедневную рассылку не догоняем, ждём утра
 
 
@@ -72,7 +75,17 @@ def _days(n: int) -> str:
     return f"{n} {word}"
 
 
-def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date) -> list[Reason]:
+def _is_fresh(p, now: datetime) -> bool:
+    added = p.added_at
+    if added is None:
+        return False
+    if added.tzinfo is None:
+        added = added.replace(tzinfo=timezone.utc)
+    return now - added < NEW_PACKAGE_DELAY
+
+
+def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
+                now: datetime | None = None) -> list[Reason]:
     """Все поводы напомнить этому человеку сейчас (и уже отправленные, и новые)."""
     fams = {m.family_id: m.family.name for m in db.scalars(
         select(Membership).where(Membership.user_id == user.id).options(selectinload(Membership.family)))}
@@ -83,6 +96,7 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date) 
     meds = db.scalars(
         select(Medicine).where(Medicine.family_id.in_(allowed)).options(selectinload(Medicine.packages))
     ).all()
+    now = now or datetime.now(timezone.utc)
     out: list[Reason] = []
     for med in meds:
         where = f" ({fams[med.family_id]})" if many else ""
@@ -93,7 +107,7 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date) 
         if not prefs.notify_expiry:
             continue
         for p in med.packages:
-            if p.quantity <= 0 or not p.expiry_date:
+            if p.quantity <= 0 or not p.expiry_date or _is_fresh(p, now):
                 continue
             d = (p.expiry_date - today).days
             until = p.expiry_date.strftime("%d.%m.%Y")
@@ -153,19 +167,20 @@ def has_channel(user: User, prefs: NotificationPrefs) -> bool:
         prefs.telegram_enabled and prefs.telegram_chat_id and get_settings().telegram_enabled)
 
 
-def remind_user(db: Session, user: User, today: date | None = None) -> int:
+def remind_user(db: Session, user: User, today: date | None = None, kinds: set[str] | None = None,
+                now: datetime | None = None) -> int:
     """Проверяет поводы одного человека и отправляет новые. Возвращает, сколько поводов отправлено."""
     prefs = db.get(NotificationPrefs, user.id)
     if not prefs or not has_channel(user, prefs):
         return 0
     today = today or datetime.now(MSK).date()
-    current = reasons_for(db, user, prefs, today)
+    current = reasons_for(db, user, prefs, today, now)
     keys = {(r.kind, r.ref_id) for r in current}
     sent = {(s.kind, s.ref_id): s for s in db.scalars(select(ReminderSent).where(ReminderSent.user_id == user.id))}
     for key, row in sent.items():
         if key not in keys:  # повода больше нет — забываем, чтобы напомнить, если он вернётся
             db.delete(row)
-    new = [r for r in current if (r.kind, r.ref_id) not in sent]
+    new = [r for r in current if (r.kind, r.ref_id) not in sent and (kinds is None or r.kind in kinds)]
     if new and deliver(user, prefs, *compose(new)):
         db.add_all(ReminderSent(user_id=user.id, kind=r.kind, ref_id=r.ref_id) for r in new)
     else:
@@ -174,14 +189,14 @@ def remind_user(db: Session, user: User, today: date | None = None) -> int:
     return len(new)
 
 
-def remind_users(db: Session, user_ids) -> int:
+def remind_users(db: Session, user_ids, kinds: set[str] | None = None) -> int:
     total = 0
     for uid in user_ids:
         user = db.get(User, uid)
         if not user:
             continue
         try:
-            total += remind_user(db, user)
+            total += remind_user(db, user, kinds=kinds)
         except Exception:  # noqa: BLE001 — сбой у одного человека не должен остановить рассылку остальным
             log.exception("Напоминания для пользователя %s не отправлены", uid)
             db.rollback()
@@ -197,7 +212,7 @@ def run_daily(db: Session) -> int:
 
 def run_family(db: Session, family_id: int) -> int:
     ids = db.scalars(select(Membership.user_id).where(Membership.family_id == family_id)).all()
-    return remind_users(db, ids)
+    return remind_users(db, ids, kinds={"low"})  # сроки годности — только в ежедневной сводке
 
 
 # --- фоновый поток ---
