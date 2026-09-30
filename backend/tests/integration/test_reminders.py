@@ -350,3 +350,14 @@ def test_fresh_package_window():
     assert reminders._is_fresh(P(now - timedelta(hours=11, minutes=59)), now)
     assert not reminders._is_fresh(P(now - reminders.NEW_PACKAGE_DELAY), now)
     assert reminders._is_fresh(P(datetime(2026, 9, 30, 6)), now)  # без часового пояса = UTC
+
+
+def test_debug_mode_skips_12h_delay(client, db, home, outbox):
+    from app.services import set_debug_enabled
+    h, u, f = home
+    add(client, h, f, "Лоратадин", 4, expiry=TODAY - timedelta(days=3))
+    now = datetime.now(timezone.utc)
+    assert remind(db, u["id"], now=now) == 0
+    set_debug_enabled(db, True)
+    assert remind(db, u["id"], now=now) == 1
+    assert "Лоратадин" in text_of(outbox[0])
