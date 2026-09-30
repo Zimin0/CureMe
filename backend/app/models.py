@@ -204,6 +204,46 @@ class Intake(Base):
     user: Mapped[User] = relationship()
 
 
+class Schedule(Base):
+    """Назначенный приём: лекарство, доза и повторение. Личное расписание человека, другие его не видят.
+
+    В какие дни и часы пить — в slots (одна строка на «день недели + время»). Так можно убрать
+    «каждый вторник в 16:00», не трогая остальные приёмы этого лекарства.
+    Название лекарства копируется, чтобы расписание не потеряло подпись, если лекарство удалят.
+    """
+
+    __tablename__ = "schedules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    medicine_id: Mapped[int | None] = mapped_column(ForeignKey("medicines.id", ondelete="SET NULL"), index=True)
+    medicine_name: Mapped[str] = mapped_column(String(200))
+    unit: Mapped[str] = mapped_column(String(20), default="шт")
+    amount: Mapped[float] = mapped_column(Float, default=1)              # сколько принимать за раз
+    start_date: Mapped[date] = mapped_column(Date)                        # с какого дня (по Москве)
+    end_date: Mapped[date | None] = mapped_column(Date)                   # по какой день включительно; None — бессрочно
+    every_weeks: Mapped[int] = mapped_column(Integer, default=1)          # 1 — каждую неделю, 2 — через неделю…
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    slots: Mapped[list["ScheduleSlot"]] = relationship(
+        back_populates="schedule", cascade="all, delete-orphan", order_by="ScheduleSlot.weekday, ScheduleSlot.minute")
+
+
+class ScheduleSlot(Base):
+    """Один повторяющийся приём: день недели (0 — понедельник) и время в минутах от полуночи по Москве."""
+
+    __tablename__ = "schedule_slots"
+    __table_args__ = (UniqueConstraint("schedule_id", "weekday", "minute"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    schedule_id: Mapped[int] = mapped_column(ForeignKey("schedules.id", ondelete="CASCADE"), index=True)
+    weekday: Mapped[int] = mapped_column(Integer)
+    minute: Mapped[int] = mapped_column(Integer)
+
+    schedule: Mapped[Schedule] = relationship(back_populates="slots")
+
+
 class NotificationPrefs(Base):
     """Настройки напоминаний человека: куда слать (почта, Telegram) и о чём.
 

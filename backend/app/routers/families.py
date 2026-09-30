@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..limits import ensure_can_add_member, members_full
-from ..models import Family, Membership, User
+from ..models import Family, Membership, Schedule, User
 from ..plans import LIMIT_FEATURE, own_families_left, plan_out, plus_required
 from ..ratelimit import client_ip, limiter
 from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, PlanOut, RoleIn
@@ -107,6 +107,8 @@ def remove_member(user_id: int, m: Membership = Depends(family_membership), db: 
     if target.role == "owner" and others and not any(x.role == "owner" for x in others):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Сначала назначьте другого владельца")
     family = m.family
+    # Личное расписание приёма не остаётся у того, кто ушёл из аптечки (лекарства там ему больше недоступны).
+    db.execute(delete(Schedule).where(Schedule.family_id == family.id, Schedule.user_id == user_id))
     db.delete(target)
     if not others:
         db.delete(family)  # последний участник ушёл — аптечка никому не нужна
