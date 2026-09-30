@@ -361,3 +361,61 @@ def test_debug_mode_skips_12h_delay(client, db, home, outbox):
     set_debug_enabled(db, True)
     assert remind(db, u["id"], now=now) == 1
     assert "Лоратадин" in text_of(outbox[0])
+
+
+def test_nudge_user_without_background_thread_is_noop():
+    reminders.nudge_user(1)
+    assert reminders._queue.empty()
+
+
+def test_enabling_email_queues_immediate_check(client, outbox, monkeypatch):
+    """Включил почту днём — проверка идёт сразу, а не со следующей сводки в 10:00."""
+    queued = []
+    monkeypatch.setattr(reminders, "nudge_user", queued.append)
+    monkeypatch.setattr("app.routers.notifications.nudge_user", queued.append)
+    h, u = register(client)
+    assert client.put("/api/notifications", headers=h, json={"email_enabled": True}).status_code == 200
+    assert queued == [u["id"]]
+    # выключили — проверять нечего
+    assert client.put("/api/notifications", headers=h, json={"email_enabled": False}).status_code == 200
+    assert queued == [u["id"]]
+
+
+def test_worker_processes_user_item(client, db, home, outbox, monkeypatch):
+    """Фоновый поток берёт из очереди и человека: письмо с уже давним поводом уходит сразу."""
+    import threading
+
+    h, u, f = home
+    add(client, h, f, "Лоратадин", 4, expiry=date.today() - timedelta(days=3))
+    db.expire_all()
+    # упаковка «не новая»: сдвигаем добавление в прошлое
+    from app.models import Package
+    for p in db.query(Package).all():
+        p.added_at = datetime.now(timezone.utc) - timedelta(days=2)
+    db.commit()
+    stop = threading.Event()
+    calls = []
+
+    class Factory:
+        def __call__(self):
+            return _Ctx()
+
+    class _Ctx:
+        def __enter__(self):
+            return db
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(reminders, "daily_due", lambda *a: False)
+    reminders._queue.put(("user", u["id"]))
+    orig_get = reminders._queue.get
+
+    def get_once(timeout=None):
+        try:
+            return orig_get(timeout=0.1)
+        finally:
+            stop.set()
+    monkeypatch.setattr(reminders._queue, "get", get_once)
+    reminders.work_forever(Factory(), stop)
+    assert len(outbox) == 1 and "Лоратадин" in text_of(outbox[0])

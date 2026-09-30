@@ -10,7 +10,7 @@ from ..mailer import send_mail
 from ..models import Membership, NotificationPrefs, User, utcnow
 from ..plans import plus_required
 from ..ratelimit import limiter
-from ..reminders import can_email, plus_family_ids
+from ..reminders import can_email, nudge_user, plus_family_ids
 from ..schemas import NotificationPrefsIn, NotificationPrefsOut, TelegramLinkIn, TelegramLinkOut
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -73,6 +73,8 @@ def update_prefs(body: NotificationPrefsIn, user: User = Depends(current_user), 
     for k, v in data.items():
         setattr(prefs, k, v)
     db.commit()
+    if data and (prefs.email_enabled or prefs.telegram_enabled):
+        nudge_user(user.id)  # новые настройки действуют сразу, а не со следующей сводки
     return _out(db, user, prefs)
 
 
