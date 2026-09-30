@@ -10,7 +10,7 @@ def close_site(client, admin_h, user_ids=()):
 
 
 def test_site_is_open_by_default(client):
-    assert client.get("/api/auth/access").json() == {"closed": False}
+    assert client.get("/api/auth/access").json() == {"closed": False, "debug": False}
     h, _ = register(client)
     assert client.get("/api/admin/access", headers=h).json() == {"closed": False, "user_ids": []}
 
@@ -21,7 +21,7 @@ def test_closed_mode_blocks_others_but_keeps_their_rights(client):
     other_h, other = register(client, "other@example.com", "Чужой")
     assert close_site(client, admin_h, [tester["id"], 999]) == {"closed": True, "user_ids": [tester["id"]]}
 
-    assert client.get("/api/auth/access").json() == {"closed": True}
+    assert client.get("/api/auth/access").json() == {"closed": True, "debug": False}
     # администратор и тестировщик работают как раньше
     assert client.get(f"/api/families/{fid(admin)}/medicines", headers=admin_h).status_code == 200
     assert client.get(f"/api/families/{fid(tester)}/medicines", headers=tester_h).status_code == 200
@@ -55,3 +55,16 @@ def test_reopening_restores_access(client):
     assert client.get(f"/api/families/{fid(other)}/medicines", headers=other_h).status_code == 403
     client.put("/api/admin/access", json={"closed": False, "user_ids": []}, headers=admin_h)
     assert client.get(f"/api/families/{fid(other)}/medicines", headers=other_h).status_code == 200
+
+
+def test_debug_mode_is_admin_switch_visible_to_everyone(client):
+    admin_h, _ = register(client)
+    user_h, _ = register(client, "user@example.com", "Обычный")
+    assert client.get("/api/auth/access").json()["debug"] is False
+    assert client.put("/api/admin/debug", json={"enabled": True}, headers=user_h).status_code == 403
+    assert client.get("/api/auth/access").json()["debug"] is False
+    assert client.put("/api/admin/debug", json={"enabled": True}, headers=admin_h).json() == {"enabled": True}
+    assert client.get("/api/admin/debug", headers=admin_h).json() == {"enabled": True}
+    assert client.get("/api/auth/access").json()["debug"] is True
+    client.put("/api/admin/debug", json={"enabled": False}, headers=admin_h)
+    assert client.get("/api/auth/access").json()["debug"] is False

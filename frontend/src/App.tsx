@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { api } from './api'
 import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
@@ -16,6 +18,7 @@ import { Medicines } from './pages/Medicines'
 import { Scan } from './pages/Scan'
 import { NoFamily } from './pages/NoFamily'
 import { Plus } from './pages/Plus'
+import { versionLabel } from './version'
 
 function Protected() {
   const { me, loading, familyId } = useAuth()
@@ -29,9 +32,18 @@ function Protected() {
   return <Layout />
 }
 
+/** Режим отладки (включается в админке): версия приложения вверху любой страницы. */
+function DebugBar() {
+  const q = useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean; debug?: boolean }>('/auth/access'), staleTime: 60_000 })
+  if (!q.data?.debug) return null
+  return <div className="debug-bar" data-testid="debug-bar">{versionLabel()}</div>
+}
+
 export default function App() {
   const { me } = useAuth()
   return (
+    <>
+    <DebugBar />
     <Routes>
       <Route path="/login" element={me ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/register" element={me ? <Navigate to="/" replace /> : <Register />} />
@@ -57,5 +69,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }

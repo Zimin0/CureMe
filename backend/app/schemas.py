@@ -79,6 +79,11 @@ class MeOut(UserOut):
 
 class AccessOut(BaseModel):
     closed: bool
+    debug: bool = False  # режим отладки: показывать версию приложения на каждой странице
+
+
+class DebugSettings(BaseModel):
+    enabled: bool
 
 
 class VerifyEmailIn(BaseModel):

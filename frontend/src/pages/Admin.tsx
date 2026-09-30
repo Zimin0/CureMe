@@ -14,6 +14,7 @@ const TABS = [
   { id: 'categories', label: 'Категории' },
   { id: 'hints', label: 'Подсказки' },
   { id: 'access', label: 'Доступ' },
+  { id: 'debug', label: 'Отладка' },
   { id: 'plans', label: 'Тарифы' },
 ] as const
 type Tab = typeof TABS[number]['id']
@@ -64,6 +65,7 @@ export function Admin() {
       {tab === 'categories' && <CategoriesTab />}
       {tab === 'hints' && <HintsTab />}
       {tab === 'access' && <AccessTab />}
+      {tab === 'debug' && <DebugTab />}
       {tab === 'plans' && <PlansTab />}
     </div>
   )
@@ -404,7 +406,7 @@ function AccessTab() {
     onSuccess: a => {
       setDraft(a)
       qc.setQueryData(['admin', 'access'], a)
-      qc.setQueryData(['access'], { closed: a.closed })
+      qc.setQueryData(['access'], (old: object | undefined) => ({ ...old, closed: a.closed }))
       toast(a.closed ? 'Сайт закрыт для остальных' : 'Сайт открыт для всех')
     },
     onError: (e: Error) => toast(e.message, 'error'),
@@ -444,6 +446,34 @@ function AccessTab() {
         </button>
       </div>
     </>
+  )
+}
+
+// ---------- режим отладки ----------
+/** Режим отладки: на каждой странице сверху видна версия приложения (для всех, кто открыл сайт). */
+function DebugTab() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const debug = useQuery({ queryKey: ['admin', 'debug'], queryFn: () => api<{ enabled: boolean }>('/admin/debug') })
+  const save = useMutation({
+    mutationFn: (enabled: boolean) => api<{ enabled: boolean }>('/admin/debug', { method: 'PUT', body: { enabled } }),
+    onSuccess: d => {
+      qc.setQueryData(['admin', 'debug'], d)
+      qc.setQueryData(['access'], (old: object | undefined) => ({ ...old, debug: d.enabled }))
+      toast(d.enabled ? 'Режим отладки включён' : 'Режим отладки выключен')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+  if (debug.isLoading) return <PageLoader />
+  return (
+    <label className="check card" style={{ padding: 16 }}>
+      <input type="checkbox" checked={debug.data?.enabled ?? false} disabled={save.isPending}
+        onChange={e => save.mutate(e.target.checked)} />
+      <span>
+        <b>Режим отладки</b><br />
+        <span className="muted small">Вверху каждой страницы показывается версия приложения и коммит сборки. Видно всем, кто открыл сайт, в том числе на страницах входа. Включайте, когда проверяете, что выкатилась нужная версия.</span>
+      </span>
+    </label>
   )
 }
 
