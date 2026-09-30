@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Family } from '../api'
-import { server } from '../test/server'
+import { planFixture, server } from '../test/server'
 import { renderApp } from '../test/utils'
 
 const FAMILY: Family = {
@@ -25,7 +25,7 @@ function setup() {
         headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="kapsulka-dlya-vracha-x.pdf"' },
       })
     }),
-    http.get('/api/families/7/report.xlsx', () => HttpResponse.json({ detail: 'Экспорт для врача доступен в Капсулке Плюс' }, { status: 402 })),
+    http.get('/api/families/7/report.xlsx', () => HttpResponse.json({ detail: 'Экспорт для врача доступен в Капсулке Плюс' }, { status: 402, headers: { 'X-Plus-Feature': 'export_pdf' } })),
   )
   const clicks: string[] = []
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { clicks.push(this.download) })
@@ -65,10 +65,12 @@ it('свой период: кнопки выключены, пока начал�
   expect(screen.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
 })
 
-it('без Плюса (402) не показывает лишнюю ошибку и ничего не скачивает', async () => {
+it('без Плюса: замочек у заголовка, 402 открывает шторку и ничего не скачивает', async () => {
   const { clicks } = setup()
+  server.use(http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false, billing_enabled: true }))))
   const { user } = renderApp('/export')
-  await user.click(await screen.findByRole('button', { name: /^Excel$/ }))
-  await waitFor(() => expect(screen.getByRole('button', { name: /^Excel$/ })).toBeEnabled())
+  expect(await screen.findByRole('button', { name: /Доступно в Плюсе/ })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /^Excel$/ }))
+  expect(await screen.findByText('Доступно в Капсулке Плюс')).toBeInTheDocument()
   expect(clicks).toEqual([])
 })

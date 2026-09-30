@@ -6,6 +6,7 @@ import { api, ApiError, fetchFile, fetchText, type Family } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Empty, Spinner, useToast } from '../components/ui'
 import { plural } from '../format'
+import { PlusLock } from '../plan'
 
 function saveFile(file: File) {
   const url = URL.createObjectURL(file)
@@ -131,7 +132,7 @@ function DoctorReport() {
       <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
         <Stethoscope size={22} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
         <div>
-          <h2>Для врача: PDF и Excel</h2>
+          <h2 className="row" style={{ gap: 8 }}>Для врача: PDF и Excel<PlusLock feature="export_pdf" /></h2>
           <p className="small muted">Что и когда принималось за период, сводка по каждому лекарству и ваши комментарии к приёму.</p>
         </div>
       </div>
