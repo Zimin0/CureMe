@@ -8,6 +8,7 @@ import type { Me, Medicine } from '../api'
 import App from '../App'
 import { AuthProvider } from '../auth'
 import { ToastProvider } from '../components/ui'
+import { PlusProvider } from '../plan'
 import { server } from './server'
 
 export const ME: Me = { id: 1, email: 'nikita@example.com', name: 'Никита', is_admin: false, families: [{ id: 7, name: 'Семья Никита', role: 'owner' }] }
@@ -27,8 +28,10 @@ export function renderWithProviders(ui: ReactElement, { route = '/' } = {}) {
       <MemoryRouter initialEntries={[route]}>
         <AuthProvider>
           <ToastProvider>
-            {ui}
-            <LocationProbe />
+            <PlusProvider>
+              {ui}
+              <LocationProbe />
+            </PlusProvider>
           </ToastProvider>
         </AuthProvider>
       </MemoryRouter>

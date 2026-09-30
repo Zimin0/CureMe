@@ -4,6 +4,7 @@ import { useDeferredValue } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, Family, Intake, OlderHistory } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
+import { usePlusSheet } from '../plan'
 import { IntakeList } from '../components/IntakeList'
 import { Empty, PageLoader } from '../components/ui'
 
@@ -60,11 +61,13 @@ export function History() {
     queryKey: ['intakes-older', fam(''), olderQs],
     queryFn: () => api<OlderHistory>(fam(`/intakes/older${olderQs}`)),
   })
+  const openPlus = usePlusSheet()
   const items = q.data?.pages.flat() ?? []
   const locked = !q.hasNextPage && !!older.data?.hidden && (
     <div className="plus-note" role="note">
       <Lock size={16} />
       <span>Более ранняя история доступна в Капсулке Плюс. Записи не удалены: они появятся, как только семья подключит Плюс.</span>
+      <button type="button" className="btn ghost sm" onClick={() => openPlus('full_history')}>Подробнее</button>
     </div>
   )
   const medName = medicine ? items.find(i => String(i.medicine_id) === medicine)?.medicine_name : null

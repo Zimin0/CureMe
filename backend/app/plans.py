@@ -74,9 +74,12 @@ PLUS_HEADER = "X-Plus-Feature"  # в ответе 402: какую функцию
 
 
 def billing_settings(db: Session) -> BillingSettings:
-    """Включена ли платная версия. По умолчанию выключена: всем доступно всё."""
+    """Включена ли платная версия и сколько стоит Плюс. По умолчанию выключена: всем доступно всё."""
     row = db.get(AppSetting, BILLING)
-    return BillingSettings(enabled=bool((row.value or {}).get("enabled")) if row else False)
+    value = (row.value if row else None) or {}
+    return BillingSettings(
+        enabled=bool(value.get("enabled")), price_month=value.get("price_month"), price_year=value.get("price_year"),
+    )
 
 
 def set_billing_settings(db: Session, body: BillingSettings) -> BillingSettings:
@@ -161,13 +164,16 @@ def usage(db: Session, family: Family) -> dict[str, int]:
 
 
 def plan_out(db: Session, family: Family) -> PlanOut:
-    enabled = billing_settings(db).enabled
+    billing = billing_settings(db)
+    enabled = billing.enabled
     plus = plus_active(family) or not enabled
     return PlanOut(
         plan=family.plan,
         plus_until=family.plus_until,
         plus_active=plus_active(family),
         billing_enabled=enabled,
+        price_month=billing.price_month,
+        price_year=billing.price_year,
         has_plus=plus,
         limits={k: (None if plus else v) for k, v in FREE_LIMITS.items()},
         free_limits=FREE_LIMITS,

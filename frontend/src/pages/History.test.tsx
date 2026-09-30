@@ -151,6 +151,8 @@ it('без Плюса внизу истории замочек: ранние з�
     http.get('/api/families/7/intakes', () => HttpResponse.json([intake()])),
     http.get('/api/families/7/intakes/older', () => HttpResponse.json({ history_since: new Date().toISOString(), hidden: 12 })),
   )
-  renderApp('/history')
+  const { user } = renderApp('/history')
   expect(await screen.findByRole('note')).toHaveTextContent('Более ранняя история доступна в Капсулке Плюс')
+  await user.click(within(screen.getByRole('note')).getByRole('button', { name: 'Подробнее' }))
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Доступно в Капсулке Плюс')
 })

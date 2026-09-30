@@ -6,6 +6,7 @@ from ..db import get_db
 from ..deps import signed_in_user
 from ..email_verification import issue_token, mark_verified, needs_verification, send_verification, user_by_token, verification_link
 from ..legal import CONSENT_VERSION
+from ..limits import ensure_can_add_member
 from ..models import Family, Membership, User, utcnow
 from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
@@ -53,6 +54,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         family = db.scalar(select(Family).where(Family.invite_code == body.invite_code.strip().upper()))
         if not family:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден")
+        ensure_can_add_member(db, family, joining=True)
 
     first = db.scalar(select(User.id).limit(1)) is None  # первый аккаунт — администратор
     user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password), is_admin=first,

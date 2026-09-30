@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
+from ..limits import ensure_can_add_member, members_full
 from ..models import Family, Membership, User
 from ..plans import plan_out
 from ..ratelimit import client_ip, limiter
@@ -67,6 +68,7 @@ def add_member(body: AddMemberIn, m: Membership = Depends(family_owner), db: Ses
         )
     if any(x.user_id == user.id for x in m.family.memberships):
         raise HTTPException(status.HTTP_409_CONFLICT, "Этот человек уже в семье")
+    ensure_can_add_member(db, m.family)
     db.add(Membership(family=m.family, user=user, role="member"))
     db.commit()
     db.refresh(m.family)
@@ -112,7 +114,7 @@ def invite_info(code: str, request: Request, db: Session = Depends(get_db)):
     fam = db.scalar(select(Family).where(Family.invite_code == code.strip().upper()))
     if not fam:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено или устарело")
-    return InviteInfo(family_name=fam.name, members=len(fam.memberships))
+    return InviteInfo(family_name=fam.name, members=len(fam.memberships), full=members_full(db, fam))
 
 
 @router.post("/families/join", response_model=FamilyOut)
@@ -123,6 +125,7 @@ def join(body: JoinIn, request: Request, user: User = Depends(current_user), db:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено или устарело")
     existing = next((x for x in fam.memberships if x.user_id == user.id), None)
     if not existing:
+        ensure_can_add_member(db, fam, joining=True)
         db.add(Membership(family=fam, user=user, role="member"))
         db.commit()
         db.refresh(fam)
