@@ -119,3 +119,44 @@ def test_join_by_code(client, owner):
     assert client.post("/api/families/join", headers=h1, json={"code": code}).json()["role"] == "owner"
     assert len(client.get(f"/api/families/{f}", headers=h1).json()["members"]) == 2
     assert client.post("/api/families/join", headers=h2, json={"code": "WRONG123"}).status_code == 404
+
+
+def enable_billing(client, h, on=True):
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": on}).status_code == 200
+
+
+def test_free_plan_allows_one_own_cabinet(client, owner):
+    h, _, first = owner
+    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] is None  # платная версия выключена
+    enable_billing(client, h)
+    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] == 0
+    r = client.post("/api/families", headers=h, json={"name": "Дача"})
+    assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "cabinets"
+    assert "одну свою аптечку" in r.json()["detail"]
+    assert len(client.get("/api/auth/me", headers=h).json()["families"]) == 1
+
+
+def test_plus_in_own_family_unlocks_more_cabinets(client, owner):
+    h, _, first = owner
+    enable_billing(client, h)
+    assert client.put(f"/api/admin/families/{first}/plan", headers=h, json={"plan": "plus", "plus_until": None}).status_code == 200
+    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] is None
+    assert client.post("/api/families", headers=h, json={"name": "Дача"}).status_code == 201
+    assert client.post("/api/families", headers=h, json={"name": "Машина"}).status_code == 201
+
+
+def test_cabinets_over_limit_are_kept_and_joining_is_free(client):
+    (h1, _), (h2, u2), f = two_members(client)
+    # Мама уже завела свою аптечку, пока платная версия была выключена.
+    mine = client.post("/api/families", headers=h2, json={"name": "Бабушка"}).json()["id"]
+    enable_billing(client, h1)  # первый аккаунт — администратор
+    assert client.post("/api/families", headers=h2, json={"name": "Ещё одна"}).status_code == 402
+    # Созданное раньше остаётся, и в неё можно зайти.
+    assert client.get(f"/api/families/{mine}", headers=h2).status_code == 200
+    # Вступить в чужую аптечку по приглашению можно и без Плюса.
+    other = client.post("/api/families/join", headers=h1, json={"code": invite_code(client, h2, mine)})
+    assert other.status_code == 200
+    # Первую аптечку всегда можно создать: например, после выхода из всех семей.
+    h3, _ = register(client, "dad@example.com", "Папа", invite=invite_code(client, h1, f))
+    assert client.get("/api/auth/me", headers=h3).json()["own_families_left"] == 1
+    assert client.post("/api/families", headers=h3, json={"name": "Гараж"}).status_code == 201

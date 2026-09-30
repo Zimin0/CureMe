@@ -71,6 +71,8 @@ class MeOut(UserOut):
     email_verified: bool = False
     verification_needed: bool = False  # почта не подтверждена, а проверка включена — показать экран «Проверьте почту»
     families: list[FamilyBrief]
+    # Сколько ещё своих аптечек можно создать: None — без ограничений (Плюс или платная версия выключена).
+    own_families_left: int | None = None
     # Только после смены своего пароля: старый токен уже не действует, вот новый.
     access_token: str | None = None
 
@@ -392,6 +394,11 @@ class IntakeOut(BaseModel):
 
 class IntakeUpdate(BaseModel):
     comment: str = Field(max_length=COMMENT_MAX)
+
+
+class OlderHistoryOut(BaseModel):
+    history_since: datetime | None  # с какого момента видна история; None — вся (Плюс)
+    hidden: int                     # сколько более ранних записей скрыто до подключения Плюса
 
 
 class SuggestionOut(BaseModel):
