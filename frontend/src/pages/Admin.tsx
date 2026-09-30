@@ -466,14 +466,26 @@ function DebugTab() {
   })
   if (debug.isLoading) return <PageLoader />
   return (
-    <label className="check card" style={{ padding: 16 }}>
-      <input type="checkbox" checked={debug.data?.enabled ?? false} disabled={save.isPending}
-        onChange={e => save.mutate(e.target.checked)} />
-      <span>
-        <b>Режим отладки</b><br />
-        <span className="muted small">Вверху каждой страницы показывается версия приложения и коммит сборки. Видно всем, кто открыл сайт, в том числе на страницах входа. Включайте, когда проверяете, что выкатилась нужная версия.</span>
-      </span>
-    </label>
+    <>
+      <label className="check card" style={{ padding: 16 }}>
+        <input type="checkbox" checked={debug.data?.enabled ?? false} disabled={save.isPending}
+          onChange={e => save.mutate(e.target.checked)} />
+        <span>
+          <b>Режим отладки</b><br />
+          <span className="muted small">Вверху каждой страницы показывается версия приложения и коммит сборки. Видно всем, кто открыл сайт, в том числе на страницах входа. Включайте, когда проверяете, что выкатилась нужная версия.</span>
+        </span>
+      </label>
+      {debug.data?.enabled && (
+        <div className="card" role="note" data-testid="debug-note" style={{ padding: 16, marginTop: 12 }}>
+          <b>Что меняется в режиме отладки</b>
+          <ul className="muted small" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+            <li>Напоминания о просроченных и скоро истекающих лекарствах приходят сразу после добавления упаковки, без обычной паузы в 12 часов.</li>
+            <li>Сообщение о сроке уходит сразу после добавления, а не в ежедневной сводке в 10:00.</li>
+            <li>Вверху каждой страницы показывается версия приложения.</li>
+          </ul>
+        </div>
+      )}
+    </>
   )
 }
 
