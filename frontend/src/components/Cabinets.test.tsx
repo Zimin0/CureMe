@@ -47,6 +47,13 @@ it('в бесплатной версии вторая своя аптечка п
   expect(created).toBe(false)
 })
 
+it('при Плюсе потолок своих аптечек показан без предложения купить Плюс', async () => {
+  mockFamilies()
+  renderApp('/family', { me: { ...ME, own_families_left: 0, plus_active: true } })
+  expect(await screen.findByText(/не больше 5 своих аптечек/)).toBeInTheDocument()
+  expect(screen.queryByText(/в Капсулке Плюс/)).not.toBeInTheDocument()
+})
+
 it('на странице «Аптечка» есть переключатель, когда аптечек несколько', async () => {
   mockFamilies()
   const me = { ...ME, families: [...ME.families, { id: 8, name: 'Дача', role: 'member' as const }] }

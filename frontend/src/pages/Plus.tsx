@@ -23,7 +23,7 @@ export function Plus() {
         <Sparkles size={34} />
         <div>
           <h1>Капсулка Плюс</h1>
-          <p>Одна подписка на всю семью: платит один, пользуются все участники аптечки.</p>
+          <p>Одна подписка на аккаунт владельца: платит один, Плюс действует на все его аптечки, и пользуются все их участники.</p>
         </div>
       </div>
 
@@ -34,13 +34,13 @@ export function Plus() {
         </div>
         {priceText(plan) && (
           <>
-            <p>Стоимость Плюса за всю семью: <b>{priceText(plan)}</b>.</p>
+            <p>Стоимость Плюса: <b>{priceText(plan)}</b>.</p>
             <p className="muted small">{PRICE_NOTE}</p>
           </>
         )}
         {!plan.billing_enabled && <p className="muted small">Платная версия пока не включена, поэтому все функции Плюса доступны бесплатно.</p>}
         {plan.billing_enabled && !plan.plus_active && (
-          <p className="muted small">Оплата появится скоро. Пока Плюс для семьи включает администратор.</p>
+          <p className="muted small">Оплата появится скоро. Пока Плюс включает администратор.</p>
         )}
       </section>
 

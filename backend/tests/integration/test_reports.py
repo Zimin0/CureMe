@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.doctor_report import DISCLAIMER, NO_COMMENTS_NOTE
 from app.models import Intake
-from tests.conftest import fid, register
+from tests.conftest import fid, grant_plus, register
 
 
 @pytest.fixture
@@ -122,5 +122,5 @@ def test_plus_only_when_billing_on(client, fam):
     # Простой текстовый список остаётся бесплатным
     assert client.get(f"/api/families/{f}/export.txt", headers=h).status_code == 200
     until = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
-    assert client.put(f"/api/admin/families/{f}/plan", headers=h, json={"plan": "plus", "plus_until": until}).status_code == 200
+    grant_plus(client, h, f, until=until)
     assert client.get(f"/api/families/{f}/report.pdf", headers=h).status_code == 200

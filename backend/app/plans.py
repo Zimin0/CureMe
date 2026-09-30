@@ -1,7 +1,9 @@
 """Тарифы «Бесплатный» и «Плюс»: что даёт Плюс, лимиты бесплатной версии и проверки.
 
 Все лимиты и список платных функций живут здесь, чтобы их было легко менять.
-Подписка семейная: тариф хранится у семьи (Family.plan, Family.plus_until), а не у человека.
+Подписка на аккаунт: тариф хранится у человека (User.plan, User.plus_until) и действует на все аптечки,
+где он главный владелец (самый ранний из владельцев семьи). Так вторая и третья аптечка платящего
+получают Плюс сразу, а платящий, которого добавили в чужую семью, чужой аптечке Плюс не даёт.
 
 Пока администратор не включил платную версию (настройка billing в app_settings),
 у всех семей работает всё, как в Плюсе. Так выкладка не урезает сайт у тех, кто уже им пользуется.
@@ -20,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from .db import get_db
 from .deps import family_membership
-from .models import AppSetting, Family, Medicine, Membership
+from .models import AppSetting, Family, Medicine, Membership, User
 from .schemas import BillingSettings, PlanFeatureOut, PlanOut
 
 FREE = "free"
@@ -34,6 +36,8 @@ FREE_LIMITS: dict[str, int] = {
     "own_families": 1,   # своих аптечек (где человек владелец); вступать в чужие можно без ограничений
     "history_days": 30,  # сколько дней истории приёма видно
 }
+# Потолок своих аптечек при Плюсе: защита от того, что один платящий держит десятки семей.
+PLUS_OWN_FAMILIES_MAX = 5
 LIMIT_LABELS = {
     "members": "участников в семье",
     "medicines": "лекарств в аптечке",
@@ -96,16 +100,32 @@ def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)  # SQLite отдаёт время без пояса
 
 
-def plus_active(family: Family, now: datetime | None = None) -> bool:
-    """Оплачен ли Плюс у семьи сейчас (без учёта того, включена ли платная версия)."""
-    if family.plan != PLUS:
+def plus_active(user: User | None, now: datetime | None = None) -> bool:
+    """Оплачен ли Плюс у аккаунта сейчас (без учёта того, включена ли платная версия)."""
+    if user is None or user.plan != PLUS:
         return False
-    return family.plus_until is None or _aware(family.plus_until) > (now or datetime.now(timezone.utc))
+    return user.plus_until is None or _aware(user.plus_until) > (now or datetime.now(timezone.utc))
+
+
+def family_owner_user(family: Family) -> User | None:
+    """Главный владелец аптечки: самый ранний из владельцев. Его тариф действует на всю аптечку.
+
+    Если в семью добавили ещё одного владельца (даже платящего), Плюс от этого не появится.
+    """
+    owners = [m for m in family.memberships if m.role == "owner"]
+    if not owners:
+        return None
+    return min(owners, key=lambda m: (_aware(m.joined_at), m.id or 0)).user
+
+
+def family_plus_active(family: Family, now: datetime | None = None) -> bool:
+    """Оплачен ли Плюс у аптечки: у её главного владельца."""
+    return plus_active(family_owner_user(family), now)
 
 
 def has_plus(db: Session, family: Family) -> bool:
     """Доступно ли семье всё, что есть в Плюсе: Плюс оплачен или платная версия выключена."""
-    return plus_active(family) or not billing_settings(db).enabled
+    return family_plus_active(family) or not billing_settings(db).enabled
 
 
 def limit_of(db: Session, family: Family, name: str) -> int | None:
@@ -146,16 +166,22 @@ def history_since(db: Session, family: Family, now: datetime | None = None) -> d
 
 
 def own_families_left(db: Session, user_id: int) -> int | None:
-    """Сколько ещё своих аптечек может создать человек; None — без ограничений.
+    """Сколько ещё своих аптечек может создать человек; None — без ограничений (платная версия выключена).
 
-    Если хотя бы у одной его семьи есть Плюс (или платная версия выключена), ограничения нет.
+    В бесплатной версии своя аптечка одна, при Плюсе аккаунта — до PLUS_OWN_FAMILIES_MAX.
+    Считаются аптечки, где человек главный владелец: именно на них действует его тариф.
     """
-    owned = list(db.scalars(
-        select(Family).join(Membership).where(Membership.user_id == user_id, Membership.role == "owner")
-    ))
-    if not billing_settings(db).enabled or any(plus_active(f) for f in owned):
+    if not billing_settings(db).enabled:
         return None
-    return max(FREE_LIMITS["own_families"] - len(owned), 0)
+    user = db.get(User, user_id)
+    owned = [
+        f for f in db.scalars(
+            select(Family).join(Membership).where(Membership.user_id == user_id, Membership.role == "owner")
+        )
+        if family_owner_user(f) is user
+    ]
+    limit = PLUS_OWN_FAMILIES_MAX if plus_active(user) else FREE_LIMITS["own_families"]
+    return max(limit - len(owned), 0)
 
 
 def usage(db: Session, family: Family) -> dict[str, int]:
@@ -166,11 +192,14 @@ def usage(db: Session, family: Family) -> dict[str, int]:
 def plan_out(db: Session, family: Family) -> PlanOut:
     billing = billing_settings(db)
     enabled = billing.enabled
-    plus = plus_active(family) or not enabled
+    owner = family_owner_user(family)
+    active = plus_active(owner)
+    plus = active or not enabled
     return PlanOut(
-        plan=family.plan,
-        plus_until=family.plus_until,
-        plus_active=plus_active(family),
+        plan=owner.plan if owner else "free",
+        plus_until=owner.plus_until if owner else None,
+        plus_active=active,
+        owner_name=owner.name if owner else None,
         billing_enabled=enabled,
         price_month=billing.price_month,
         price_year=billing.price_year,

@@ -7,7 +7,7 @@ import pytest
 from app import mailer, reminders, telegram
 from app.config import get_settings
 from app.models import NotificationPrefs, ReminderSent, User
-from tests.conftest import fid, register
+from tests.conftest import fid, grant_plus, register
 
 TODAY = date(2026, 10, 1)
 
@@ -216,7 +216,7 @@ def test_free_family_gets_nothing_when_billing_on(client, db, home, outbox):
     assert client.put("/api/notifications", headers=h, json={"email_enabled": False}).status_code == 200
 
     # Семье включили Плюс — напоминания пошли.
-    client.put(f"/api/admin/families/{f}/plan", headers=h, json={"plan": "plus", "plus_until": None})
+    grant_plus(client, h, f)
     client.put("/api/notifications", headers=h, json={"email_enabled": True})
     assert remind(db, u["id"]) == 1
 

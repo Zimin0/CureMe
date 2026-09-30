@@ -91,8 +91,8 @@ function PlusSheet({ feature, onClose }: { feature: PlusFeature; onClose: () => 
             {f && <p className="muted small">{f.description}</p>}
           </div>
         </div>
-        {priceText(plan) && <p><b>{priceText(plan)}</b> за всю семью. <span className="muted small">{PRICE_NOTE}</span></p>}
-        <p className="muted small">Плюс подключается сразу для всей семьи. Оплата появится скоро, а пока Плюс включает администратор.</p>
+        {priceText(plan) && <p><b>{priceText(plan)}</b> за аккаунт. <span className="muted small">{PRICE_NOTE}</span></p>}
+        <p className="muted small">Плюс подключается к аккаунту владельца и действует на все его аптечки и всех их участников. Оплата появится скоро, а пока Плюс включает администратор.</p>
         <Link to="/plus" className="btn primary block" onClick={onClose}><Sparkles size={18} />Что даёт Плюс</Link>
       </div>
     </Sheet>

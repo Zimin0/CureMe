@@ -12,7 +12,7 @@ from ..schemas import (
     CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
-from ..plans import billing_settings, plus_active, set_billing_settings
+from ..plans import billing_settings, family_owner_user, plus_active, set_billing_settings
 from ..security import hash_password
 from ..services import access_settings, debug_enabled, indication_hints, set_access_settings, set_debug_enabled, set_indication_hints
 from .files import _drop_photo
@@ -37,19 +37,22 @@ def _user_out(u: User) -> AdminUserOut:
         id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, email_verified=u.email_verified_at is not None,
         created_at=u.created_at,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
+        plan=u.plan, plus_until=u.plus_until, plus_active=plus_active(u),
     )
 
 
 def _family_out(db: Session, f: Family) -> AdminFamilyOut:
     count = db.scalar(select(func.count()).select_from(Medicine).where(Medicine.family_id == f.id)) or 0
     members = sorted(f.memberships, key=lambda m: (m.role != "owner", m.joined_at))
+    owner = family_owner_user(f)
     return AdminFamilyOut(
         id=f.id, name=f.name, invite_code=f.invite_code, created_at=f.created_at, medicine_count=count,
         members=[
             MemberOut(user_id=m.user_id, name=m.user.name, email=m.user.email, role=m.role, joined_at=m.joined_at)
             for m in members
         ],
-        plan=f.plan, plus_until=f.plus_until, plus_active=plus_active(f),
+        plan=owner.plan if owner else "free", plus_until=owner.plus_until if owner else None,
+        plus_active=plus_active(owner), owner_id=owner.id if owner else None, owner_name=owner.name if owner else None,
     )
 
 
@@ -86,6 +89,17 @@ def list_users(db: Session = Depends(get_db)):
         select(User).options(selectinload(User.memberships).selectinload(Membership.family)).order_by(User.created_at)
     )
     return [_user_out(u) for u in users]
+
+
+@router.put("/users/{user_id}/plan", response_model=AdminUserOut)
+def set_user_plan(user_id: int, body: AdminPlanIn, db: Session = Depends(get_db)):
+    """Ручное включение Плюса аккаунту (оплаты пока нет). Плюс действует на все аптечки, где он главный владелец.
+    Бесплатный тариф сбрасывает и срок."""
+    u = _get_user(db, user_id)
+    u.plan = body.plan
+    u.plus_until = body.plus_until if body.plan == "plus" else None
+    db.commit()
+    return _user_out(u)
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)
@@ -157,16 +171,6 @@ def delete_family(family_id: int, db: Session = Depends(get_db)):
     _delete_family(db, _family(db, family_id))
     db.commit()
     return Response(status_code=204)
-
-
-@router.put("/families/{family_id}/plan", response_model=AdminFamilyOut)
-def set_plan(family_id: int, body: AdminPlanIn, db: Session = Depends(get_db)):
-    """Ручное включение Плюса (оплаты пока нет). Бесплатный тариф сбрасывает и срок."""
-    f = _family(db, family_id)
-    f.plan = body.plan
-    f.plus_until = body.plus_until if body.plan == "plus" else None
-    db.commit()
-    return _family_out(db, f)
 
 
 @router.post("/families/{family_id}/members", response_model=AdminFamilyOut)

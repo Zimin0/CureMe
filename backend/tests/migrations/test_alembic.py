@@ -91,3 +91,36 @@ def test_single_category_moves_to_link_table(alembic):
     with engine.connect() as conn:
         rows = conn.execute(text("SELECT id, category_id FROM medicines ORDER BY id")).all()
     assert [tuple(r) for r in rows] == [(1, cat), (2, None)]
+
+
+def test_plus_moves_from_family_to_main_owner(alembic):
+    """Плюс семьи переходит главному владельцу (раннему), а при откате возвращается его семьям."""
+    cfg, engine = alembic
+    command.upgrade(cfg, "c9f3a5e7d2b1")
+    with engine.begin() as conn:
+        for uid in (1, 2, 3):
+            conn.execute(text(
+                "INSERT INTO users (id, email, name, password_hash, is_admin, token_version, created_at) "
+                f"VALUES ({uid}, 'u{uid}@example.com', 'U{uid}', 'x', 0, 0, '2026-01-01')"
+            ))
+        conn.execute(text(
+            "INSERT INTO families (id, name, invite_code, plan, plus_until, created_at) VALUES "
+            "(1, 'Дом', 'A1', 'plus', '2030-01-01', '2026-01-01'),"
+            "(2, 'Дача', 'A2', 'plus', NULL, '2026-01-01'),"
+            "(3, 'Чужая', 'A3', 'free', NULL, '2026-01-01')"
+        ))
+        conn.execute(text(
+            "INSERT INTO memberships (family_id, user_id, role, joined_at) VALUES "
+            "(1, 1, 'owner', '2026-01-01'), (1, 2, 'owner', '2026-02-01'),"  # главный владелец — 1, не 2
+            "(2, 1, 'owner', '2026-01-01'), (3, 3, 'owner', '2026-01-01')"
+        ))
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT id, plan, plus_until FROM users ORDER BY id")).all()
+    assert [(r[0], r[1], r[2]) for r in rows] == [(1, "plus", None), (2, "free", None), (3, "free", None)]  # бессрочный сильнее срока
+    assert "plan" not in {c["name"] for c in inspect(engine).get_columns("families")}
+
+    command.downgrade(cfg, "c9f3a5e7d2b1")
+    with engine.connect() as conn:
+        fams = conn.execute(text("SELECT id, plan FROM families ORDER BY id")).all()
+    assert [tuple(r) for r in fams] == [(1, "plus"), (2, "plus"), (3, "free")]
