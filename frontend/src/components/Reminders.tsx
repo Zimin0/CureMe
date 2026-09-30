@@ -67,9 +67,8 @@ export function Reminders() {
         </span>
       </label>
 
-      {!p.telegram_possible ? (
-        <p className="muted small"><Send size={14} style={{ verticalAlign: -2 }} /> Telegram появится, когда администратор подключит бота</p>
-      ) : p.telegram_connected ? (
+      {/* Админ выключил Telegram (по умолчанию): про него на странице ничего не показываем. */}
+      {!p.telegram_possible ? null : p.telegram_connected ? (
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
           <label className="check">
             <input type="checkbox" checked={p.telegram_enabled} disabled={locked && !p.telegram_enabled}

@@ -11,6 +11,28 @@ from .seed import DEFAULT_INDICATION_HINTS
 INDICATION_HINTS = "indication_hints"
 ACCESS = "access"
 DEBUG_MODE = "debug_mode"
+TELEGRAM_SWITCH = "telegram_switch"
+
+
+def telegram_switch_on(db: Session) -> bool:
+    """Переключатель «Telegram включён» в админке. По умолчанию выключен: Telegram на сайте скрыт."""
+    row = db.get(AppSetting, TELEGRAM_SWITCH)
+    return bool(row.value.get("enabled")) if row else False
+
+
+def set_telegram_switch(db: Session, enabled: bool) -> bool:
+    row = db.get(AppSetting, TELEGRAM_SWITCH)
+    if row:
+        row.value = {"enabled": enabled}
+    else:
+        db.add(AppSetting(key=TELEGRAM_SWITCH, value={"enabled": enabled}))
+    db.commit()
+    return enabled
+
+
+def telegram_active(db: Session) -> bool:
+    """Telegram работает, только если и бот настроен в .env, и админ включил переключатель."""
+    return get_settings().telegram_enabled and telegram_switch_on(db)
 
 
 def debug_enabled(db: Session) -> bool:
