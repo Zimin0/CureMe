@@ -1,10 +1,10 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Lock, Search, Stethoscope, X } from 'lucide-react'
+import { Search, Stethoscope, X } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, Family, Intake, OlderHistory } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
-import { usePlusSheet } from '../plan'
+import { PlusBanner, usePlusSheet } from '../plan'
 import { DoctorReport } from '../components/DoctorReport'
 import { IntakeList } from '../components/IntakeList'
 import { Empty, PageLoader } from '../components/ui'
@@ -66,11 +66,8 @@ export function History() {
   const openPlus = usePlusSheet()
   const items = q.data?.pages.flat() ?? []
   const locked = !q.hasNextPage && !!older.data?.hidden && (
-    <div className="plus-note" role="note">
-      <Lock size={16} />
-      <span>Более ранняя история доступна в Капсулке Плюс. Записи не удалены: они появятся, как только семья подключит Плюс.</span>
-      <button type="button" className="btn ghost sm" onClick={() => openPlus('full_history')}>Подробнее</button>
-    </div>
+    <PlusBanner title="Более ранняя история — в Капсулке Плюс" cta="Подробнее" onClick={() => openPlus('full_history')}
+      text="Более ранняя история доступна в Капсулке Плюс. Записи не удалены: они появятся, как только семья подключит Плюс." />
   )
   const medName = medicine ? items.find(i => String(i.medicine_id) === medicine)?.medicine_name : null
 

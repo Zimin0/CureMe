@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, Lock, Mail, Send } from 'lucide-react'
+import { Bell, Mail, Send } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PlusBanner } from '../plan'
 import { api, NotificationPrefs } from '../api'
 import { useToast } from './ui'
 
@@ -46,16 +47,17 @@ export function Reminders() {
     <section className="card stack" data-testid="reminders">
       <div className="card-head">
         <h2><Bell size={18} style={{ verticalAlign: -3 }} /> Напоминания</h2>
-        {locked && <Link to="/plus" className="badge"><Lock size={12} />Плюс</Link>}
       </div>
       <p className="muted small">
         Раз в день пришлём одно сообщение, если лекарство заканчивается или у него скоро истекает срок.
         Об одном и том же повторять не будем.
       </p>
       {locked && (
-        <p className="small">Напоминания доступны в <Link to="/plus">Капсулке Плюс</Link>. Уже включённые можно выключить.</p>
+        <PlusBanner testId="plus-banner" title="Напоминания — в Капсулке Плюс" to="/plus" cta="Узнать про Плюс"
+          text="Подключите Плюс, и мы сами напомним о лекарствах, которые заканчиваются или портятся." />
       )}
 
+      <fieldset className="locked-block" disabled={locked}>
       <h3>Куда</h3>
       <label className="check">
         <input type="checkbox" checked={p.email_enabled} disabled={(!p.email_possible || locked) && !p.email_enabled}
@@ -118,6 +120,7 @@ export function Reminders() {
       {anyChannel && (
         <button className="btn ghost" disabled={test.isPending} onClick={() => test.mutate()}>Прислать пробное напоминание</button>
       )}
+      </fieldset>
     </section>
   )
 }

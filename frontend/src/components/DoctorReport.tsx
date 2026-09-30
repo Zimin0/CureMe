@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { api, ApiError, fetchFile, type Family } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { canShare, saveFile, shareFile } from '../files'
-import { PlusLock } from '../plan'
+import { PlusBanner, usePlan, usePlusSheet } from '../plan'
 import { Spinner, useToast } from './ui'
 
 type Period = '30' | '90' | '365' | 'custom'
@@ -23,6 +23,8 @@ export function DoctorReport() {
   const [from, setFrom] = useState(daysAgo(29))
   const [to, setTo] = useState(isoDay(new Date()))
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null)
+  const { available } = usePlan()
+  const openPlus = usePlusSheet()
   const [ready, setReady] = useState<File | null>(null)
 
   const who = member ?? me?.id
@@ -52,10 +54,15 @@ export function DoctorReport() {
       <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
         <Stethoscope size={22} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
         <div>
-          <h2 className="row" style={{ gap: 8 }}>Для врача: PDF и Excel<PlusLock feature="export_pdf" /></h2>
+          <h2 className="row" style={{ gap: 8 }}>Для врача: PDF и Excel</h2>
           <p className="small muted">Что и когда принималось за период, сводка по каждому лекарству и ваши комментарии к приёму.</p>
         </div>
       </div>
+
+      {!available('export_pdf') && (
+        <PlusBanner title="Выписка для врача — в Капсулке Плюс" cta="Узнать про Плюс" label="Доступно в Плюсе: экспорт для врача"
+          onClick={() => openPlus('export_pdf')} text="PDF и Excel с историей приёма и сводкой по лекарствам доступны в Капсулке Плюс." />
+      )}
 
       {members.length > 1 && (
         <label className="field"><span>Чья история</span>

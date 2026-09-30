@@ -115,6 +115,24 @@ export function PlusLock({ feature, showBadge = false }: { feature: PlusFeature;
   )
 }
 
+/** Крупный сиреневый блок «нужен Плюс»: один вид для всех закрытых функций. */
+export function PlusBanner({ title, text, cta, to, onClick, label, testId }: {
+  title: string; text: string; cta: string; to?: string; onClick?: () => void; label?: string; testId?: string
+}) {
+  return (
+    <div className="plus-banner" role="note" data-testid={testId}>
+      <Lock size={32} />
+      <div>
+        <strong>{title}</strong>
+        <p>{text}</p>
+      </div>
+      {to
+        ? <Link to={to} className="btn plus-btn">{cta}</Link>
+        : <button type="button" className="btn plus-btn" aria-label={label} onClick={onClick}>{cta}</button>}
+    </div>
+  )
+}
+
 /** «58 из 60 лекарств»: лимит видно заранее, а не ошибкой. Без лимита ничего не рисует. */
 export function LimitCounter({ name }: { name: 'members' | 'medicines' }) {
   const { limit, usage } = usePlan()

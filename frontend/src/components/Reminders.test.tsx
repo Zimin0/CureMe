@@ -46,7 +46,8 @@ it('включает почту и подключает Telegram по ссылк
 it('без Плюса показывает замочек и не даёт включить', async () => {
   server.use(http.get('/api/notifications', () => HttpResponse.json(prefs({ available: false }))))
   renderWithProviders(<Reminders />)
-  expect(await screen.findByText('Плюс')).toHaveAttribute('href', '/plus')
+  expect(await screen.findByText('Узнать про Плюс')).toHaveAttribute('href', '/plus')
+  expect(screen.getByTestId('plus-banner')).toBeInTheDocument()
   expect(screen.getByLabelText(/На почту/)).toBeDisabled()
   expect(screen.getByText('Подключить Telegram')).toBeDisabled()
 })
