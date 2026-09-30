@@ -48,7 +48,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "Семьи и приглашения": {
         "sources": ["routers/families.py"],
-        "tests": ["integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py"],
+        "tests": [
+            "integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py",
+            "integration/test_plans.py",
+        ],
     },
     "Лекарства, упаковки, остатки": {
         "sources": ["routers/medicines.py", "services.py"],
@@ -87,8 +90,12 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/admin.py"],
         "tests": [
             "integration/test_admin.py", "integration/test_closed_mode.py", "integration/test_access_control.py",
-            "integration/test_email_verification.py",
+            "integration/test_email_verification.py", "integration/test_plans.py",
         ],
+    },
+    "Тарифы: Бесплатный и Плюс": {
+        "sources": ["plans.py"],
+        "tests": ["integration/test_plans.py", "integration/test_access_control.py"],
     },
     "Схема базы, миграции, перенос из SQLite": {
         "sources": ["models.py", "db.py", "sqlite_import.py"],
