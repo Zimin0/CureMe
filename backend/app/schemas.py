@@ -217,6 +217,9 @@ class AdminFamilyOut(BaseModel):
 # --- тарифы (plans.py) ---
 class BillingSettings(BaseModel):
     enabled: bool = False  # платная версия включена: у семей без Плюса действуют лимиты
+    # Стоимость Плюса для всей семьи в рублях; пусто — цена не показывается.
+    price_month: int | None = Field(default=None, ge=1, le=100_000)
+    price_year: int | None = Field(default=None, ge=1, le=1_000_000)
 
 
 class AdminPlanIn(BaseModel):
@@ -236,6 +239,8 @@ class PlanOut(BaseModel):
     plus_until: datetime | None        # до какого момента Плюс; пусто — бессрочно
     plus_active: bool                  # Плюс оплачен и не истёк
     billing_enabled: bool              # платная версия включена администратором
+    price_month: int | None = None     # стоимость Плюса в рублях за месяц / за год (настраивает админ)
+    price_year: int | None = None
     has_plus: bool                     # семье доступно всё из Плюса (Плюс или платная версия выключена)
     limits: dict[str, int | None]      # действующие лимиты семьи; None — без ограничений
     free_limits: dict[str, int]        # лимиты бесплатной версии — для сравнения на странице «Плюс»

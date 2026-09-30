@@ -91,6 +91,7 @@ function PlusSheet({ feature, onClose }: { feature: PlusFeature; onClose: () => 
             {f && <p className="muted small">{f.description}</p>}
           </div>
         </div>
+        {priceText(plan) && <p><b>{priceText(plan)}</b> за всю семью. <span className="muted small">{PRICE_NOTE}</span></p>}
         <p className="muted small">Плюс подключается сразу для всей семьи. Оплата появится скоро, а пока Плюс включает администратор.</p>
         <Link to="/plus" className="btn primary block" onClick={onClose}><Sparkles size={18} />Что даёт Плюс</Link>
       </div>
@@ -125,6 +126,18 @@ export function LimitCounter({ name }: { name: 'members' | 'medicines' }) {
       {used} из {max} {ofWord(name, max)}
     </span>
   )
+}
+
+/** Пока нет оплаты и оферты, цена только справочная (ст. 437 ГК РФ: реклама и предложения — не оферта). */
+export const PRICE_NOTE = 'Оплата пока недоступна: цена указана для сведения и не является публичной офертой.'
+
+const rub = (n: number) => `${n.toLocaleString('ru-RU')} ₽`
+
+/** «149 ₽ в месяц или 990 ₽ в год»; пусто, если администратор цену не задал. */
+export function priceText(plan: Plan | undefined): string {
+  const m = plan?.price_month, y = plan?.price_year
+  const parts = [m && `${rub(m)} в месяц`, y && `${rub(y)} в год${m ? '' : ` (${rub(Math.round(y / 12))} в месяц)`}`].filter(Boolean)
+  return parts.join(' или ')
 }
 
 /** Короткая подпись тарифа семьи: «Плюс до 12.10.2026», «Бесплатная версия». */

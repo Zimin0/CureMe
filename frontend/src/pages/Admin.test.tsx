@@ -133,12 +133,12 @@ describe('админка: закрытый режим', () => {
       members: [{ user_id: 1, name: 'Никита', email: 'nikita@example.com', role: 'owner', joined_at: '2026-09-26T10:00:00Z' }],
       plan: 'free', plus_until: null, plus_active: false,
     }
-    let billing: { enabled: boolean } | undefined
+    let billing: Record<string, unknown> | undefined
     let plan: { plan: string; plus_until: string | null } | undefined
     server.use(
       stats,
-      http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false })),
-      http.put('/api/admin/billing', async ({ request }) => { billing = await request.json() as { enabled: boolean }; return HttpResponse.json(billing) }),
+      http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false, price_month: null, price_year: 990 })),
+      http.put('/api/admin/billing', async ({ request }) => { billing = await request.json() as Record<string, unknown>; return HttpResponse.json(billing) }),
       http.get('/api/admin/families', () => HttpResponse.json([fam])),
       http.put('/api/admin/families/7/plan', async ({ request }) => {
         plan = await request.json() as typeof plan
@@ -148,7 +148,13 @@ describe('админка: закрытый режим', () => {
     const { user } = renderApp('/admin?tab=plans', { me: ADMIN })
     window.confirm = () => true
     await user.click(await screen.findByRole('checkbox', { name: /Платная версия включена/ }))
-    await waitFor(() => expect(billing).toEqual({ enabled: true }))
+    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: null, price_year: 990 }))  // цена не стирается
+
+    // стоимость подписки
+    expect(screen.getByLabelText('В год, ₽')).toHaveValue(990)
+    await user.type(screen.getByLabelText('В месяц, ₽'), '149')
+    await user.click(screen.getByRole('button', { name: 'Сохранить стоимость' }))
+    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: 149, price_year: 990 }))
 
     await user.click(screen.getByText('Семья Никиты'))
     const sheet = await screen.findByRole('dialog', { name: 'Тариф: Семья Никиты' })

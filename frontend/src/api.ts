@@ -25,6 +25,8 @@ export interface Plan {
   plus_until: string | null
   plus_active: boolean       // Плюс оплачен и не истёк
   billing_enabled: boolean   // платная версия включена администратором
+  price_month?: number | null  // стоимость Плюса для семьи, ₽ (настраивает админ); null — не показывать
+  price_year?: number | null
   has_plus: boolean          // семье доступно всё из Плюса
   limits: Record<LimitName, number | null>  // null — без ограничений
   free_limits: Record<LimitName, number>
