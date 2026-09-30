@@ -85,7 +85,26 @@ export function Family() {
         <ChevronRight size={18} className="muted" />
       </Link>
 
-      <Cabinets />
+      <section className="card flush">
+        <div className="row between" style={{ padding: '18px 18px 6px' }}><h2>Участники</h2><LimitCounter name="members" /></div>
+        {f.members.map(m => (
+          <div key={m.user_id} className="list-row">
+            <div className="avatar" style={{ background: avatarColor(m.user_id) }}>{m.name.slice(0, 1).toUpperCase()}</div>
+            <div className="grow">
+              <div style={{ fontWeight: 700 }}>{m.name}{m.user_id === me?.id && <span className="muted"> (вы)</span>}</div>
+              <div className="small muted ellipsis">{m.email}</div>
+            </div>
+            {m.role === 'owner' && <span className="badge accent"><Crown size={12} />Владелец</span>}
+            {owner && m.user_id !== me?.id && (
+              <>
+                <button className="icon-btn" title={m.role === 'owner' ? 'Сделать участником' : 'Сделать владельцем'}
+                  onClick={() => setRole.mutate({ uid: m.user_id, role: m.role === 'owner' ? 'member' : 'owner' })}><Crown size={16} /></button>
+                <button className="icon-btn" title="Убрать из семьи" onClick={() => confirm(`Убрать ${m.name} из семьи?`) && removeMember.mutate(m.user_id)}><Trash2 size={16} /></button>
+              </>
+            )}
+          </div>
+        ))}
+      </section>
 
       <section className="card stack">
         <h2>Пригласить в семью</h2>
@@ -114,26 +133,7 @@ export function Family() {
         )}
       </section>
 
-      <section className="card flush">
-        <div className="row between" style={{ padding: '18px 18px 6px' }}><h2>Участники</h2><LimitCounter name="members" /></div>
-        {f.members.map(m => (
-          <div key={m.user_id} className="list-row">
-            <div className="avatar" style={{ background: avatarColor(m.user_id) }}>{m.name.slice(0, 1).toUpperCase()}</div>
-            <div className="grow">
-              <div style={{ fontWeight: 700 }}>{m.name}{m.user_id === me?.id && <span className="muted"> (вы)</span>}</div>
-              <div className="small muted ellipsis">{m.email}</div>
-            </div>
-            {m.role === 'owner' && <span className="badge accent"><Crown size={12} />Владелец</span>}
-            {owner && m.user_id !== me?.id && (
-              <>
-                <button className="icon-btn" title={m.role === 'owner' ? 'Сделать участником' : 'Сделать владельцем'}
-                  onClick={() => setRole.mutate({ uid: m.user_id, role: m.role === 'owner' ? 'member' : 'owner' })}><Crown size={16} /></button>
-                <button className="icon-btn" title="Убрать из семьи" onClick={() => confirm(`Убрать ${m.name} из семьи?`) && removeMember.mutate(m.user_id)}><Trash2 size={16} /></button>
-              </>
-            )}
-          </div>
-        ))}
-      </section>
+      <Cabinets />
 
       <Reminders />
 
