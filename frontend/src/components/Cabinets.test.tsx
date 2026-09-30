@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { expect, it } from 'vitest'
 import { server } from '../test/server'
@@ -40,7 +40,8 @@ it('в бесплатной версии вторая своя аптечка п
   server.use(http.post('/api/families', () => { created = true; return HttpResponse.json({}, { status: 201 }) }))
   const { user } = renderApp('/family', { me: { ...ME, own_families_left: 0 } })
   expect(await screen.findByText(/В бесплатной версии одна своя аптечка/)).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Новая аптечка' }))
+  expect(screen.getAllByRole('button', { name: 'Новая аптечка' })[0]).toBeDisabled()
+  await user.click(within(screen.getByRole('note')).getByRole('button', { name: 'Новая аптечка' }))
   expect(await screen.findByRole('dialog', { name: 'Доступно в Капсулке Плюс' })).toBeInTheDocument()
   expect(screen.getByText('Несколько своих аптечек')).toBeInTheDocument()
   expect(created).toBe(false)
