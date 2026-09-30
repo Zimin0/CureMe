@@ -72,6 +72,7 @@ export function MedicineDetail() {
       qc.invalidateQueries({ queryKey: ['medicines'] })
       qc.invalidateQueries({ queryKey: ['overview'] })
       qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['plan'] })
       toast('Лекарство удалено')
       nav('/medicines', { replace: true })
     },

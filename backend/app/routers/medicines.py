@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..codes import parse_code
 from ..db import get_db
 from ..deps import current_user, get_family
+from ..limits import ensure_can_add_medicine
 from ..lookup import remember_product
 from ..models import Category, Family, Medicine, MedicineCategory, Package, User, UserMark
 from ..schemas import (
@@ -101,6 +102,7 @@ def filter_none(xs):
 def create_medicine(
     body: MedicineIn, fam: Family = Depends(get_family), user: User = Depends(current_user), db: Session = Depends(get_db)
 ):
+    ensure_can_add_medicine(db, fam)
     data = body.model_dump(exclude={"packages", "category_ids"})
     data["gtin"] = _normalize_gtin(body.gtin)
     med = Medicine(family_id=fam.id, created_by_id=user.id, **data)
