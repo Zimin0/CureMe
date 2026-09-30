@@ -541,8 +541,6 @@ a.intake-med { color: var(--primary); }
 .compare td.plus-col { color: var(--plus); font-weight: 700; }
 
 /* ---------- несколько аптечек ---------- */
-.cabinets-card { background: var(--surface-3); }
-.cabinets-card .cabinet:not(.active) { background: var(--surface); }
 .cabinets { display: grid; gap: 8px; }
 @media (min-width: 640px) { .cabinets { grid-template-columns: 1fr 1fr; } }
 .cabinet {
