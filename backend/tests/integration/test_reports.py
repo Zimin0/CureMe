@@ -86,14 +86,6 @@ def test_period_and_timezone(client, fam, db):
     assert rows(xlsx(client, h, f)["Журнал приёма"]) == []
 
 
-def test_cabinet_sheet_is_optional(client, fam):
-    wb = xlsx(client, fam["h"], fam["f"], cabinet="true")
-    [row] = rows(wb["Аптечка"])
-    assert row[:6] == ("Нурофен", "200 мг", None, "ибупрофен", 18.5, "таб")
-    r = client.get(f"/api/families/{fam['f']}/report.pdf?cabinet=true", headers=fam["h"])
-    assert r.status_code == 200
-
-
 def test_deleted_medicine_stays_in_report(client, fam):
     client.delete(f"/api/families/{fam['f']}/medicines/{fam['med']['id']}", headers=fam["h"])
     [row] = rows(xlsx(client, fam["h"], fam["f"])["Журнал приёма"])

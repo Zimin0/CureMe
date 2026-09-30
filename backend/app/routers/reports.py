@@ -33,7 +33,6 @@ def doctor_report(
     date_from: date | None = Query(default=None, alias="from"),
     date_to: date | None = Query(default=None, alias="to"),
     tz: str = Query(default="Europe/Moscow", max_length=64, description="Часовой пояс браузера"),
-    cabinet: bool = Query(default=False, description="Добавить список лекарств в аптечке"),
     fam: Family = Depends(plus_feature("export_pdf")), user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
     if fmt not in FORMATS:
@@ -55,7 +54,7 @@ def doctor_report(
             raise HTTPException(404, "Участник не найден")
         patient = m.user
 
-    report = collect(db, fam, user, patient, date_from, date_to, zone, cabinet)
+    report = collect(db, fam, user, patient, date_from, date_to, zone)
     render, media = FORMATS[fmt]
     ascii_name, name = report.filename(fmt)
     return Response(
