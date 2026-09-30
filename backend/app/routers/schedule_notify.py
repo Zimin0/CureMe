@@ -48,6 +48,7 @@ def _out(db: Session, user: User) -> SchedulePrefsOut:
         repeat_minutes=prefs.repeat_minutes if prefs else 10,
         escalate_enabled=bool(prefs and prefs.escalate_enabled), escalate_minutes=prefs.escalate_minutes if prefs else 10,
         share_medicine_name=bool(prefs and prefs.share_medicine_name),
+        escalate_consent_at=prefs.escalate_consent_at if prefs else None,
         trusted=TrustedOut(name=c.name, email=c.email, status=c.status, confirmed_at=c.confirmed_at) if c else None,
     )
 
@@ -60,8 +61,17 @@ def get_prefs(user: User = Depends(current_user), db: Session = Depends(get_db))
 @router.put("", response_model=SchedulePrefsOut)
 def update_prefs(body: SchedulePrefsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     data = body.model_dump(exclude_unset=True)
+    consent = data.pop("escalate_consent", None)
     if data.get("enabled") or data.get("escalate_enabled"):
         _require_plus(db, user)
+    if data.get("escalate_enabled"):
+        # Письмо доверенному раскрывает сведения о здоровье: нужно отдельное разрешение пользователя, с датой.
+        if not consent:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "Отметьте, что разрешаете сообщать доверенному человеку о неотмеченном приёме")
+        data["escalate_consent_at"] = utcnow()
+    elif data.get("escalate_enabled") is False:
+        data["escalate_consent_at"] = None  # выключили — разрешение снято, при новом включении спросим снова
     if data.get("enabled") and not can_email(user):
         raise HTTPException(status.HTTP_409_CONFLICT, "Отправка писем на сайте пока не настроена")
     prefs = _prefs(db, user)
@@ -148,6 +158,9 @@ def _set_status(db: Session, c: TrustedContact, new: str) -> TrustedPublicOut:
     c.status = new
     if new == "confirmed":
         c.confirmed_at, c.consent_version = utcnow(), CONSENT_VERSION
+    else:
+        c.name = c.email = ""  # отказался или отписался: имя и почту стираем, остаётся только статус
+        c.confirmed_at = None
     db.commit()
     return TrustedPublicOut(user_name=db.get(User, c.user_id).name, status=c.status)
 

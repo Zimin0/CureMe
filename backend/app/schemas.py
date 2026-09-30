@@ -632,6 +632,7 @@ class SchedulePrefsOut(BaseModel):
     escalate_enabled: bool
     escalate_minutes: int
     share_medicine_name: bool
+    escalate_consent_at: datetime | None  # когда разрешено сообщать доверенному (None — не разрешено)
     trusted: TrustedOut | None
 
 
@@ -642,6 +643,8 @@ class SchedulePrefsIn(BaseModel):
     escalate_enabled: bool | None = None
     escalate_minutes: int | None = Field(default=None, ge=1, le=120)
     share_medicine_name: bool | None = None
+    # Вместе с escalate_enabled=true: человек разрешает сообщать доверенному, что приём не отмечен.
+    escalate_consent: bool | None = None
 
     @model_validator(mode="after")
     def no_nulls(self):

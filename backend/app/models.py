@@ -256,6 +256,9 @@ class SchedulePrefs(Base):
     escalate_enabled: Mapped[bool] = mapped_column(Boolean, default=False)     # сообщать доверенному человеку
     escalate_minutes: Mapped[int] = mapped_column(Integer, default=10)         # через сколько минут после повторного напоминания
     share_medicine_name: Mapped[bool] = mapped_column(Boolean, default=False)  # называть лекарство в письме доверенному
+    # Когда пользователь отдельно разрешил сообщать доверенному, что приём не отмечен (Согласие, п. 4.1):
+    # письмо доверенному раскрывает сведения о здоровье. Без этой даты такие письма не уходят.
+    escalate_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TrustedContact(Base):
