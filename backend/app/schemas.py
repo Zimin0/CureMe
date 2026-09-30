@@ -80,11 +80,17 @@ class MeOut(UserOut):
 
 class AccessOut(BaseModel):
     closed: bool
+    telegram: bool = False  # Telegram на сайте включён (бот настроен и переключатель в админке)
     debug: bool = False  # режим отладки: показывать версию приложения на каждой странице
 
 
 class DebugSettings(BaseModel):
     enabled: bool
+
+
+class TelegramSettings(BaseModel):
+    enabled: bool          # переключатель в админке
+    configured: bool = False  # бот настроен в .env (только в ответе админки)
 
 
 class VerifyEmailIn(BaseModel):

@@ -14,6 +14,7 @@ const TABS = [
   { id: 'categories', label: 'Категории' },
   { id: 'hints', label: 'Подсказки' },
   { id: 'access', label: 'Доступ' },
+  { id: 'telegram', label: 'Telegram' },
   { id: 'debug', label: 'Отладка' },
   { id: 'plans', label: 'Тарифы' },
 ] as const
@@ -65,6 +66,7 @@ export function Admin() {
       {tab === 'categories' && <CategoriesTab />}
       {tab === 'hints' && <HintsTab />}
       {tab === 'access' && <AccessTab />}
+      {tab === 'telegram' && <TelegramTab />}
       {tab === 'debug' && <DebugTab />}
       {tab === 'plans' && <PlansTab />}
     </div>
@@ -445,6 +447,45 @@ function AccessTab() {
           {save.isPending ? 'Сохраняем…' : 'Сохранить'}
         </button>
       </div>
+    </>
+  )
+}
+
+// ---------- Telegram ----------
+type TelegramSettings = { enabled: boolean; configured: boolean }
+
+/** Переключатель «Telegram включён»: пока выключен, на сайте нет ничего про Telegram и бот молчит. */
+function TelegramTab() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const tg = useQuery({ queryKey: ['admin', 'telegram'], queryFn: () => api<TelegramSettings>('/admin/telegram') })
+  const save = useMutation({
+    mutationFn: (enabled: boolean) => api<TelegramSettings>('/admin/telegram', { method: 'PUT', body: { enabled } }),
+    onSuccess: d => {
+      qc.setQueryData(['admin', 'telegram'], d)
+      qc.invalidateQueries({ queryKey: ['access'] })
+      qc.invalidateQueries({ queryKey: ['notifications'] })
+      qc.invalidateQueries({ queryKey: ['plan'] })
+      toast(d.enabled ? 'Telegram включён' : 'Telegram выключен')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+  if (tg.isLoading) return <PageLoader />
+  return (
+    <>
+      <label className="check card" style={{ padding: 16 }}>
+        <input type="checkbox" checked={tg.data?.enabled ?? false} disabled={save.isPending}
+          onChange={e => save.mutate(e.target.checked)} />
+        <span>
+          <b>Telegram включён</b><br />
+          <span className="muted small">Пока выключено, на сайте нигде не упоминается Telegram: нет привязки бота и согласия на передачу данных, бот не опрашивается, напоминания в Telegram не уходят. Напоминания на почту работают как обычно. Уже привязанные чаты сохраняются и вернутся при включении.</span>
+        </span>
+      </label>
+      {tg.data && !tg.data.configured && (
+        <div className="card" role="note" data-testid="telegram-not-configured" style={{ padding: 16, marginTop: 12 }}>
+          <span className="muted small">Бот не настроен на сервере (нет CUREME_TELEGRAM_BOT_TOKEN и CUREME_TELEGRAM_BOT_USERNAME), поэтому Telegram останется скрытым, даже если включить переключатель.</span>
+        </div>
+      )}
     </>
   )
 }

@@ -54,7 +54,8 @@ export function Cabinets() {
         <PlusBanner title="Новая аптечка — в Капсулке Плюс" cta="Новая аптечка" onClick={() => openPlus('cabinets')}
           text="В бесплатной версии одна своя аптечка, больше — в Капсулке Плюс." />
       )}
-      <div className="cabinets">
+      {/* Одна аптечка — выбирать нечего, список показываем только когда их несколько. */}
+      {me.families.length > 1 && <div className="cabinets">
         {me.families.map(f => (
           <button key={f.id} className={`cabinet ${f.id === familyId ? 'active' : ''}`} aria-pressed={f.id === familyId}
             onClick={() => f.id !== familyId && setFamilyId(f.id)}>
@@ -63,7 +64,7 @@ export function Cabinets() {
             {f.id === familyId && <Check size={16} />}
           </button>
         ))}
-      </div>
+      </div>}
 
       {name !== null && (
         <Sheet title="Новая аптечка" onClose={() => setName(null)}>

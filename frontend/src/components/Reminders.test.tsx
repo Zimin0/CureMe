@@ -48,14 +48,19 @@ it('без Плюса показывает замочек и не даёт вк�
   renderWithProviders(<Reminders />)
   expect(await screen.findByText('Узнать про Плюс')).toHaveAttribute('href', '/plus')
   expect(screen.getByTestId('plus-banner')).toBeInTheDocument()
-  expect(screen.getByLabelText(/На почту/)).toBeDisabled()
-  expect(screen.getByText('Подключить Telegram')).toBeDisabled()
+  // В бесплатной версии настроек нет совсем: только описание и баннер Плюса.
+  expect(screen.queryByText('Куда')).not.toBeInTheDocument()
+  expect(screen.queryByText('О чём')).not.toBeInTheDocument()
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
 it('если на сайте нет почты и бота — объясняет это', async () => {
   server.use(http.get('/api/notifications', () => HttpResponse.json(prefs({ email_possible: false, telegram_possible: false }))))
   renderWithProviders(<Reminders />)
   expect(await screen.findByText('Отправка писем на сайте пока не настроена')).toBeInTheDocument()
-  expect(screen.getByText(/Telegram появится/)).toBeInTheDocument()
+  expect(screen.queryByText(/Telegram/)).not.toBeInTheDocument()  // Telegram выключен в админке: о нём ни слова
+  expect(screen.queryByText('Подключить Telegram')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/передачу данных напоминаний в Telegram/)).not.toBeInTheDocument()
   await waitFor(() => expect(screen.getByLabelText(/На почту/)).toBeDisabled())
 })

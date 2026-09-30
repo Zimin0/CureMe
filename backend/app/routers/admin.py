@@ -3,18 +3,19 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
 from ..models import Category, Family, Medicine, MedicineCategory, Membership, User
 from ..schemas import (
-    AccessSettings, AdminPlanIn, BillingSettings, DebugSettings,
+    AccessSettings, AdminPlanIn, BillingSettings, DebugSettings, TelegramSettings,
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
     CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
 from ..plans import billing_settings, family_owner_user, plus_active, set_billing_settings
 from ..security import hash_password
-from ..services import access_settings, debug_enabled, indication_hints, set_access_settings, set_debug_enabled, set_indication_hints
+from ..services import access_settings, debug_enabled, indication_hints, set_access_settings, set_debug_enabled, set_indication_hints, set_telegram_switch, telegram_switch_on
 from .files import _drop_photo
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_user)])
@@ -299,6 +300,17 @@ def put_access(body: AccessSettings, db: Session = Depends(get_db)):
 @router.get("/debug", response_model=DebugSettings)
 def get_debug(db: Session = Depends(get_db)):
     return DebugSettings(enabled=debug_enabled(db))
+
+
+@router.get("/telegram", response_model=TelegramSettings)
+def get_telegram(db: Session = Depends(get_db)):
+    return TelegramSettings(enabled=telegram_switch_on(db), configured=get_settings().telegram_enabled)
+
+
+@router.put("/telegram", response_model=TelegramSettings)
+def put_telegram(body: TelegramSettings, db: Session = Depends(get_db)):
+    """Показать или спрятать всё про Telegram. Привязанные чаты не трогаем: при включении всё вернётся."""
+    return TelegramSettings(enabled=set_telegram_switch(db, body.enabled), configured=get_settings().telegram_enabled)
 
 
 @router.put("/debug", response_model=DebugSettings)
