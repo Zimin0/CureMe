@@ -126,4 +126,38 @@ describe('админка: закрытый режим', () => {
     await user.click(screen.getByRole('button', { name: 'Сохранить' }))
     await waitFor(() => expect(body).toEqual({ closed: true, user_ids: [2] }))
   })
+
+  it('тарифы: включение платной версии и Плюс семье со сроком', async () => {
+    const fam = {
+      id: 7, name: 'Семья Никиты', invite_code: 'ABC', created_at: '2026-09-26T10:00:00Z', medicine_count: 3,
+      members: [{ user_id: 1, name: 'Никита', email: 'nikita@example.com', role: 'owner', joined_at: '2026-09-26T10:00:00Z' }],
+      plan: 'free', plus_until: null, plus_active: false,
+    }
+    let billing: { enabled: boolean } | undefined
+    let plan: { plan: string; plus_until: string | null } | undefined
+    server.use(
+      stats,
+      http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false })),
+      http.put('/api/admin/billing', async ({ request }) => { billing = await request.json() as { enabled: boolean }; return HttpResponse.json(billing) }),
+      http.get('/api/admin/families', () => HttpResponse.json([fam])),
+      http.put('/api/admin/families/7/plan', async ({ request }) => {
+        plan = await request.json() as typeof plan
+        return HttpResponse.json({ ...fam, ...plan, plus_active: true })
+      }),
+    )
+    const { user } = renderApp('/admin?tab=plans', { me: ADMIN })
+    window.confirm = () => true
+    await user.click(await screen.findByRole('checkbox', { name: /Платная версия включена/ }))
+    await waitFor(() => expect(billing).toEqual({ enabled: true }))
+
+    await user.click(screen.getByText('Семья Никиты'))
+    const sheet = await screen.findByRole('dialog', { name: 'Тариф: Семья Никиты' })
+    await user.click(within(sheet).getByRole('radio', { name: 'Плюс' }))
+    await user.click(within(sheet).getByRole('button', { name: '+1 месяц' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Сохранить' }))
+    await waitFor(() => expect(plan?.plan).toBe('plus'))
+    const days = (new Date(plan!.plus_until!).getTime() - Date.now()) / 86_400_000
+    expect(days).toBeGreaterThan(27)
+    expect(days).toBeLessThan(33)
+  })
 })

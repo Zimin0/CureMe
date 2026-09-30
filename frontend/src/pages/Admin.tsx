@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Crown, House, Lightbulb, Pill, Plus, Search, Shield, Tags, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Crown, House, Lightbulb, Pill, Plus, Search, Shield, Sparkles, Tags, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { AdminFamily, AdminStats, AdminUser, api, Category } from '../api'
+import { AdminFamily, AdminStats, AdminUser, api, Category, PlanName } from '../api'
 import { useAuth } from '../auth'
 import { CategoryDraft, CategoryEditor } from '../components/CategoryEditor'
 import { Empty, PageLoader, Sheet, useToast } from '../components/ui'
@@ -14,6 +14,7 @@ const TABS = [
   { id: 'categories', label: 'Категории' },
   { id: 'hints', label: 'Подсказки' },
   { id: 'access', label: 'Доступ' },
+  { id: 'plans', label: 'Тарифы' },
 ] as const
 type Tab = typeof TABS[number]['id']
 
@@ -22,7 +23,7 @@ function useRefresh() {
   const qc = useQueryClient()
   const { refresh } = useAuth()
   return () => {
-    ['admin', 'categories', 'medicines', 'family', 'overview'].forEach(k => qc.invalidateQueries({ queryKey: [k] }))
+    ['admin', 'categories', 'medicines', 'family', 'overview', 'plan'].forEach(k => qc.invalidateQueries({ queryKey: [k] }))
     refresh()
   }
 }
@@ -63,6 +64,7 @@ export function Admin() {
       {tab === 'categories' && <CategoriesTab />}
       {tab === 'hints' && <HintsTab />}
       {tab === 'access' && <AccessTab />}
+      {tab === 'plans' && <PlansTab />}
     </div>
   )
 }
@@ -442,5 +444,123 @@ function AccessTab() {
         </button>
       </div>
     </>
+  )
+}
+
+// ---------- тарифы ----------
+type Billing = { enabled: boolean }
+
+const planText = (f: AdminFamily) =>
+  f.plus_active ? (f.plus_until ? `Плюс до ${fmtDate(f.plus_until)}` : 'Плюс бессрочно')
+    : f.plan === 'plus' ? 'Плюс истёк' : 'Бесплатный'
+
+/** Платная версия: общий переключатель и ручное включение Плюса семьям (оплаты пока нет). */
+function PlansTab() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const billing = useQuery({ queryKey: ['admin', 'billing'], queryFn: () => api<Billing>('/admin/billing') })
+  const fams = useQuery({ queryKey: ['admin', 'families'], queryFn: () => api<AdminFamily[]>('/admin/families') })
+  const [q, setQ] = useState('')
+  const [edit, setEdit] = useState<AdminFamily | null>(null)
+
+  const save = useMutation({
+    mutationFn: (b: Billing) => api<Billing>('/admin/billing', { method: 'PUT', body: b }),
+    onSuccess: b => {
+      qc.setQueryData(['admin', 'billing'], b)
+      qc.invalidateQueries({ queryKey: ['plan'] })
+      toast(b.enabled ? 'Платная версия включена' : 'Платная версия выключена: всем доступно всё')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+
+  if (billing.isLoading || fams.isLoading || !billing.data) return <PageLoader />
+  const needle = q.trim().toLowerCase()
+  const list = (fams.data ?? []).filter(f => !needle || `${f.name} ${f.members.map(m => `${m.name} ${m.email}`).join(' ')}`.toLowerCase().includes(needle))
+  const plusCount = (fams.data ?? []).filter(f => f.plus_active).length
+
+  return (
+    <>
+      <label className="check card" style={{ padding: 16 }}>
+        <input type="checkbox" checked={billing.data.enabled} disabled={save.isPending}
+          onChange={e => {
+            const on = e.target.checked
+            if (!on || confirm('Включить платную версию? Семьи без Плюса получат лимиты бесплатной версии: 4 участника, 60 лекарств, 1 своя аптечка, история за 30 дней.')) save.mutate({ enabled: on })
+          }} />
+        <span>
+          <b>Платная версия включена</b><br />
+          <span className="muted small">Пока выключено, всем семьям доступны все функции Плюса. Включите, когда будут готовы оплата и оферта.</span>
+        </span>
+      </label>
+      <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'семьи', 'семей', 'семей')}. Нажмите на семью, чтобы включить или продлить Плюс вручную.</p>
+      <div className="search"><Search size={18} /><input className="input" placeholder="Семья, имя или почта" value={q} onChange={e => setQ(e.target.value)} /></div>
+      <section className="card flush">
+        {list.length === 0 && <div style={{ padding: 18 }} className="muted">Ничего не нашли</div>}
+        {list.map(f => (
+          <button key={f.id} className="list-row admin-row" onClick={() => setEdit(f)}>
+            <div className="avatar" style={{ background: avatarColor(f.id + 7) }}><House size={18} /></div>
+            <div className="grow">
+              <div style={{ fontWeight: 700 }} className="ellipsis">{f.name}</div>
+              <div className="small muted ellipsis">{f.members.map(m => m.name).join(', ') || 'Нет участников'}</div>
+            </div>
+            <span className={`badge ${f.plus_active ? 'plus' : ''}`}>{f.plus_active && <Sparkles size={12} />}{planText(f)}</span>
+          </button>
+        ))}
+      </section>
+      {edit && <PlanSheet family={edit} onClose={() => setEdit(null)} />}
+    </>
+  )
+}
+
+/** Дата «Плюс до» для поля ввода: yyyy-mm-dd по местному времени. */
+function dateInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function PlanSheet({ family, onClose }: { family: AdminFamily; onClose: () => void }) {
+  const toast = useToast()
+  const refresh = useRefresh()
+  const [plan, setPlan] = useState<PlanName>(family.plan)
+  const [until, setUntil] = useState(dateInput(family.plus_until))
+
+  const addMonths = (n: number) => {
+    const base = until ? new Date(until) : new Date()
+    base.setMonth(base.getMonth() + n)
+    setPlan('plus')
+    setUntil(dateInput(base.toISOString()))
+  }
+  const save = useMutation({
+    // «Плюс до 12.10» — включительно: до конца этого дня по местному времени.
+    mutationFn: () => api<AdminFamily>(`/admin/families/${family.id}/plan`, {
+      method: 'PUT', body: { plan, plus_until: plan === 'plus' && until ? new Date(`${until}T23:59:59`).toISOString() : null },
+    }),
+    onSuccess: f => { refresh(); toast(`${f.name}: ${planText(f)}`); onClose() },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+
+  return (
+    <Sheet title={`Тариф: ${family.name}`} onClose={onClose}>
+      <form className="stack" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate() }}>
+        <div className="segmented" role="radiogroup" aria-label="Тариф">
+          <button type="button" role="radio" aria-checked={plan === 'free'} className={plan === 'free' ? 'on' : ''} onClick={() => setPlan('free')}>Бесплатный</button>
+          <button type="button" role="radio" aria-checked={plan === 'plus'} className={plan === 'plus' ? 'on' : ''} onClick={() => setPlan('plus')}>Плюс</button>
+        </div>
+        {plan === 'plus' && (
+          <>
+            <label className="field"><span>Плюс до (пусто — бессрочно)</span>
+              <input className="input" type="date" value={until} onChange={e => setUntil(e.target.value)} />
+            </label>
+            <div className="row wrap" style={{ gap: 8 }}>
+              <button type="button" className="btn sm" onClick={() => addMonths(1)}>+1 месяц</button>
+              <button type="button" className="btn sm" onClick={() => addMonths(12)}>+1 год</button>
+              <button type="button" className="btn sm ghost" onClick={() => setUntil('')}>Бессрочно</button>
+            </div>
+          </>
+        )}
+        <p className="muted small">Сейчас: {planText(family)}.</p>
+        <button className="btn primary block" disabled={save.isPending}>{save.isPending ? 'Сохраняем…' : 'Сохранить'}</button>
+      </form>
+    </Sheet>
   )
 }
