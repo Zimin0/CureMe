@@ -29,7 +29,7 @@ function AuthShell({ title, sub, children }: { title: string; sub: string; child
 
 /** Закрыт ли сайт для всех, кроме участников теста (переключается в админке). */
 function useSiteClosed() {
-  const q = useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean }>('/auth/access'), staleTime: 60_000 })
+  const q = useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean; debug?: boolean }>('/auth/access'), staleTime: 60_000 })
   return q.data?.closed ?? false
 }
 

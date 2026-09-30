@@ -10,6 +10,23 @@ from .seed import DEFAULT_INDICATION_HINTS
 
 INDICATION_HINTS = "indication_hints"
 ACCESS = "access"
+DEBUG_MODE = "debug_mode"
+
+
+def debug_enabled(db: Session) -> bool:
+    """Режим отладки: на каждой странице показывается версия приложения. По умолчанию выключен."""
+    row = db.get(AppSetting, DEBUG_MODE)
+    return bool(row.value.get("enabled")) if row else False
+
+
+def set_debug_enabled(db: Session, enabled: bool) -> bool:
+    row = db.get(AppSetting, DEBUG_MODE)
+    if row:
+        row.value = {"enabled": enabled}
+    else:
+        db.add(AppSetting(key=DEBUG_MODE, value={"enabled": enabled}))
+    db.commit()
+    return enabled
 
 
 def access_settings(db: Session) -> dict:

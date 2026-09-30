@@ -167,3 +167,22 @@ describe('админка: закрытый режим', () => {
     expect(days).toBeLessThan(33)
   })
 })
+
+describe('режим отладки', () => {
+  it('админ включает его, и версия появляется вверху страницы', async () => {
+    let enabled = false
+    server.use(
+      stats, overview,
+      http.get('/api/auth/access', () => HttpResponse.json({ closed: false, debug: enabled })),
+      http.get('/api/admin/debug', () => HttpResponse.json({ enabled })),
+      http.put('/api/admin/debug', async ({ request }) => {
+        enabled = ((await request.json()) as { enabled: boolean }).enabled
+        return HttpResponse.json({ enabled })
+      }),
+    )
+    const { user } = renderApp('/admin?tab=debug', { me: ADMIN })
+    expect(screen.queryByTestId('debug-bar')).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('checkbox', { name: /Режим отладки/ }))
+    await waitFor(() => expect(screen.getByTestId('debug-bar').textContent).toMatch(/^Версия /))
+  })
+})
