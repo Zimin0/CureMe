@@ -56,6 +56,8 @@ it('если на сайте нет почты и бота — объясняе�
   server.use(http.get('/api/notifications', () => HttpResponse.json(prefs({ email_possible: false, telegram_possible: false }))))
   renderWithProviders(<Reminders />)
   expect(await screen.findByText('Отправка писем на сайте пока не настроена')).toBeInTheDocument()
-  expect(screen.getByText(/Telegram появится/)).toBeInTheDocument()
+  expect(screen.queryByText(/Telegram/)).not.toBeInTheDocument()  // Telegram выключен в админке: о нём ни слова
+  expect(screen.queryByText('Подключить Telegram')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/передачу данных напоминаний в Telegram/)).not.toBeInTheDocument()
   await waitFor(() => expect(screen.getByLabelText(/На почту/)).toBeDisabled())
 })

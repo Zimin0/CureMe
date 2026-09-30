@@ -11,6 +11,7 @@ from ..models import Membership, NotificationPrefs, User, utcnow
 from ..plans import plus_required
 from ..ratelimit import limiter
 from ..reminders import can_email, nudge_user, plus_family_ids
+from ..services import telegram_active
 from ..schemas import NotificationPrefsIn, NotificationPrefsOut, TelegramLinkIn, TelegramLinkOut
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -26,6 +27,12 @@ def _prefs(db: Session, user: User) -> NotificationPrefs:
     return prefs
 
 
+def _require_telegram(db: Session) -> None:
+    """Админ спрятал Telegram: для API такой функции как будто нет."""
+    if not telegram_active(db):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+
+
 def _available(db: Session, user: User) -> bool:
     fams = db.scalars(select(Membership.family_id).where(Membership.user_id == user.id)).all()
     return bool(plus_family_ids(db, list(fams)))
@@ -33,16 +40,17 @@ def _available(db: Session, user: User) -> bool:
 
 def _out(db: Session, user: User, prefs: NotificationPrefs | None) -> NotificationPrefsOut:
     s = get_settings()
+    tg = telegram_active(db)
     return NotificationPrefsOut(
         available=_available(db, user),
         email=user.email,
         email_possible=can_email(user),
-        telegram_possible=s.telegram_enabled,
-        telegram_bot=s.telegram_bot_username if s.telegram_enabled else None,
+        telegram_possible=tg,
+        telegram_bot=s.telegram_bot_username if tg else None,
         email_enabled=bool(prefs and prefs.email_enabled),
-        telegram_enabled=bool(prefs and prefs.telegram_enabled and prefs.telegram_chat_id),
-        telegram_connected=bool(prefs and prefs.telegram_chat_id),
-        telegram_name=prefs.telegram_name if prefs else None,
+        telegram_enabled=bool(tg and prefs and prefs.telegram_enabled and prefs.telegram_chat_id),
+        telegram_connected=bool(tg and prefs and prefs.telegram_chat_id),
+        telegram_name=prefs.telegram_name if tg and prefs else None,
         notify_low=prefs.notify_low if prefs else True,
         notify_expiry=prefs.notify_expiry if prefs else True,
         expiry_days=prefs.expiry_days if prefs else s.expiring_soon_days,
@@ -63,6 +71,8 @@ def get_prefs(user: User = Depends(current_user), db: Session = Depends(get_db))
 def update_prefs(body: NotificationPrefsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     prefs = _prefs(db, user)
     data = body.model_dump(exclude_unset=True)
+    if "telegram_enabled" in data:
+        _require_telegram(db)
     turning_on = data.get("email_enabled") or data.get("telegram_enabled")
     if turning_on:
         _require_plus(db, user)
@@ -85,10 +95,9 @@ def telegram_link(body: TelegramLinkIn, user: User = Depends(current_user), db: 
     Сначала — отдельное согласие на трансграничную передачу (страница /consent-telegram):
     напоминания с названиями лекарств пойдут через серверы Telegram за рубежом.
     """
+    _require_telegram(db)
     if not body.consent:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Нужно согласие на передачу данных в Telegram")
-    if not get_settings().telegram_enabled:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Telegram-бот на сайте пока не настроен")
     _require_plus(db, user)
     limiter.hit(f"tg-link:{user.id}", limit=10, window=3600)
     prefs = _prefs(db, user)
@@ -100,6 +109,7 @@ def telegram_link(body: TelegramLinkIn, user: User = Depends(current_user), db: 
 
 @router.delete("/telegram", status_code=204)
 def telegram_unlink(background: BackgroundTasks, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _require_telegram(db)
     prefs = db.get(NotificationPrefs, user.id)
     if prefs and prefs.telegram_chat_id:
         chat_id = prefs.telegram_chat_id
@@ -115,7 +125,7 @@ def send_test(background: BackgroundTasks, user: User = Depends(current_user), d
     """Пробное напоминание во все включённые каналы: убедиться, что всё доходит."""
     prefs = db.get(NotificationPrefs, user.id)
     email = bool(prefs and prefs.email_enabled and can_email(user))
-    tg = bool(prefs and prefs.telegram_enabled and prefs.telegram_chat_id and get_settings().telegram_enabled)
+    tg = bool(prefs and prefs.telegram_enabled and prefs.telegram_chat_id and telegram_active(db))
     if not (email or tg):
         raise HTTPException(status.HTTP_409_CONFLICT, "Включите почту или Telegram")
     limiter.hit(f"notify-test:{user.id}", limit=3, window=600)

@@ -9,7 +9,7 @@ import { plural } from './format'
 
 /** Названия функций на случай, когда тариф ещё не загрузился. Совпадают с FEATURES в backend/app/plans.py. */
 export const FEATURE_TITLES: Record<PlusFeature, string> = {
-  reminders: 'Напоминания в Telegram и на почту',
+  reminders: 'Напоминания на почту',
   full_history: 'Вся история приёма',
   export_pdf: 'Экспорт в PDF и Excel для врача',
   cabinets: 'Несколько своих аптечек',

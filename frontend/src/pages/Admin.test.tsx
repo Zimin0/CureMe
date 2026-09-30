@@ -188,3 +188,28 @@ describe('режим отладки', () => {
     expect(screen.getByTestId('debug-note').textContent).toMatch(/12 часов/)
   })
 })
+
+describe('Telegram', () => {
+  it('админ включает и выключает Telegram', async () => {
+    let enabled = false
+    const puts: boolean[] = []
+    server.use(
+      stats, overview,
+      http.get('/api/admin/telegram', () => HttpResponse.json({ enabled, configured: false })),
+      http.put('/api/admin/telegram', async ({ request }) => {
+        enabled = ((await request.json()) as { enabled: boolean }).enabled
+        puts.push(enabled)
+        return HttpResponse.json({ enabled, configured: false })
+      }),
+    )
+    const { user } = renderApp('/admin?tab=telegram', { me: ADMIN })
+    const box = await screen.findByRole('checkbox', { name: /Telegram включён/ })
+    expect(box).not.toBeChecked()
+    expect(screen.getByTestId('telegram-not-configured')).toBeInTheDocument()
+    await user.click(box)
+    await waitFor(() => expect(box).toBeChecked())
+    await user.click(box)
+    await waitFor(() => expect(box).not.toBeChecked())
+    expect(puts).toEqual([true, false])
+  })
+})

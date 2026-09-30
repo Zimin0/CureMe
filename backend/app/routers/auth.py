@@ -13,7 +13,7 @@ from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
 from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
 from ..seed import ensure_default_categories
-from ..services import access_settings, debug_enabled, has_access
+from ..services import access_settings, debug_enabled, has_access, telegram_active
 from .admin import _leave
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -172,4 +172,4 @@ def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(ge
 @router.get("/access", response_model=AccessOut)
 def access(db: Session = Depends(get_db)):
     """Открыт ли сайт для всех и включён ли режим отладки. Нужен страницам входа и регистрации до того, как человек вошёл."""
-    return AccessOut(closed=access_settings(db)["closed"], debug=debug_enabled(db))
+    return AccessOut(closed=access_settings(db)["closed"], debug=debug_enabled(db), telegram=telegram_active(db))
