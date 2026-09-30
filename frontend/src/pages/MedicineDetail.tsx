@@ -135,18 +135,19 @@ export function MedicineDetail() {
                 {s.nearest_expiry && <p className="small muted">Ближайший срок: {fmtDate(s.nearest_expiry)} ({daysText(s.days_left!)})</p>}
               </div>
             </div>
-            <div className="row wrap">
+            {/* Сверху «сколько» и комментарий, снизу широкая кнопка приёма: надпись помещается на любом телефоне. */}
+            <div className="take">
               <div className="stepper" aria-label="Сколько списать">
                 <button type="button" onClick={() => setDose(d => Math.max(0.5, d - (d > 1 ? 1 : 0.5)))}><Minus size={16} /></button>
                 <input type="number" min={0.5} step="any" value={dose} onChange={e => setDose(Math.max(0, Number(e.target.value)))} />
                 <button type="button" onClick={() => setDose(d => d + 1)}><Plus size={16} /></button>
               </div>
-              <button className="btn primary grow" disabled={s.total <= 0 || consume.isPending || dose <= 0} onClick={() => consume.mutate('')}>
-                Принял(а) {fmtQty(dose)} {m.unit}
-              </button>
-              <button className="icon-btn" title="Принять с комментарием" aria-label="Принять с комментарием"
+              <button className="btn ghost sm" aria-label="Принять с комментарием"
                 disabled={s.total <= 0 || consume.isPending || dose <= 0} onClick={() => setCommentOpen(true)}>
-                <MessageSquarePlus size={19} />
+                <MessageSquarePlus size={17} /><span className="take-label">С комментарием</span>
+              </button>
+              <button className="btn primary take-main" disabled={s.total <= 0 || consume.isPending || dose <= 0} onClick={() => consume.mutate('')}>
+                Принял(а) {fmtQty(dose)} {m.unit}
               </button>
             </div>
             <p className="faint small" style={{ marginTop: 8 }}>Списываем из упаковки, у которой срок кончается раньше</p>

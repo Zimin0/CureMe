@@ -299,6 +299,10 @@ a.list-row:hover { background: var(--surface-2); }
 .stepper { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .stepper button { width: 40px; height: 40px; border: none; background: var(--surface-2); cursor: pointer; font-size: 18px; font-weight: 700; }
 .stepper input { width: 56px; height: 40px; border: none; text-align: center; font: inherit; font-weight: 700; background: var(--surface); color: var(--text); }
+/* Блок «Принял(а)»: счётчик и «С комментарием» в первой строке, кнопка приёма на всю ширину под ними. */
+.take { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.take-main { flex: 1 0 100%; }
+@media (max-width: 379px) { .take-label { display: none; } }  /* совсем узкий телефон: только значок, чтобы всё было в одной строке */
 .two-col { display: grid; gap: 20px; grid-template-columns: 1fr; }
 @media (min-width: 980px) { .two-col { grid-template-columns: 1.3fr 1fr; align-items: start; } }
 
