@@ -139,6 +139,12 @@ describe('согласие на обработку данных', () => {
     expect(screen.getByRole('link', { name: 'Пользовательское соглашение' })).toHaveAttribute('href', '/terms')
   })
 
+  it('согласие на передачу в Telegram открывается без входа', async () => {
+    renderApp('/consent-telegram', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: 'Согласие на трансграничную передачу персональных данных в Telegram' })).toBeInTheDocument()
+    expect(screen.getByText(/Telegram FZ-LLC/)).toBeInTheDocument()
+  })
+
   it('удаление аккаунта просит пароль и выходит', async () => {
     let body: unknown
     server.use(
