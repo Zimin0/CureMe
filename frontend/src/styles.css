@@ -518,7 +518,12 @@ a.intake-med { color: var(--primary); }
 .plus-list .list-row > svg.off { color: var(--faint); }
 .compare { width: 100%; border-collapse: collapse; font-size: 14px; }
 .compare th, .compare td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-.compare th:not(:first-child), .compare td:not(:first-child) { text-align: center; white-space: nowrap; }
+.compare th:not(:first-child), .compare td:not(:first-child) { text-align: center; }
+@media (max-width: 600px) {
+  .compare { table-layout: fixed; font-size: 13px; }
+  .compare th, .compare td { padding: 10px 6px; overflow-wrap: anywhere; hyphens: auto; }
+  .compare th:first-child, .compare td:first-child { width: 34%; }
+}
 .compare thead th { font-size: 13px; color: var(--muted); }
 .compare td.plus-col { color: var(--plus); font-weight: 700; }
 
