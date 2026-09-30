@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Family } from '../api'
@@ -19,6 +19,8 @@ function setup() {
   server.use(
     http.get('/api/families/7', () => HttpResponse.json(FAMILY)),
     http.get('/api/families/7/export.txt', () => HttpResponse.text('Нурофен — 200 мг\n')),
+    http.get('/api/families/7/intakes', () => HttpResponse.json([])),
+    http.get('/api/families/7/intakes/older', () => HttpResponse.json({ history_since: null, hidden: 0 })),
     http.get('/api/families/7/report.pdf', ({ request }) => {
       asked.push(new URL(request.url))
       return new HttpResponse('%PDF-1.4', {
@@ -34,11 +36,24 @@ function setup() {
   return { asked, clicks }
 }
 
-it('выписка для врача: чья история, период, аптечка — и скачивание PDF', async () => {
+async function openReport() {
+  const r = renderApp('/history')
+  await r.user.click(await screen.findByRole('button', { name: 'Для врача' }))
+  return r
+}
+
+it('экспорт аптечки: только список, выписки для врача здесь нет', async () => {
+  setup()
+  renderApp('/export')
+  expect(await screen.findByText('Экспорт аптечки')).toBeInTheDocument()
+  expect(await screen.findByText('Нурофен — 200 мг')).toBeInTheDocument()
+  expect(screen.queryByText('Для врача: PDF и Excel')).toBeNull()
+})
+
+it('выписка для врача на странице истории: чья история, период, аптечка — и скачивание PDF', async () => {
   const { asked, clicks } = setup()
-  const { user } = renderApp('/export')
+  const { user } = await openReport()
   expect(await screen.findByText('Для врача: PDF и Excel')).toBeInTheDocument()
-  expect(await screen.findByText('Нурофен — 200 мг')).toBeInTheDocument()  // простой список на месте
 
   await user.selectOptions(await screen.findByLabelText('Чья история'), '2')
   expect(screen.getByText(/Комментарии к приёму видит только их автор/)).toBeInTheDocument()
@@ -57,9 +72,9 @@ it('выписка для врача: чья история, период, ап�
 
 it('свой период: кнопки выключены, пока начало позже конца', async () => {
   setup()
-  const { user } = renderApp('/export')
+  const { user } = await openReport()
   await user.click(await screen.findByRole('tab', { name: 'Свой' }))
-  const from = screen.getByLabelText('С')
+  const from = within(screen.getByText('Для врача: PDF и Excel').closest('section')!).getByLabelText('С')
   await user.clear(from)
   await user.type(from, '2099-01-01')
   expect(screen.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
@@ -68,7 +83,7 @@ it('свой период: кнопки выключены, пока начал�
 it('без Плюса: замочек у заголовка, 402 открывает шторку и ничего не скачивает', async () => {
   const { clicks } = setup()
   server.use(http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false, billing_enabled: true }))))
-  const { user } = renderApp('/export')
+  const { user } = await openReport()
   expect(await screen.findByRole('button', { name: /Доступно в Плюсе/ })).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: /^Excel$/ }))
   expect(await screen.findByText('Доступно в Капсулке Плюс')).toBeInTheDocument()
