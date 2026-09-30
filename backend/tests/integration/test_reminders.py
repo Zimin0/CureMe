@@ -1,6 +1,6 @@
 """Напоминания «скоро закончится» и «истекает срок»: настройки, рассылка, Telegram-бот, тариф."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -48,9 +48,11 @@ def add(client, h, f, name, qty, expiry=None, min_quantity=None):
     return r.json()
 
 
-def remind(db, user_id, today=TODAY) -> int:
+def remind(db, user_id, today=TODAY, kinds=None, now=None) -> int:
     db.expire_all()
-    return reminders.remind_user(db, db.get(User, user_id), today)
+    # по умолчанию «сейчас» — через сутки: только что добавленные упаковки уже не новые
+    now = now or datetime.now(timezone.utc) + timedelta(days=1)
+    return reminders.remind_user(db, db.get(User, user_id), today, kinds=kinds, now=now)
 
 
 @pytest.fixture
@@ -97,6 +99,34 @@ def test_one_digest_then_silence(client, db, home, outbox):
     # Назавтра то же самое не повторяем.
     assert remind(db, u["id"], TODAY + timedelta(days=1)) == 0
     assert len(outbox) == 1
+
+
+def test_new_package_waits_12_hours(client, db, home, outbox):
+    h, u, f = home
+    add(client, h, f, "Лоратадин", 4, expiry=TODAY - timedelta(days=3))
+    add(client, h, f, "Аспирин", 4, expiry=TODAY - timedelta(days=1))
+    soon = datetime.now(timezone.utc) + timedelta(hours=11)
+    assert remind(db, u["id"], now=soon) == 0 and not outbox
+    later = datetime.now(timezone.utc) + timedelta(hours=13)
+    assert remind(db, u["id"], now=later) == 2
+    assert len(outbox) == 1  # одно сообщение на все просроченные
+    body = text_of(outbox[0])
+    assert "Лоратадин" in body and "Аспирин" in body
+
+
+def test_new_package_low_stock_not_delayed(client, db, home, outbox):
+    h, u, f = home
+    add(client, h, f, "Нурофен", 3, min_quantity=5)
+    assert remind(db, u["id"], now=datetime.now(timezone.utc)) == 1
+
+
+def test_family_nudge_sends_only_low(client, db, home, outbox):
+    h, u, f = home
+    add(client, h, f, "Нурофен", 3, min_quantity=5)
+    add(client, h, f, "Лоратадин", 4, expiry=TODAY - timedelta(days=3))
+    assert remind(db, u["id"], kinds={"low"}) == 1
+    assert "Лоратадин" not in text_of(outbox[0])
+    assert remind(db, u["id"]) == 1  # срок — в ежедневной сводке
 
 
 def test_low_again_after_restock(client, db, home, outbox):
