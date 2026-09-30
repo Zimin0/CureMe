@@ -101,8 +101,8 @@ def test_plus_moves_from_family_to_main_owner(alembic):
         for uid in (1, 2, 3):
             conn.execute(text(
                 "INSERT INTO users (id, email, name, password_hash, is_admin, token_version, created_at) "
-                f"VALUES ({uid}, 'u{uid}@example.com', 'U{uid}', 'x', 0, 0, '2026-01-01')"
-            ))
+                f"VALUES ({uid}, 'u{uid}@example.com', 'U{uid}', 'x', :admin, 0, '2026-01-01')"
+            ), {"admin": False})  # булево параметром: в Postgres 0 вместо false не принимается
         conn.execute(text(
             "INSERT INTO families (id, name, invite_code, plan, plus_until, created_at) VALUES "
             "(1, 'Дом', 'A1', 'plus', '2030-01-01', '2026-01-01'),"
