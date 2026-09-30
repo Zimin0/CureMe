@@ -396,6 +396,11 @@ class IntakeUpdate(BaseModel):
     comment: str = Field(max_length=COMMENT_MAX)
 
 
+class OlderHistoryOut(BaseModel):
+    history_since: datetime | None  # с какого момента видна история; None — вся (Плюс)
+    hidden: int                     # сколько более ранних записей скрыто до подключения Плюса
+
+
 class SuggestionOut(BaseModel):
     medicine: MedicineOut
     score: float

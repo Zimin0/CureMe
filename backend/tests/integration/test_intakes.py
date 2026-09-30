@@ -149,3 +149,64 @@ def test_paging_and_account_deletion(client, db, owner, med):
     r = client.request("DELETE", "/api/auth/me", headers=h_mom, json={"password": "secret123"})
     assert r.status_code == 204, r.text
     assert [i["user_name"] for i in history(client, h, f)] == ["Никита"]
+
+
+def test_search_by_text_member_and_dates(client, db, owner, med):
+    h, f, mid = med
+    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
+    h_mom, mom = register(client, "mom@example.com", "Мама", invite=code)
+    other = client.post(f"/api/families/{f}/medicines", headers=h,
+                        json={"name": "Пенталгин", "packages": [{"quantity": 5}]}).json()["id"]
+    take(client, h, f, mid, comment="Болела ГОЛОВА ёлки")
+    age(db, 3 * 24 * 60)  # три дня назад
+    take(client, h_mom, f, other, comment="голова тоже")
+    take(client, h, f, other)
+
+    names = lambda items: sorted((i["medicine_name"], i["user_name"]) for i in items)  # noqa: E731
+    # название — без учёта регистра, кириллица тоже
+    assert names(history(client, h, f, q="нурОФ")) == [("Нурофен", "Никита")]
+    # свой комментарий ищется (и «е» находит «ё»), чужой — нет: его содержимое скрыто
+    assert names(history(client, h, f, q="голова")) == [("Нурофен", "Никита")]
+    assert names(history(client, h, f, q="елки")) == [("Нурофен", "Никита")]
+    assert names(history(client, h_mom, f, q="голова")) == [("Пенталгин", "Мама")]
+    # символы шаблона LIKE ищутся как обычный текст
+    assert history(client, h, f, q="%") == []
+    # кто принимал
+    assert names(history(client, h, f, user_id=mom["id"])) == [("Пенталгин", "Мама")]
+    # период [since, until)
+    now = datetime.now(timezone.utc)
+    recent = history(client, h, f, since=(now - timedelta(days=1)).isoformat())
+    assert names(recent) == [("Пенталгин", "Мама"), ("Пенталгин", "Никита")]
+    old = history(client, h, f, until=(now - timedelta(days=1)).isoformat())
+    assert names(old) == [("Нурофен", "Никита")]
+    assert client.get(f"/api/families/{f}/intakes", headers=h, params={"q": "x" * 101}).status_code == 422
+
+
+def test_free_family_sees_only_last_30_days(client, db, owner, med):
+    """Без Плюса старая история скрыта, но не удалена: с Плюсом она снова видна."""
+    h, f, mid = med  # первый аккаунт — администратор
+    take(client, h, f, mid, comment="старое")
+    age(db, 40 * 24 * 60)  # 40 дней назад
+    take(client, h, f, mid)
+    [old_id] = [i["id"] for i in history(client, h, f) if i["comment"] == "старое"]
+    older = f"/api/families/{f}/intakes/older"
+
+    # платная версия выключена — видно всё
+    assert len(history(client, h, f)) == 2
+    assert client.get(older, headers=h).json() == {"history_since": None, "hidden": 0}
+
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": True}).status_code == 200
+    [recent] = history(client, h, f)
+    assert recent["comment"] == ""
+    assert history(client, h, f, q="старое") == []  # поиск тоже не достаёт скрытое
+    info = client.get(older, headers=h, params={"medicine_id": mid}).json()
+    assert info["hidden"] == 1
+    since = datetime.fromisoformat(info["history_since"])
+    assert abs(since - (datetime.now(timezone.utc) - timedelta(days=30))) < timedelta(minutes=1)
+    assert client.get(older, headers=h, params={"medicine_id": mid + 1000}).json()["hidden"] == 0
+    assert client.patch(f"/api/families/{f}/intakes/{old_id}", headers=h, json={"comment": "x"}).status_code == 404
+    assert db.get(Intake, old_id) is not None  # запись на месте
+
+    assert client.put(f"/api/admin/families/{f}/plan", headers=h, json={"plan": "plus", "plus_until": None}).status_code == 200
+    assert len(history(client, h, f)) == 2
+    assert client.get(older, headers=h).json() == {"history_since": None, "hidden": 0}

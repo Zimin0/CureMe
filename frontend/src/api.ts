@@ -103,6 +103,9 @@ export interface Intake {
   last_at: string
 }
 
+/** Сколько записей истории скрыто без Плюса (history_since: null — видна вся история). */
+export interface OlderHistory { history_since: string | null; hidden: number }
+
 export interface PackageInput {
   quantity: number
   expiry_date?: string | null
