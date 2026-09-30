@@ -136,7 +136,7 @@ p { margin: 0; }
   .main { padding: 32px 36px 48px; }
   h1 { font-size: 30px; }
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; padding: 4px 10px 18px; letter-spacing: -0.02em; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: 'Comfortaa Variable', 'Manrope Variable', system-ui, sans-serif; font-weight: 700; font-size: 22px; padding: 4px 10px 18px; letter-spacing: -0.01em; }
 .brand img { width: 36px; height: 36px; }
 .side-link {
   display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px;
