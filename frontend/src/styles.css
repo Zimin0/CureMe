@@ -495,6 +495,8 @@ a.intake-med { color: var(--primary); }
 .plus-feature p { margin: 4px 0 0; }
 .limit-counter { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .limit-counter.full { color: var(--warning); font-weight: 700; }
+.locked-block { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.locked-block:disabled { opacity: .45; filter: grayscale(.6); pointer-events: none; user-select: none; }
 .plus-banner {
   display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 22px; border-radius: var(--radius);
   background: linear-gradient(135deg, #7048e8, #9b6dff); color: #fff; box-shadow: 0 6px 20px rgba(112, 72, 232, .35);

@@ -56,12 +56,13 @@ export function Reminders() {
           <Lock size={32} />
           <div>
             <strong>Напоминания — в Капсулке Плюс</strong>
-            <p>Подключите Плюс, и мы сами напомним о лекарствах, которые заканчиваются или портятся. Уже включённые напоминания можно выключить.</p>
+            <p>Подключите Плюс, и мы сами напомним о лекарствах, которые заканчиваются или портятся.</p>
           </div>
           <Link to="/plus" className="btn plus-btn">Узнать про Плюс</Link>
         </div>
       )}
 
+      <fieldset className="locked-block" disabled={locked}>
       <h3>Куда</h3>
       <label className="check">
         <input type="checkbox" checked={p.email_enabled} disabled={(!p.email_possible || locked) && !p.email_enabled}
@@ -124,6 +125,7 @@ export function Reminders() {
       {anyChannel && (
         <button className="btn ghost" disabled={test.isPending} onClick={() => test.mutate()}>Прислать пробное напоминание</button>
       )}
+      </fieldset>
     </section>
   )
 }
