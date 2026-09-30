@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Settings, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
+import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, Category, Family as FamilyT } from '../api'
+import { api, ApiError, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Cabinets } from '../components/Cabinets'
 import { DeleteAccountButton } from '../components/DeleteAccount'
@@ -21,7 +21,6 @@ export function Family() {
   const toast = useToast()
   const key = ['family', familyId]
   const { data: f, isLoading } = useQuery({ queryKey: key, queryFn: () => api<FamilyT>(fam('')) })
-  const cats = useQuery({ queryKey: ['categories', fam('')], queryFn: () => api<Category[]>(fam('/categories')) })
   const { plan } = usePlan()
 
   const [email, setEmail] = useState('')
@@ -134,21 +133,6 @@ export function Family() {
             )}
           </div>
         ))}
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2>Категории</h2>
-          {me?.is_admin && <Link to="/admin?tab=categories" className="btn sm"><Settings size={16} />Настроить</Link>}
-        </div>
-        <p className="muted small" style={{ marginBottom: 10 }}>Список категорий общий для всех семей, его ведёт администратор. Цифра показывает, сколько лекарств в вашей аптечке.</p>
-        <div className="chips wrap">
-          {cats.data?.map(c => (
-            <Link key={c.id} to={`/medicines?category=${c.id}`} className="chip" style={{ borderColor: `color-mix(in srgb, ${c.color} 40%, transparent)` }}>
-              {c.icon} {c.name} <span className="count">{c.medicine_count}</span>
-            </Link>
-          ))}
-        </div>
       </section>
 
       <Reminders />
