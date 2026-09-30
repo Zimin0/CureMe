@@ -6,6 +6,7 @@ import pytest
 
 from app import mailer, reminders, telegram
 from app.config import get_settings
+from app.services import set_telegram_switch, telegram_active
 from app.models import NotificationPrefs, ReminderSent, User
 from tests.conftest import fid, register
 
@@ -23,8 +24,9 @@ def outbox(monkeypatch):
 
 
 @pytest.fixture
-def tg(monkeypatch):
-    """Telegram-бот «настроен», вызовы Bot API складываются сюда."""
+def tg(monkeypatch, db):
+    """Telegram-бот «настроен» и включён в админке, вызовы Bot API складываются сюда."""
+    set_telegram_switch(db, True)
     monkeypatch.setattr(get_settings(), "telegram_bot_token", "123:TEST")
     monkeypatch.setattr(get_settings(), "telegram_bot_username", "kapsulka_bot")
     calls = []
@@ -301,9 +303,67 @@ def test_telegram_needs_separate_consent(client, db, tg):
     assert db.query(NotificationPrefs).one().telegram_consent_at is not None
 
 
-def test_telegram_link_needs_bot(client):
+def test_telegram_link_needs_bot(client, db):
+    set_telegram_switch(db, True)  # переключатель включён, но бот в .env не настроен
     h, _ = register(client)
-    assert client.post("/api/notifications/telegram/link", headers=h, json={"consent": True}).status_code == 409
+    assert client.post("/api/notifications/telegram/link", headers=h, json={"consent": True}).status_code == 404
+
+
+def test_telegram_hidden_by_default(client, db, home, outbox, monkeypatch):
+    """По умолчанию переключатель выключен: API, интерфейс и рассылка ведут себя так, будто Telegram нет."""
+    monkeypatch.setattr(get_settings(), "telegram_bot_token", "123:TEST")
+    monkeypatch.setattr(get_settings(), "telegram_bot_username", "kapsulka_bot")
+    sent = []
+    monkeypatch.setattr(telegram, "call", lambda method, http_timeout=20, **p: sent.append((method, p)) or {})
+    h, u, f = home
+    assert not telegram_active(db)
+    assert client.get("/api/auth/access").json()["telegram"] is False
+    p = client.get("/api/notifications", headers=h).json()
+    assert p["telegram_possible"] is False and p["telegram_bot"] is None and p["telegram_connected"] is False
+    assert client.post("/api/notifications/telegram/link", headers=h, json={"consent": True}).status_code == 404
+    assert client.delete("/api/notifications/telegram", headers=h).status_code == 404
+    assert client.put("/api/notifications", headers=h, json={"telegram_enabled": True}).status_code == 404
+    # Почтовые настройки при этом работают.
+    assert client.put("/api/notifications", headers=h, json={"notify_low": False}).status_code == 200
+    titles = [x["title"] for x in client.get(f"/api/families/{f}/plan", headers=h).json()["features"]]
+    assert "Напоминания на почту" in titles and not any("Telegram" in t for t in titles)
+
+
+def test_switch_off_keeps_link_and_stops_delivery(client, db, tg, home, outbox):
+    """Выключение прячет Telegram и останавливает рассылку, но привязка остаётся и возвращается при включении."""
+    h, u, f = home
+    code = start_code(client.post("/api/notifications/telegram/link", headers=h, json={"consent": True}).json()["url"])
+    telegram.handle_update(db, tg_message(f"/start {code}"))
+    client.put("/api/notifications", headers=h, json={"email_enabled": True})
+    add(client, h, f, "Нурофен", 3, min_quantity=5)
+
+    set_telegram_switch(db, False)
+    assert client.get("/api/auth/access").json()["telegram"] is False
+    assert client.get("/api/notifications", headers=h).json()["telegram_connected"] is False
+    tg.clear()
+    assert remind(db, u["id"]) == 1
+    assert not [c for c in tg if c[0] == "sendMessage"]  # в Telegram ничего
+    assert outbox                                         # на почту пришло
+    assert db.query(NotificationPrefs).one().telegram_chat_id == 555  # привязка цела
+
+    set_telegram_switch(db, True)
+    p = client.get("/api/notifications", headers=h).json()
+    assert p["telegram_connected"] and p["telegram_enabled"] and p["telegram_name"] == "@nikita"
+    assert client.get("/api/auth/access").json()["telegram"] is True
+
+
+def test_admin_turns_telegram_on_and_off(client, monkeypatch):
+    admin, _ = register(client)  # первый аккаунт — админ
+    assert client.get("/api/admin/telegram", headers=admin).json() == {"enabled": False, "configured": False}
+    monkeypatch.setattr(get_settings(), "telegram_bot_token", "123:TEST")
+    monkeypatch.setattr(get_settings(), "telegram_bot_username", "kapsulka_bot")
+    assert client.get("/api/auth/access").json()["telegram"] is False  # бот есть, переключатель выключен
+    r = client.put("/api/admin/telegram", headers=admin, json={"enabled": True})
+    assert r.json() == {"enabled": True, "configured": True}
+    assert client.get("/api/auth/access").json()["telegram"] is True
+    assert client.get("/api/notifications", headers=admin).json()["telegram_possible"] is True
+    client.put("/api/admin/telegram", headers=admin, json={"enabled": False})
+    assert client.get("/api/notifications", headers=admin).json()["telegram_possible"] is False
 
 
 def test_test_message(client, home, outbox, tg):

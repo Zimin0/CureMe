@@ -40,7 +40,7 @@ from .email_verification import needs_verification
 from .mailer import send_mail
 from .models import AppSetting, Family, Medicine, Membership, NotificationPrefs, ReminderSent, User
 from .plans import has_plus
-from .services import debug_enabled, stock_of
+from .services import debug_enabled, stock_of, telegram_active
 
 log = logging.getLogger("cureme.reminders")
 MSK = timezone(timedelta(hours=3))  # в Москве нет перехода на летнее время
@@ -154,26 +154,26 @@ def can_email(user: User) -> bool:
     return bool(get_settings().smtp_host) and not needs_verification(user)
 
 
-def deliver(user: User, prefs: NotificationPrefs, subject: str, text: str, html: str) -> bool:
+def deliver(user: User, prefs: NotificationPrefs, subject: str, text: str, html: str, tg_on: bool = False) -> bool:
     """Шлёт во все включённые каналы. True, если хотя бы один доставил."""
     ok = False
     if prefs.email_enabled and can_email(user):
         ok = send_mail(user.email, subject, text) or ok
-    if prefs.telegram_enabled and prefs.telegram_chat_id and get_settings().telegram_enabled:
+    if prefs.telegram_enabled and prefs.telegram_chat_id and tg_on:
         ok = telegram.send_message(prefs.telegram_chat_id, html) or ok
     return ok
 
 
-def has_channel(user: User, prefs: NotificationPrefs) -> bool:
+def has_channel(user: User, prefs: NotificationPrefs, tg_on: bool = False) -> bool:
     return (prefs.email_enabled and can_email(user)) or bool(
-        prefs.telegram_enabled and prefs.telegram_chat_id and get_settings().telegram_enabled)
+        prefs.telegram_enabled and prefs.telegram_chat_id and tg_on)
 
 
 def remind_user(db: Session, user: User, today: date | None = None, kinds: set[str] | None = None,
                 now: datetime | None = None) -> int:
     """Проверяет поводы одного человека и отправляет новые. Возвращает, сколько поводов отправлено."""
     prefs = db.get(NotificationPrefs, user.id)
-    if not prefs or not has_channel(user, prefs):
+    if not prefs or not has_channel(user, prefs, telegram_active(db)):
         return 0
     today = today or datetime.now(MSK).date()
     current = reasons_for(db, user, prefs, today, now)
@@ -183,7 +183,7 @@ def remind_user(db: Session, user: User, today: date | None = None, kinds: set[s
         if key not in keys:  # повода больше нет — забываем, чтобы напомнить, если он вернётся
             db.delete(row)
     new = [r for r in current if (r.kind, r.ref_id) not in sent and (kinds is None or r.kind in kinds)]
-    if new and deliver(user, prefs, *compose(new)):
+    if new and deliver(user, prefs, *compose(new), tg_on=telegram_active(db)):
         db.add_all(ReminderSent(user_id=user.id, kind=r.kind, ref_id=r.ref_id) for r in new)
     else:
         new = []
