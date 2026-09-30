@@ -11,7 +11,8 @@
 напомним снова. Все новые поводы собираются в одно сообщение: одно письмо и одно сообщение
 в Telegram в день, а не по штуке на лекарство. Про просрочку и скорый срок пишем только в
 ежедневной сводке (после «Принял(а)» — лишь про остаток), а про упаковку, добавленную менее
-12 часов назад, молчим до следующей сводки.
+12 часов назад, молчим до следующей сводки. В режиме отладки (админка) этих ограничений нет:
+сообщение уходит сразу после добавления упаковки.
 
 Когда проверяем:
 - раз в день в CUREME_REMINDERS_HOUR по Москве — все семьи;
@@ -39,7 +40,7 @@ from .email_verification import needs_verification
 from .mailer import send_mail
 from .models import AppSetting, Family, Medicine, Membership, NotificationPrefs, ReminderSent, User
 from .plans import has_plus
-from .services import stock_of
+from .services import debug_enabled, stock_of
 
 log = logging.getLogger("cureme.reminders")
 MSK = timezone(timedelta(hours=3))  # в Москве нет перехода на летнее время
@@ -97,6 +98,7 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
         select(Medicine).where(Medicine.family_id.in_(allowed)).options(selectinload(Medicine.packages))
     ).all()
     now = now or datetime.now(timezone.utc)
+    debug = debug_enabled(db)  # режим отладки: про новые упаковки сообщаем сразу
     out: list[Reason] = []
     for med in meds:
         where = f" ({fams[med.family_id]})" if many else ""
@@ -107,7 +109,7 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
         if not prefs.notify_expiry:
             continue
         for p in med.packages:
-            if p.quantity <= 0 or not p.expiry_date or _is_fresh(p, now):
+            if p.quantity <= 0 or not p.expiry_date or (not debug and _is_fresh(p, now)):
                 continue
             d = (p.expiry_date - today).days
             until = p.expiry_date.strftime("%d.%m.%Y")
@@ -212,7 +214,8 @@ def run_daily(db: Session) -> int:
 
 def run_family(db: Session, family_id: int) -> int:
     ids = db.scalars(select(Membership.user_id).where(Membership.family_id == family_id)).all()
-    return remind_users(db, ids, kinds={"low"})  # сроки годности — только в ежедневной сводке
+    # сроки годности — только в ежедневной сводке, а в режиме отладки сразу
+    return remind_users(db, ids, kinds=None if debug_enabled(db) else {"low"})
 
 
 # --- фоновый поток ---

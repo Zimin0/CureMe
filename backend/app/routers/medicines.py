@@ -113,6 +113,7 @@ def create_medicine(
     db.add(med)
     _remember(db, med)
     db.commit()
+    reminders.nudge(fam.id)  # в режиме отладки про просрочку сообщаем сразу
     return _detail(db, fam, med.id, user)
 
 
@@ -191,6 +192,7 @@ def add_package(
         raise HTTPException(409, "Эта упаковка уже добавлена (совпадает серийный номер)")
     med.packages.append(Package(added_by_id=user.id, **body.model_dump()))
     db.commit()
+    reminders.nudge(fam.id)  # в режиме отладки про просрочку сообщаем сразу
     return _detail(db, fam, medicine_id, user)
 
 
