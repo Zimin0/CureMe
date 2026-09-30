@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Copy, Crown, LogOut, Pencil, Plus, RefreshCw, Settings, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
+import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Settings, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, Category, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
+import { Cabinets } from '../components/Cabinets'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
@@ -13,7 +14,7 @@ import { versionLabel } from '../version'
 import { LegalLinks } from './Legal'
 
 export function Family() {
-  const { me, familyId, setFamilyId, refresh, signOut } = useAuth()
+  const { me, familyId, refresh, signOut } = useAuth()
   const fam = useFamilyPath()
   const qc = useQueryClient()
   const toast = useToast()
@@ -24,7 +25,6 @@ export function Family() {
 
   const [email, setEmail] = useState('')
   const [rename, setRename] = useState<string | null>(null)
-  const [newFamily, setNewFamily] = useState<string | null>(null)
 
   const onFam = (d: FamilyT, msg?: string) => { qc.setQueryData(key, d); if (msg) toast(msg) }
   // На 402 (лимит бесплатной версии) шторка Плюса открывается сама, тост не нужен.
@@ -51,10 +51,6 @@ export function Family() {
   const doRename = useMutation({
     mutationFn: (name: string) => api<FamilyT>(fam(''), { method: 'PATCH', body: { name } }),
     onSuccess: d => { onFam(d, 'Название изменено'); setRename(null); refresh() }, onError,
-  })
-  const createFamily = useMutation({
-    mutationFn: (name: string) => api<FamilyT>('/families', { body: { name } }),
-    onSuccess: async d => { await refresh(); setFamilyId(d.id); setNewFamily(null); toast(`Создана «${d.name}»`) }, onError,
   })
   if (isLoading || !f) return <PageLoader />
   const owner = f.role === 'owner'
@@ -88,6 +84,8 @@ export function Family() {
         </div>
         <ChevronRight size={18} className="muted" />
       </Link>
+
+      <Cabinets />
 
       <section className="card stack">
         <h2>Пригласить в семью</h2>
@@ -154,16 +152,8 @@ export function Family() {
 
       <section className="card stack">
         <h2>Аккаунт</h2>
-        {me && me.families.length > 1 && (
-          <label className="field"><span>Аптечка какой семьи открыта</span>
-            <select value={familyId ?? ''} onChange={e => setFamilyId(Number(e.target.value))}>
-              {me.families.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
-          </label>
-        )}
         <div className="row wrap">
           {me?.is_admin && <Link to="/admin" className="btn"><Shield size={16} />Панель администратора</Link>}
-          <button className="btn ghost" onClick={() => setNewFamily('')}><Plus size={16} />Создать ещё одну семью</button>
           <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»?`) && removeMember.mutate(me!.id)}>Покинуть семью</button>
           <button className="btn danger" onClick={signOut}><LogOut size={16} />Выйти из аккаунта</button>
           <DeleteAccountButton />
@@ -177,15 +167,6 @@ export function Family() {
           <form className="stack" onSubmit={e => { e.preventDefault(); doRename.mutate(rename) }}>
             <input className="input" autoFocus required value={rename} onChange={e => setRename(e.target.value)} />
             <button className="btn primary block">Сохранить</button>
-          </form>
-        </Sheet>
-      )}
-      {newFamily !== null && (
-        <Sheet title="Новая семья" onClose={() => setNewFamily(null)}>
-          <form className="stack" onSubmit={e => { e.preventDefault(); createFamily.mutate(newFamily) }}>
-            <p className="muted small">Например, отдельная аптечка на даче или у родителей.</p>
-            <input className="input" autoFocus required placeholder="Дача" value={newFamily} onChange={e => setNewFamily(e.target.value)} />
-            <button className="btn primary block">Создать</button>
           </form>
         </Sheet>
       )}

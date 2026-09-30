@@ -6,7 +6,7 @@ from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..limits import ensure_can_add_member, members_full
 from ..models import Family, Membership, User
-from ..plans import plan_out
+from ..plans import LIMIT_FEATURE, own_families_left, plan_out, plus_required
 from ..ratelimit import client_ip, limiter
 from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, PlanOut, RoleIn
 from ..security import new_invite_code
@@ -28,6 +28,13 @@ def family_out(fam: Family, role: str) -> FamilyOut:
 
 @router.post("/families", response_model=FamilyOut, status_code=201)
 def new_family(body: FamilyIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    # Бесплатно — одна своя аптечка. Вступать в чужие по приглашению можно всегда,
+    # а уже созданные сверх лимита аптечки не трогаем.
+    if own_families_left(db, user.id) == 0:
+        raise plus_required(
+            LIMIT_FEATURE["own_families"],
+            "В бесплатной версии можно завести одну свою аптечку. В Капсулке Плюс — сколько угодно: дача, машина, бабушка.",
+        )
     fam = create_family(db, body.name.strip(), user)
     db.commit()
     return family_out(fam, "owner")

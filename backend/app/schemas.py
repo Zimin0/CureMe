@@ -71,6 +71,8 @@ class MeOut(UserOut):
     email_verified: bool = False
     verification_needed: bool = False  # почта не подтверждена, а проверка включена — показать экран «Проверьте почту»
     families: list[FamilyBrief]
+    # Сколько ещё своих аптечек можно создать: None — без ограничений (Плюс или платная версия выключена).
+    own_families_left: int | None = None
     # Только после смены своего пароля: старый токен уже не действует, вот новый.
     access_token: str | None = None
 
