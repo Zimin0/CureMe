@@ -27,7 +27,7 @@ def test_create_second_family_with_default_categories(client, owner):
 def test_invite_info_is_public(client, owner):
     h, _, f = owner
     code = invite_code(client, h, f)
-    assert client.get(f"/api/invites/{code.lower()}").json() == {"family_name": "Семья Никита", "members": 1}
+    assert client.get(f"/api/invites/{code.lower()}").json() == {"family_name": "Семья Никита", "members": 1, "full": False}
     assert client.get("/api/invites/UNKNOWN1").status_code == 404
 
 

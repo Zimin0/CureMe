@@ -448,7 +448,7 @@ function AccessTab() {
 }
 
 // ---------- тарифы ----------
-type Billing = { enabled: boolean }
+type Billing = { enabled: boolean; price_month: number | null; price_year: number | null }
 
 const planText = (f: AdminFamily) =>
   f.plus_active ? (f.plus_until ? `Плюс до ${fmtDate(f.plus_until)}` : 'Плюс бессрочно')
@@ -462,16 +462,25 @@ function PlansTab() {
   const fams = useQuery({ queryKey: ['admin', 'families'], queryFn: () => api<AdminFamily[]>('/admin/families') })
   const [q, setQ] = useState('')
   const [edit, setEdit] = useState<AdminFamily | null>(null)
+  const [prices, setPrices] = useState<{ month: string; year: string } | null>(null)
+  useEffect(() => {
+    if (billing.data && prices === null) {
+      setPrices({ month: billing.data.price_month?.toString() ?? '', year: billing.data.price_year?.toString() ?? '' })
+    }
+  }, [billing.data, prices])
 
   const save = useMutation({
     mutationFn: (b: Billing) => api<Billing>('/admin/billing', { method: 'PUT', body: b }),
-    onSuccess: b => {
+    onSuccess: (b, sent) => {
+      const priceChanged = sent.price_month !== billing.data?.price_month || sent.price_year !== billing.data?.price_year
       qc.setQueryData(['admin', 'billing'], b)
       qc.invalidateQueries({ queryKey: ['plan'] })
-      toast(b.enabled ? 'Платная версия включена' : 'Платная версия выключена: всем доступно всё')
+      toast(priceChanged ? 'Стоимость сохранена'
+        : b.enabled ? 'Платная версия включена' : 'Платная версия выключена: всем доступно всё')
     },
     onError: (e: Error) => toast(e.message, 'error'),
   })
+  const toPrice = (s: string) => (s.trim() ? Math.round(Number(s)) : null)
 
   if (billing.isLoading || fams.isLoading || !billing.data) return <PageLoader />
   const needle = q.trim().toLowerCase()
@@ -484,13 +493,33 @@ function PlansTab() {
         <input type="checkbox" checked={billing.data.enabled} disabled={save.isPending}
           onChange={e => {
             const on = e.target.checked
-            if (!on || confirm('Включить платную версию? Семьи без Плюса получат лимиты бесплатной версии: 4 участника, 60 лекарств, 1 своя аптечка, история за 30 дней.')) save.mutate({ enabled: on })
+            if (!on || confirm('Включить платную версию? Семьи без Плюса получат лимиты бесплатной версии: 4 участника, 60 лекарств, 1 своя аптечка, история за 30 дней.')) save.mutate({ ...billing.data!, enabled: on })
           }} />
         <span>
           <b>Платная версия включена</b><br />
           <span className="muted small">Пока выключено, всем семьям доступны все функции Плюса. Включите, когда будут готовы оплата и оферта.</span>
         </span>
       </label>
+      {prices && (
+        <form className="card stack" style={{ padding: 16 }} onSubmit={(e: FormEvent) => {
+          e.preventDefault()
+          save.mutate({ ...billing.data!, price_month: toPrice(prices.month), price_year: toPrice(prices.year) })
+        }}>
+          <b>Стоимость Плюса для всей семьи</b>
+          <div className="row wrap" style={{ gap: 12 }}>
+            <label className="field grow"><span>В месяц, ₽</span>
+              <input className="input" type="number" min={1} max={100000} inputMode="numeric" placeholder="149"
+                value={prices.month} onChange={e => setPrices({ ...prices, month: e.target.value })} />
+            </label>
+            <label className="field grow"><span>В год, ₽</span>
+              <input className="input" type="number" min={1} max={1000000} inputMode="numeric" placeholder="990"
+                value={prices.year} onChange={e => setPrices({ ...prices, year: e.target.value })} />
+            </label>
+          </div>
+          <span className="muted small">Показывается на странице «Капсулка Плюс» и в шторке. Пустое поле — эта цена не показывается. Пока нет оплаты, цена указана только для сведения.</span>
+          <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={save.isPending}>Сохранить стоимость</button>
+        </form>
+      )}
       <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'семьи', 'семей', 'семей')}. Нажмите на семью, чтобы включить или продлить Плюс вручную.</p>
       <div className="search"><Search size={18} /><input className="input" placeholder="Семья, имя или почта" value={q} onChange={e => setQ(e.target.value)} /></div>
       <section className="card flush">

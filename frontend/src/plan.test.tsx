@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { api, ApiError } from './api'
-import { LimitCounter, planLabel, PlusLock, useRequirePlus } from './plan'
+import { LimitCounter, planLabel, PlusLock, priceText, useRequirePlus } from './plan'
 import { planFixture, server } from './test/server'
 import { renderWithProviders } from './test/utils'
 
@@ -74,6 +74,12 @@ describe('Капсулка Плюс на фронтенде', () => {
     expect(err.plusFeature).toBe('no_limits')
     expect(await screen.findByRole('dialog', { name: 'Доступно в Капсулке Плюс' })).toBeInTheDocument()
     expect(screen.getByText('Без лимитов')).toBeInTheDocument()
+  })
+
+  it('цена Плюса: как задал администратор', () => {
+    expect(priceText(planFixture())).toBe('')
+    expect(priceText(planFixture({ price_month: 149, price_year: 990 }))).toBe('149 ₽ в месяц или 990 ₽ в год')
+    expect(priceText(planFixture({ price_year: 1200 }))).toBe('1\u00a0200 ₽ в год (100 ₽ в месяц)')
   })
 
   it('подпись тарифа', () => {

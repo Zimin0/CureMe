@@ -1,7 +1,7 @@
 import { Check, Lock, Sparkles } from 'lucide-react'
 import { LimitName } from '../api'
 import { PageLoader } from '../components/ui'
-import { limitWord, planLabel, usePlan } from '../plan'
+import { limitWord, planLabel, PRICE_NOTE, priceText, usePlan } from '../plan'
 
 // Что сравниваем на странице: лимит бесплатной версии → «без ограничений» в Плюсе.
 const COMPARE: { name: LimitName; label: string }[] = [
@@ -32,6 +32,12 @@ export function Plus() {
           <h2>Ваша семья</h2>
           <span className={`badge ${plan.plus_active ? 'plus' : ''}`}>{planLabel(plan)}</span>
         </div>
+        {priceText(plan) && (
+          <>
+            <p>Стоимость Плюса за всю семью: <b>{priceText(plan)}</b>.</p>
+            <p className="muted small">{PRICE_NOTE}</p>
+          </>
+        )}
         {!plan.billing_enabled && <p className="muted small">Платная версия пока не включена, поэтому все функции Плюса доступны бесплатно.</p>}
         {plan.billing_enabled && !plan.plus_active && (
           <p className="muted small">Оплата появится скоро. Пока Плюс для семьи включает администратор.</p>

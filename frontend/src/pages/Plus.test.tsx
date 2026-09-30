@@ -20,5 +20,13 @@ describe('страница «Капсулка Плюс»', () => {
     expect(await screen.findByText('Бесплатная версия')).toBeInTheDocument()
     expect(screen.getByText(/Оплата появится скоро/)).toBeInTheDocument()
     expect(screen.getByText('Вся история приёма')).toBeInTheDocument()
+    expect(screen.queryByText(/Стоимость Плюса/)).not.toBeInTheDocument()
+  })
+
+  it('показывает стоимость, которую задал администратор, с пометкой «не оферта»', async () => {
+    server.use(http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ price_month: 149, price_year: 990 }))))
+    renderApp('/plus')
+    expect(await screen.findByText('149 ₽ в месяц или 990 ₽ в год')).toBeInTheDocument()
+    expect(screen.getByText(/не является публичной офертой/)).toBeInTheDocument()
   })
 })

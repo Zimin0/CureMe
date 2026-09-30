@@ -6,6 +6,7 @@ import { useAuth, useFamilyPath } from '../auth'
 import { MedicineCard } from '../components/MedicineCard'
 import { Empty, MedIcon, PageLoader } from '../components/ui'
 import { daysText, fmtQty } from '../format'
+import { useMedicineLimitGuard } from '../limits'
 
 function greeting() {
   const h = new Date().getHours()
@@ -35,6 +36,7 @@ function AttentionRow({ m, kind }: { m: Medicine; kind: 'expired' | 'expiring' |
 export function Home() {
   const { me } = useAuth()
   const fam = useFamilyPath()
+  const guard = useMedicineLimitGuard()
   const { data, isLoading } = useQuery({ queryKey: ['overview', fam('')], queryFn: () => api<Overview>(fam('/overview')) })
   if (isLoading || !data) return <PageLoader />
 
@@ -55,7 +57,7 @@ export function Home() {
         <div className="actions">
           <Link to="/scan" className="btn white"><ScanLine size={18} />Сканировать</Link>
           <Link to="/find" className="btn"><Stethoscope size={18} />Что есть от…</Link>
-          <Link to="/medicines/new" className="btn"><Plus size={18} />Вручную</Link>
+          <Link to="/medicines/new" className="btn" onClick={guard}><Plus size={18} />Вручную</Link>
           <Link to="/history" className="btn"><History size={18} />История приёма</Link>
         </div>
       </section>

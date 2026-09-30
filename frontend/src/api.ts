@@ -6,6 +6,8 @@ export interface FamilyBrief { id: number; name: string; role: Role }
 export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[] }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 export interface Family { id: number; name: string; invite_code: string; role: Role; members: Member[] }
+/** Публичные сведения о приглашении. full — в бесплатной семье уже предел участников, вступить нельзя. */
+export interface InviteInfo { family_name: string; members: number; full: boolean }
 export interface Category { id: number; name: string; icon: string; color: string; medicine_count: number }
 
 export interface AdminStats { users: number; admins: number; families: number; medicines: number; categories: number }
@@ -23,6 +25,8 @@ export interface Plan {
   plus_until: string | null
   plus_active: boolean       // Плюс оплачен и не истёк
   billing_enabled: boolean   // платная версия включена администратором
+  price_month?: number | null  // стоимость Плюса для семьи, ₽ (настраивает админ); null — не показывать
+  price_year?: number | null
   has_plus: boolean          // семье доступно всё из Плюса
   limits: Record<LimitName, number | null>  // null — без ограничений
   free_limits: Record<LimitName, number>

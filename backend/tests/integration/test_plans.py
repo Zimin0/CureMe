@@ -20,12 +20,12 @@ def admin(client):
 
 def enable_billing(client, h, on=True):
     r = client.put("/api/admin/billing", headers=h, json={"enabled": on})
-    assert r.status_code == 200 and r.json() == {"enabled": on}
+    assert r.status_code == 200 and r.json()["enabled"] is on
 
 
 def test_billing_is_off_by_default_and_everything_is_open(client, admin):
     h, f = admin
-    assert client.get("/api/admin/billing", headers=h).json() == {"enabled": False}
+    assert client.get("/api/admin/billing", headers=h).json()["enabled"] is False
     p = client.get(f"/api/families/{f}/plan", headers=h).json()
     assert p["plan"] == "free" and p["plus_active"] is False
     assert p["billing_enabled"] is False and p["has_plus"] is True
@@ -156,3 +156,23 @@ def test_plus_feature_dependency_returns_402_with_header(client, admin, session_
     assert "Плюс" in r.json()["detail"]
     with pytest.raises(ValueError):
         plans.plus_feature("unknown")
+
+
+def test_admin_sets_plus_price_and_family_sees_it(client, admin):
+    h, f = admin
+    assert client.get(f"/api/families/{f}/plan", headers=h).json()["price_month"] is None
+    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "price_month": 149, "price_year": 990})
+    assert r.status_code == 200
+    assert client.get("/api/admin/billing", headers=h).json() == {"enabled": False, "price_month": 149, "price_year": 990}
+    p = client.get(f"/api/families/{f}/plan", headers=h).json()
+    assert (p["price_month"], p["price_year"]) == (149, 990)
+    # переключатель не стирает цену, если фронтенд прислал её обратно; пустая цена убирается
+    client.put("/api/admin/billing", headers=h, json={"enabled": True, "price_month": 149, "price_year": None})
+    p = client.get(f"/api/families/{f}/plan", headers=h).json()
+    assert p["billing_enabled"] and p["price_month"] == 149 and p["price_year"] is None
+
+
+@pytest.mark.parametrize("body", [{"price_month": 0}, {"price_month": -5}, {"price_year": 10_000_000}, {"price_month": "дорого"}])
+def test_bad_price_is_rejected(client, admin, body):
+    h, _ = admin
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": False, **body}).status_code == 422
