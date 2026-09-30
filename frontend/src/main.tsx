@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './auth'
 import { ToastProvider } from './components/ui'
+import { PlusProvider } from './plan'
 import '@fontsource-variable/manrope'
 import './styles.css'
 
@@ -18,7 +19,9 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
-            <App />
+            <PlusProvider>
+              <App />
+            </PlusProvider>
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

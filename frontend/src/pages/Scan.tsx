@@ -84,7 +84,7 @@ function ResultSheet({ result, onClose }: { result: ScanResult; onClose: () => v
     quantity, expiry_date: expiry || null, serial: result.parsed.serial, batch: result.parsed.batch,
   }
   const done = (m: MedicineDetail, msg: string) => {
-    ['medicines', 'overview', 'categories'].forEach(k => qc.invalidateQueries({ queryKey: [k] }))
+    ['medicines', 'overview', 'categories', 'plan'].forEach(k => qc.invalidateQueries({ queryKey: [k] }))
     qc.setQueryData(['medicine', fam(''), String(m.id)], m)
     toast(msg)
     nav(`/medicines/${m.id}`)
