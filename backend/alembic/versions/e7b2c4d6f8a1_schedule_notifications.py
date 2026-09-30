@@ -28,6 +28,7 @@ def upgrade() -> None:
         sa.Column('escalate_enabled', sa.Boolean(), nullable=False),
         sa.Column('escalate_minutes', sa.Integer(), nullable=False),
         sa.Column('share_medicine_name', sa.Boolean(), nullable=False),
+        sa.Column('escalate_consent_at', sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('user_id'),
     )

@@ -9,7 +9,7 @@ import { ScheduleNotify } from './ScheduleNotify'
 function prefs(over: Partial<SchedulePrefs> = {}): SchedulePrefs {
   return {
     available: true, email: 'nikita@example.com', email_possible: true, enabled: false, lead_minutes: 10, repeat_minutes: 10,
-    escalate_enabled: false, escalate_minutes: 10, share_medicine_name: false, trusted: null, ...over,
+    escalate_enabled: false, escalate_minutes: 10, share_medicine_name: false, escalate_consent_at: null, trusted: null, ...over,
   }
 }
 
@@ -58,7 +58,10 @@ it('приглашает доверенного только с подтверж
   expect(screen.getByLabelText(/Сообщать ему/)).toBeDisabled()  // пока он не согласился
 
   s.current = { ...s.current, trusted: { ...s.current.trusted!, status: 'confirmed', confirmed_at: '2026-10-01T10:00:00Z' } }
+  await user.click(await screen.findByLabelText(/Я разрешаю Капсулке сообщать/))
   await waitFor(() => expect(screen.getByLabelText(/Сообщать ему/)).toBeEnabled(), { timeout: 7000 })
+  await user.click(screen.getByLabelText(/Сообщать ему/))
+  await waitFor(() => expect(s.puts.at(-1)).toEqual({ escalate_enabled: true, escalate_consent: true }))
 }, 15_000)
 
 it('без Плюса показывает замочек', async () => {

@@ -46,6 +46,8 @@ def setup(client, outbox):
 
 
 def enable(client, h, **extra):
+    if extra.get("escalate_enabled"):
+        extra.setdefault("escalate_consent", True)  # разрешение сообщать доверенному даётся вместе с включением
     r = client.put("/api/schedule-notifications", headers=h, json={"enabled": True, **extra})
     assert r.status_code == 200, r.text
     return r.json()
@@ -244,7 +246,7 @@ def test_escalation_off_or_taken_late(client, setup, db, outbox):
     outbox.clear()
     tick(db, u["id"], at(20))
     assert all(m["To"] != "mama@example.com" for m in outbox)
-    client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True})
+    client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True, "escalate_consent": True})
     client.post(f"/api/families/{f}/medicines/{mid}/consume", headers=h, json={"amount": 1})
     db.query(Intake).update({"taken_at": at(15), "last_at": at(15)})  # успел отметить до письма доверенному
     db.commit()
@@ -326,3 +328,75 @@ def test_trusted_letters_per_address_are_limited(client, setup, monkeypatch):
         assert r.status_code == 429
     finally:
         limiter.reset()
+
+
+# --- правки юридического review: разрешение пользователя, стирание данных, оператор в приглашении ---
+def test_escalation_needs_users_own_permission(client, setup, db, outbox):
+    h, u, *_ = setup
+    enable(client, h)
+    r = client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True})
+    assert r.status_code == 422 and "разрешаете" in r.text
+    assert client.get("/api/schedule-notifications", headers=h).json()["escalate_consent_at"] is None
+    p = client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True, "escalate_consent": True}).json()
+    assert p["escalate_enabled"] and p["escalate_consent_at"]  # дата сохранена
+    p = client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": False}).json()
+    assert p["escalate_consent_at"] is None  # выключил: разрешение снято, при включении спросим снова
+    assert client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True}).status_code == 422
+
+
+def test_no_letter_to_trusted_without_saved_permission(client, setup, db, outbox):
+    h, u, *_ = setup
+    enable(client, h, escalate_enabled=True)
+    add_trusted(client, h)
+    client.post("/api/trusted/confirm", json={"token": confirm_token(db)})
+    db.expire_all()
+    db.get(SchedulePrefs, u["id"]).escalate_consent_at = None  # как если бы дата пропала
+    db.commit()
+    outbox.clear()
+    tick(db, u["id"], at(20))
+    assert all(m["To"] != "mama@example.com" for m in outbox)
+
+
+@pytest.mark.parametrize("action", ["decline", "after_confirm"])
+def test_decline_erases_name_and_email(client, setup, db, action):
+    h, *_ = setup
+    add_trusted(client, h)
+    token = confirm_token(db)
+    if action == "after_confirm":
+        client.post("/api/trusted/confirm", json={"token": token})
+    client.post("/api/trusted/decline", json={"token": token})
+    db.expire_all()
+    row = db.scalar(select(TrustedContact))
+    assert row.status in ("declined", "revoked") and row.name == "" and row.email == "" and row.confirmed_at is None
+    t = client.get("/api/schedule-notifications", headers=h).json()["trusted"]
+    assert t["name"] == "" and t["email"] == ""
+    assert client.post("/api/trusted/lookup", json={"token": token}).json()["status"] == row.status  # ссылка всё ещё показывает статус
+
+
+def test_unanswered_invite_deleted_after_30_days(client, setup, db, outbox):
+    h, u, *_ = setup
+    enable(client, h)
+    add_trusted(client, h)
+    now = datetime.now(timezone.utc)
+    run_due(db, now + timedelta(days=29))
+    db.expire_all()
+    assert db.scalar(select(TrustedContact)) is not None
+    run_due(db, now + timedelta(days=31))
+    db.expire_all()
+    assert db.scalar(select(TrustedContact)) is None  # имя и почта удалены
+
+
+def test_confirmed_contact_is_not_purged(client, setup, db):
+    h, *_ = setup
+    add_trusted(client, h)
+    client.post("/api/trusted/confirm", json={"token": confirm_token(db)})
+    from app.schedule_notify import purge_stale_invites
+    assert purge_stale_invites(db, datetime.now(timezone.utc) + timedelta(days=90)) == 0
+
+
+def test_invitation_names_operator(client, setup, outbox):
+    h, *_ = setup
+    add_trusted(client, h)
+    text = body(outbox[-1])
+    assert "Оператор: Зименков Никита Вячеславович" in text and "work_notifications_zimino@mail.ru" in text
+    assert "https://kapsulka.test/consent-trusted" in text and "через 30 дней" in text

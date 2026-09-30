@@ -29,10 +29,13 @@ from .mailer import send_mail
 from .models import Membership, ScheduleNotified, SchedulePrefs, TrustedContact, User, utcnow
 from .reminders import MSK, can_email, plus_family_ids
 from .schedule import Occurrence, occurrences
+from .services import _aware
 
 log = logging.getLogger("cureme.schedule")
 GRACE = timedelta(minutes=30)       # сколько после нужного момента ещё пытаемся отправить
 TRUSTED_PER_DAY = 12                # писем доверенному человеку в сутки, чтобы не заспамить его при сбое
+INVITE_TTL = timedelta(days=30)        # неотвеченное приглашение через месяц удаляется вместе с почтой
+OPERATOR_LINE = "Оператор: Зименков Никита Вячеславович, вопросы: work_notifications_zimino@mail.ru"
 CONSENT_VERSION = "trusted-2026-09-30.1"  # редакция текста согласия на странице доверенного (TrustedConsent.tsx)
 STAGES = ("pre", "repeat", "trusted")
 
@@ -105,7 +108,9 @@ def send_trusted_request(contact: TrustedContact, user_name: str) -> bool:
         "Мы написали вам только потому, что нас об этом попросил пользователь. Пока вы не согласитесь, "
         "никаких уведомлений вам не придёт. Согласиться, отказаться или позже отписаться можно по ссылке:\n"
         f"{trusted_link(contact)}\n\n"
-        "Если вы не знаете, кто это, просто проигнорируйте письмо или откажитесь по ссылке: больше мы вам не напишем."
+        "Если вы не знаете, кто это, просто проигнорируйте письмо или откажитесь по ссылке: больше мы вам не напишем. "
+        "Если вы не ответите, через 30 дней мы удалим ваши имя и почту.\n\n"
+        f"{OPERATOR_LINE}, подробнее: {_site()}/consent-trusted"
     )
     return send_mail(contact.email, "Капсулка: вас просят быть доверенным человеком", text)
 
@@ -143,7 +148,7 @@ def due_items(prefs: SchedulePrefs, occs: list[Occurrence], now: datetime, trust
             "trusted": (o.due + timedelta(minutes=prefs.repeat_minutes + prefs.escalate_minutes), None),
         }
         for stage, (start, stop) in moments.items():
-            if stage == "trusted" and not (trusted_ok and prefs.escalate_enabled):
+            if stage == "trusted" and not (trusted_ok and prefs.escalate_enabled and prefs.escalate_consent_at):
                 continue
             end = stop or start + GRACE
             if start <= now < min(end, start + GRACE):
@@ -189,9 +194,22 @@ def notify_user(db: Session, user: User, prefs: SchedulePrefs, now: datetime) ->
     return count
 
 
+def purge_stale_invites(db: Session, now: datetime) -> int:
+    """Приглашения без ответа старше 30 дней удаляются вместе с именем и почтой человека."""
+    cutoff = now - INVITE_TTL
+    stale = [c for c in db.scalars(select(TrustedContact).where(TrustedContact.status == "pending"))
+             if _aware(c.request_sent_at or c.created_at) < cutoff]
+    for c in stale:
+        db.delete(c)
+    if stale:
+        db.commit()
+    return len(stale)
+
+
 def run_due(db: Session, now: datetime | None = None) -> int:
     """Раз в минуту из фонового потока: все, у кого включены уведомления по расписанию."""
     now = now or datetime.now(timezone.utc)
+    purge_stale_invites(db, now)
     total = 0
     for prefs in db.scalars(select(SchedulePrefs).where(SchedulePrefs.enabled.is_(True))).all():
         user = db.get(User, prefs.user_id)

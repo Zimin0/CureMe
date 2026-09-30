@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Mail, UserCheck } from 'lucide-react'
 import { FormEvent, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, SchedulePrefs, TrustedStatus } from '../api'
 import { PlusBanner } from '../plan'
 import { useToast } from './ui'
@@ -46,9 +47,10 @@ export function ScheduleNotify() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [attest, setAttest] = useState(false)
+  const [allow, setAllow] = useState(false)  // разрешение сообщать доверенному, что приём не отмечен
   const onError = (e: Error) => toast(e.message, 'error')
   const save = useMutation({
-    mutationFn: (body: Partial<SchedulePrefs>) => api<SchedulePrefs>('/schedule-notifications', { method: 'PUT', body }),
+    mutationFn: (body: Partial<SchedulePrefs> & { escalate_consent?: boolean }) => api<SchedulePrefs>('/schedule-notifications', { method: 'PUT', body }),
     onSuccess: d => qc.setQueryData(KEY, d), onError,
   })
   const invite = useMutation({
@@ -66,7 +68,7 @@ export function ScheduleNotify() {
   })
   if (!p) return null
   const locked = !p.available
-  const set = (body: Partial<SchedulePrefs>) => save.mutate(body)
+  const set = (body: Partial<SchedulePrefs> & { escalate_consent?: boolean }) => save.mutate(body)
   const t = p.trusted
   const submit = (e: FormEvent) => { e.preventDefault(); invite.mutate() }
 
@@ -113,8 +115,8 @@ export function ScheduleNotify() {
                 <div className="stack" style={{ gap: 8 }}>
                   <div className="row wrap" style={{ justifyContent: 'space-between' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700 }}>{t.name}</div>
-                      <div className="muted small ellipsis">{t.email}</div>
+                      <div style={{ fontWeight: 700 }}>{t.name || 'Доверенный человек'}</div>
+                      {t.email && <div className="muted small ellipsis">{t.email}</div>}
                     </div>
                     <span className={`badge ${STATUS[t.status].badge}`}>{STATUS[t.status].label}</span>
                   </div>
@@ -123,11 +125,18 @@ export function ScheduleNotify() {
                     <button className="btn ghost sm" disabled={remove.isPending} onClick={() => remove.mutate()}>Убрать и удалить почту</button>
                   </div>
                   {(t.status === 'declined' || t.status === 'revoked') && (
-                    <p className="muted small">Этот человек отказался получать письма. Чтобы пригласить его снова, уберите его и добавьте заново.</p>
+                    <p className="muted small">Этот человек отказался получать письма, его имя и почта удалены. Чтобы пригласить кого-то, уберите эту запись и добавьте заново.</p>
+                  )}
+                  {!p.escalate_enabled && (
+                    <label className="check">
+                      <input type="checkbox" checked={allow} onChange={e => setAllow(e.target.checked)} />
+                      <span className="small">Я разрешаю Капсулке сообщать этому человеку, что я не отметил(а) плановый приём: из письма он поймёт, что мне назначены лекарства
+                        (<Link to="/consent">Согласие, п. 4.1</Link>)</span>
+                    </label>
                   )}
                   <label className="check">
-                    <input type="checkbox" checked={p.escalate_enabled} disabled={t.status !== 'confirmed' && !p.escalate_enabled}
-                      onChange={e => set({ escalate_enabled: e.target.checked })} />
+                    <input type="checkbox" checked={p.escalate_enabled} disabled={!p.escalate_enabled && (t.status !== 'confirmed' || !allow)}
+                      onChange={e => set(e.target.checked ? { escalate_enabled: true, escalate_consent: true } : { escalate_enabled: false })} />
                     <span>Сообщать ему, если я не отметил(а) приём{t.status !== 'confirmed' && <><br /><span className="muted small">Заработает, когда он согласится</span></>}</span>
                   </label>
                   {p.escalate_enabled && (
