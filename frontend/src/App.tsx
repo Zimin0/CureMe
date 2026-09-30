@@ -3,7 +3,7 @@ import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
 import { ClosedGate, ConsentGate, Join, Login, Register, VerifyEmail, VerifyGate } from './pages/Auth'
-import { Consent, Privacy, Terms } from './pages/Legal'
+import { Consent, Privacy, TelegramConsent, Terms } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
 import { Family } from './pages/Family'
@@ -15,6 +15,7 @@ import { MedicineForm } from './pages/MedicineForm'
 import { Medicines } from './pages/Medicines'
 import { Scan } from './pages/Scan'
 import { NoFamily } from './pages/NoFamily'
+import { Plus } from './pages/Plus'
 
 function Protected() {
   const { me, loading, familyId } = useAuth()
@@ -39,6 +40,7 @@ export default function App() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/consent" element={<Consent />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/consent-telegram" element={<TelegramConsent />} />
       <Route element={<Protected />}>
         <Route index element={<Home />} />
         <Route path="medicines" element={<Medicines />} />
@@ -49,6 +51,7 @@ export default function App() {
         <Route path="find" element={<Find />} />
         <Route path="history" element={<History />} />
         <Route path="family" element={<Family />} />
+        <Route path="plus" element={<Plus />} />
         <Route path="export" element={<Export />} />
         <Route path="admin" element={<Admin />} />
       </Route>

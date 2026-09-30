@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { MailCheck } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, Family, Me } from '../api'
+import { api, Family, InviteInfo, Me } from '../api'
 import { useAuth } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, useToast } from '../components/ui'
@@ -99,7 +99,7 @@ function RegisterForm() {
   const [agreed, setAgreed] = useState({ consent: false, terms: false })
   const inviteInfo = useQuery({
     queryKey: ['invite', form.invite_code],
-    queryFn: () => api<{ family_name: string; members: number }>(`/invites/${form.invite_code.trim()}`),
+    queryFn: () => api<InviteInfo>(`/invites/${form.invite_code.trim()}`),
     enabled: form.invite_code.trim().length >= 6,
     retry: false,
   })
@@ -128,16 +128,19 @@ function RegisterForm() {
           <input className="input" value={form.invite_code} onChange={set('invite_code')} placeholder="Необязательно" style={{ textTransform: 'uppercase' }} />
           {inviteInfo.isError && <span className="hint" style={{ color: 'var(--danger)' }}>Такого кода нет</span>}
           {!form.invite_code && <span className="hint">Если вас позвали в семью, введите код из приглашения</span>}
+          {inviteInfo.data?.full && <span className="hint" style={{ color: 'var(--danger)' }}>{FULL_TEXT} Или сотрите код, и мы создадим вашу аптечку.</span>}
         </label>
         <ConsentChecks value={agreed} onChange={setAgreed} />
         {m.error && <div className="alert error">{m.error.message}</div>}
-        <button className="btn primary block" disabled={m.isPending}>{m.isPending ? 'Создаём…' : 'Создать аккаунт'}</button>
+        <button className="btn primary block" disabled={m.isPending || !!inviteInfo.data?.full}>{m.isPending ? 'Создаём…' : 'Создать аккаунт'}</button>
       </form>
       <div className="divider">уже есть аккаунт?</div>
       <Link className="btn ghost block" to="/login">Войти</Link>
     </AuthShell>
   )
 }
+
+const FULL_TEXT = 'В семье уже столько участников, сколько позволяет бесплатная версия. Попросите владельца подключить Капсулку Плюс.'
 
 /** Ссылка-приглашение /join/:code — работает и для новых, и для уже вошедших. */
 export function Join() {
@@ -148,7 +151,7 @@ export function Join() {
   const toast = useToast()
   const info = useQuery({
     queryKey: ['invite', code],
-    queryFn: () => api<{ family_name: string; members: number }>(`/invites/${code}`),
+    queryFn: () => api<InviteInfo>(`/invites/${code}`),
     retry: false,
   })
   const join = useMutation({
@@ -160,6 +163,13 @@ export function Join() {
     return <AuthShell title="Приглашение не найдено" sub="Возможно, код обновили. Попросите новую ссылку."><Link className="btn primary block" to="/">На главную</Link></AuthShell>
   }
   const fam = info.data!
+  if (fam.full) {
+    return (
+      <AuthShell title={`В «${fam.family_name}» нет мест`} sub={FULL_TEXT}>
+        <Link className="btn primary block" to="/">На главную</Link>
+      </AuthShell>
+    )
+  }
   return (
     <AuthShell title={`Приглашение в «${fam.family_name}»`} sub={`В семье уже ${fam.members} чел. Вы получите доступ к общей аптечке.`}>
       {me ? (

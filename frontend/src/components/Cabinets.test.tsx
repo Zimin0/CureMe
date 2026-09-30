@@ -41,7 +41,8 @@ it('в бесплатной версии вторая своя аптечка п
   const { user } = renderApp('/family', { me: { ...ME, own_families_left: 0 } })
   expect(await screen.findByText(/В бесплатной версии одна своя аптечка/)).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Новая аптечка' }))
-  expect(await screen.findByRole('dialog', { name: /Капсулке Плюс/ })).toBeInTheDocument()
+  expect(await screen.findByRole('dialog', { name: 'Доступно в Капсулке Плюс' })).toBeInTheDocument()
+  expect(screen.getByText('Несколько своих аптечек')).toBeInTheDocument()
   expect(created).toBe(false)
 })
 

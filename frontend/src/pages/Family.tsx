@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Crown, LogOut, Pencil, RefreshCw, Settings, Share2, Shield, Trash2, UserPlus } from 'lucide-react'
+import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Settings, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, Category, Family as FamilyT } from '../api'
+import { api, ApiError, Category, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Cabinets } from '../components/Cabinets'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
+import { useLimitReached } from '../limits'
+import { LimitCounter, planLabel, usePlan } from '../plan'
 import { versionLabel } from '../version'
 import { LegalLinks } from './Legal'
 
@@ -19,16 +21,19 @@ export function Family() {
   const key = ['family', familyId]
   const { data: f, isLoading } = useQuery({ queryKey: key, queryFn: () => api<FamilyT>(fam('')) })
   const cats = useQuery({ queryKey: ['categories', fam('')], queryFn: () => api<Category[]>(fam('/categories')) })
+  const { plan } = usePlan()
 
   const [email, setEmail] = useState('')
   const [rename, setRename] = useState<string | null>(null)
 
   const onFam = (d: FamilyT, msg?: string) => { qc.setQueryData(key, d); if (msg) toast(msg) }
-  const onError = (e: Error) => toast(e.message, 'error')
+  // На 402 (лимит бесплатной версии) шторка Плюса открывается сама, тост не нужен.
+  const onError = (e: Error) => { if (!(e instanceof ApiError && e.status === 402)) toast(e.message, 'error') }
+  const membersFull = useLimitReached('members')
 
   const addMember = useMutation({
     mutationFn: () => api<FamilyT>(fam('/members'), { body: { email } }),
-    onSuccess: d => { onFam(d, 'Участник добавлен'); setEmail('') }, onError,
+    onSuccess: d => { onFam(d, 'Участник добавлен'); setEmail(''); qc.invalidateQueries({ queryKey: ['plan'] }) }, onError,
   })
   const setRole = useMutation({
     mutationFn: ({ uid, role }: { uid: number; role: string }) => api<FamilyT>(fam(`/members/${uid}`), { method: 'PATCH', body: { role } }),
@@ -38,7 +43,7 @@ export function Family() {
     mutationFn: (uid: number) => api(fam(`/members/${uid}`), { method: 'DELETE' }),
     onSuccess: async (_, uid) => {
       if (uid === me?.id) { await refresh(); toast('Вы вышли из семьи') }
-      else { qc.invalidateQueries({ queryKey: key }); toast('Участник удалён') }
+      else { qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ['plan'] }); toast('Участник удалён') }
     },
     onError,
   })
@@ -71,6 +76,15 @@ export function Family() {
         {owner && <button className="btn ghost" onClick={() => setRename(f.name)}><Pencil size={16} />Переименовать</button>}
       </div>
 
+      <Link to="/plus" className="card list-row plus-link" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Sparkles size={22} style={{ color: 'var(--plus)', flex: 'none' }} />
+        <div className="grow">
+          <div style={{ fontWeight: 700 }}>Капсулка Плюс</div>
+          <div className="small muted">{planLabel(plan) || 'Тариф семьи'}</div>
+        </div>
+        <ChevronRight size={18} className="muted" />
+      </Link>
+
       <Cabinets />
 
       <section className="card stack">
@@ -87,6 +101,11 @@ export function Family() {
           </div>
         </div>
         <button className="btn primary block" onClick={share}><Share2 size={18} />Поделиться ссылкой</button>
+        {membersFull && (
+          <div className="alert warn">
+            <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> участников сколько угодно.</span>
+          </div>
+        )}
         {owner && (
           <form className="row" onSubmit={e => { e.preventDefault(); addMember.mutate() }}>
             <input className="input grow" type="email" required placeholder="Или добавить по почте, если аккаунт уже есть" value={email} onChange={e => setEmail(e.target.value)} />
@@ -96,7 +115,7 @@ export function Family() {
       </section>
 
       <section className="card flush">
-        <div style={{ padding: '18px 18px 6px' }}><h2>Участники</h2></div>
+        <div className="row between" style={{ padding: '18px 18px 6px' }}><h2>Участники</h2><LimitCounter name="members" /></div>
         {f.members.map(m => (
           <div key={m.user_id} className="list-row">
             <div className="avatar" style={{ background: avatarColor(m.user_id) }}>{m.name.slice(0, 1).toUpperCase()}</div>

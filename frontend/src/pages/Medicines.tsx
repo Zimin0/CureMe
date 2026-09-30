@@ -6,6 +6,8 @@ import { api, Category, Medicine } from '../api'
 import { useFamilyPath } from '../auth'
 import { CabinetSelect } from '../components/Cabinets'
 import { MedicineCard } from '../components/MedicineCard'
+import { useMedicineLimitGuard } from '../limits'
+import { LimitCounter, usePlan } from '../plan'
 import { Empty, PageLoader } from '../components/ui'
 
 const FILTERS = [
@@ -24,6 +26,8 @@ export function Medicines() {
   const filter = params.get('filter') ?? ''
   const cat = params.get('category') ?? ''
   const dq = useDeferredValue(q)
+  const guard = useMedicineLimitGuard()
+  const { limit } = usePlan()
 
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params)
@@ -48,10 +52,10 @@ export function Medicines() {
         <div>
           <h1>Аптечка</h1>
           <CabinetSelect />
-          <p className="sub">{meds.data ? `${meds.data.length} в списке` : ' '}</p>
+          <p className="sub">{meds.data ? `${meds.data.length} в списке` : ' '}{limit('medicines') !== null && <> · <LimitCounter name="medicines" /></>}</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <Link to="/medicines/new" className="btn primary"><Plus size={18} />Добавить</Link>
+          <Link to="/medicines/new" className="btn primary" onClick={guard}><Plus size={18} />Добавить</Link>
           <Link to="/export" className="btn ghost"><FileDown size={18} />Экспорт</Link>
         </div>
       </div>
@@ -83,7 +87,7 @@ export function Medicines() {
             <Empty icon="🔍" title="Ничего не нашлось" text="Попробуйте другой запрос или сбросьте фильтры." />
           ) : (
             <Empty icon="💊" title="Аптечка пустая" text="Добавьте первое лекарство: отсканируйте код на коробке или заполните вручную."
-              action={<div className="row"><Link className="btn primary" to="/scan">Сканировать</Link><Link className="btn ghost" to="/medicines/new">Вручную</Link></div>} />
+              action={<div className="row"><Link className="btn primary" to="/scan">Сканировать</Link><Link className="btn ghost" to="/medicines/new" onClick={guard}>Вручную</Link></div>} />
           )}
         </div>
       ) : (

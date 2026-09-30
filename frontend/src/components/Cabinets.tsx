@@ -3,6 +3,7 @@ import { Check, Lock, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { api, Family } from '../api'
 import { useAuth } from '../auth'
+import { usePlusSheet } from '../plan'
 import { Sheet, useToast } from './ui'
 
 /** Переключатель аптечек в шапке страницы. Показывается, только когда аптечек больше одной. */
@@ -23,15 +24,15 @@ export function CabinetSelect() {
 export function Cabinets() {
   const { me, familyId, setFamilyId, refresh } = useAuth()
   const toast = useToast()
-  const [plusInfo, setPlusInfo] = useState(false)
+  const openPlus = usePlusSheet()
   const [name, setName] = useState<string | null>(null)
   const locked = me?.own_families_left === 0
 
   const create = useMutation({
     mutationFn: (n: string) => api<Family>('/families', { body: { name: n } }),
     onSuccess: async d => { await refresh(); setFamilyId(d.id); setName(null); toast(`Аптечка «${d.name}» создана`) },
-    // 402: лимит бесплатной версии — показываем, что это функция Плюса.
-    onError: (e: Error & { status?: number }) => { setName(null); if (e.status === 402) { setPlusInfo(true); refresh() } else toast(e.message, 'error') },
+    // 402 (лимит бесплатной версии) сам открывает шторку Плюса; обновляем счётчик своих аптечек.
+    onError: (e: Error & { status?: number }) => { setName(null); if (e.status === 402) refresh(); else toast(e.message, 'error') },
   })
   if (!me) return null
 
@@ -39,7 +40,7 @@ export function Cabinets() {
     <section className="card stack">
       <div className="card-head" style={{ marginBottom: 0 }}>
         <h2>Мои аптечки</h2>
-        <button className="btn sm" onClick={() => (locked ? setPlusInfo(true) : setName(''))}>
+        <button className="btn sm" onClick={() => (locked ? openPlus('cabinets') : setName(''))}>
           {locked ? <Lock size={16} /> : <Plus size={16} />}Новая аптечка
         </button>
       </div>
@@ -58,15 +59,6 @@ export function Cabinets() {
         ))}
       </div>
 
-      {plusInfo && (
-        <Sheet title="Несколько аптечек — в Капсулке Плюс" onClose={() => setPlusInfo(false)}>
-          <div className="stack">
-            <p>В бесплатной версии можно завести одну свою аптечку. С Капсулкой Плюс — сколько угодно: для дачи, машины или бабушки.</p>
-            <p className="muted small">Вступить в чужую аптечку по приглашению можно и без Плюса. Уже созданные аптечки остаются с вами.</p>
-            <button className="btn primary block" onClick={() => setPlusInfo(false)}>Понятно</button>
-          </div>
-        </Sheet>
-      )}
       {name !== null && (
         <Sheet title="Новая аптечка" onClose={() => setName(null)}>
           <form className="stack" onSubmit={e => { e.preventDefault(); create.mutate(name) }}>
