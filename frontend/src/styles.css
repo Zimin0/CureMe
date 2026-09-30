@@ -207,6 +207,7 @@ textarea { resize: vertical; min-height: 84px; }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chips.wrap { flex-wrap: wrap; overflow: visible; }
+@media (min-width: 900px) { .chips.wrap-desktop { flex-wrap: wrap; overflow: visible; } }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
   border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
