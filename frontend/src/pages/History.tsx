@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Lock, Search, X } from 'lucide-react'
-import { useDeferredValue } from 'react'
+import { Lock, Search, Stethoscope, X } from 'lucide-react'
+import { useDeferredValue, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, Family, Intake, OlderHistory } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { usePlusSheet } from '../plan'
+import { DoctorReport } from '../components/DoctorReport'
 import { IntakeList } from '../components/IntakeList'
 import { Empty, PageLoader } from '../components/ui'
 
@@ -26,6 +27,7 @@ export function History() {
   const from = params.get('from') ?? ''
   const to = params.get('to') ?? ''
   const dq = useDeferredValue(text.trim())
+  const [report, setReport] = useState(false)
 
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params)
@@ -79,7 +81,12 @@ export function History() {
           <h1>История приёма</h1>
           <p className="sub">Кто, когда и сколько принял. Нажатия за одну минуту сложены в одну запись.</p>
         </div>
+        <button type="button" className={`btn ${report ? 'primary' : 'ghost'}`} aria-expanded={report} onClick={() => setReport(v => !v)}>
+          <Stethoscope size={18} />Для врача
+        </button>
       </div>
+
+      {report && <DoctorReport />}
 
       <label className="search">
         <Search size={18} />
