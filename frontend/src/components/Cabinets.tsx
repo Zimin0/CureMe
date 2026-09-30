@@ -1,9 +1,9 @@
 import { useMutation } from '@tanstack/react-query'
-import { Check, Lock, Plus } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { api, Family } from '../api'
 import { useAuth } from '../auth'
-import { usePlusSheet } from '../plan'
+import { PlusBanner, usePlusSheet } from '../plan'
 import { Sheet, useToast } from './ui'
 
 /** Переключатель аптечек в шапке страницы. Показывается, только когда аптечек больше одной. */
@@ -40,14 +40,15 @@ export function Cabinets() {
     <section className="card stack">
       <div className="card-head" style={{ marginBottom: 0 }}>
         <h2>Мои аптечки</h2>
-        <button className="btn sm" onClick={() => (locked ? openPlus('cabinets') : setName(''))}>
-          {locked ? <Lock size={16} /> : <Plus size={16} />}Новая аптечка
-        </button>
+        {!locked && <button className="btn sm" onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>}
       </div>
       <p className="muted small">
         Отдельные аптечки для дачи, машины или бабушки. У каждой свои лекарства и свои участники.
-        {locked && ' В бесплатной версии одна своя аптечка, больше — в Капсулке Плюс.'}
       </p>
+      {locked && (
+        <PlusBanner title="Новая аптечка — в Капсулке Плюс" cta="Новая аптечка" onClick={() => openPlus('cabinets')}
+          text="В бесплатной версии одна своя аптечка, больше — в Капсулке Плюс." />
+      )}
       <div className="cabinets">
         {me.families.map(f => (
           <button key={f.id} className={`cabinet ${f.id === familyId ? 'active' : ''}`} aria-pressed={f.id === familyId}

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, Lock, Mail, Send } from 'lucide-react'
+import { Bell, Mail, Send } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PlusBanner } from '../plan'
 import { api, NotificationPrefs } from '../api'
 import { useToast } from './ui'
 
@@ -52,14 +53,8 @@ export function Reminders() {
         Об одном и том же повторять не будем.
       </p>
       {locked && (
-        <div className="plus-banner" data-testid="plus-banner">
-          <Lock size={32} />
-          <div>
-            <strong>Напоминания — в Капсулке Плюс</strong>
-            <p>Подключите Плюс, и мы сами напомним о лекарствах, которые заканчиваются или портятся.</p>
-          </div>
-          <Link to="/plus" className="btn plus-btn">Узнать про Плюс</Link>
-        </div>
+        <PlusBanner testId="plus-banner" title="Напоминания — в Капсулке Плюс" to="/plus" cta="Узнать про Плюс"
+          text="Подключите Плюс, и мы сами напомним о лекарствах, которые заканчиваются или портятся." />
       )}
 
       <fieldset className="locked-block" disabled={locked}>
