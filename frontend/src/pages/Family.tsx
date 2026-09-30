@@ -8,6 +8,7 @@ import { Cabinets } from '../components/Cabinets'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { Reminders } from '../components/Reminders'
 import { PageLoader, Sheet, useToast } from '../components/ui'
+import { copyText } from '../clipboard'
 import { avatarColor } from '../format'
 import { useLimitReached } from '../limits'
 import { LimitCounter, planLabel, usePlan } from '../plan'
@@ -56,14 +57,9 @@ export function Family() {
   const owner = f.role === 'owner'
   const link = `${location.origin}/join/${f.invite_code}`
 
-  const share = async () => {
-    const text = `Присоединяйся к нашей домашней аптечке «${f.name}» в Капсулке`
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Капсулка', text, url: link }) } catch { /* отменили */ }
-    } else {
-      await navigator.clipboard.writeText(link)
-      toast('Ссылка скопирована')
-    }
+  const copyLink = async () => {
+    const ok = await copyText(link)
+    toast(ok ? 'Ссылка скопирована' : `Не удалось скопировать, ссылка: ${link}`, ok ? undefined : 'error')
   }
 
   return (
@@ -115,11 +111,11 @@ export function Family() {
             <div className="invite-code">{f.invite_code}</div>
           </div>
           <div className="row" style={{ gap: 8 }}>
-            <button className="icon-btn" title="Скопировать ссылку" onClick={() => navigator.clipboard.writeText(link).then(() => toast('Ссылка скопирована'))}><Copy size={18} /></button>
+            <button className="icon-btn" title="Скопировать ссылку" onClick={copyLink}><Copy size={18} /></button>
             {owner && <button className="icon-btn" title="Сменить код" onClick={() => confirm('Старая ссылка перестанет работать. Продолжить?') && regen.mutate()}><RefreshCw size={18} /></button>}
           </div>
         </div>
-        <button className="btn primary block" onClick={share}><Share2 size={18} />Поделиться ссылкой</button>
+        <button className="btn primary block" onClick={copyLink}><Share2 size={18} />Поделиться ссылкой</button>
         {membersFull && (
           <div className="alert warn">
             <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> участников сколько угодно.</span>

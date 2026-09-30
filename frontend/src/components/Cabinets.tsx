@@ -37,14 +37,16 @@ export function Cabinets() {
   if (!me) return null
 
   return (
-    <section className="card stack cabinets-card">
+    <section className="card stack">
       <div className="card-head" style={{ marginBottom: 0 }}>
         <h2>Мои аптечки</h2>
-        {!locked && <button className="btn sm" onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>}
       </div>
-      <p className="muted small">
-        Отдельные аптечки для дачи, машины или бабушки. У каждой свои лекарства и свои участники.
-      </p>
+      <fieldset className="locked-block" disabled={locked}>
+        <p className="muted small">
+          Отдельные аптечки для дачи, машины или бабушки. У каждой свои лекарства и свои участники.
+        </p>
+        <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>
+      </fieldset>
       {locked && (
         <PlusBanner title="Новая аптечка — в Капсулке Плюс" cta="Новая аптечка" onClick={() => openPlus('cabinets')}
           text="В бесплатной версии одна своя аптечка, больше — в Капсулке Плюс." />
