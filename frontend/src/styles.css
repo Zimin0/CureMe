@@ -551,7 +551,9 @@ a.intake-med { color: var(--primary); }
 .cabinet.active { border-color: var(--primary); background: var(--primary-soft); }
 .cabinet svg { color: var(--primary); flex: none; }
 .cabinet-select select {
-  height: 34px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; max-width: 100%;
+  height: 44px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--plus);
+  background: var(--plus-soft); color: var(--plus); font: inherit; font-weight: 700; max-width: 100%;
+  cursor: pointer;
 }
+.cabinet-select select:focus-visible { outline: 3px solid var(--plus); outline-offset: 2px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
