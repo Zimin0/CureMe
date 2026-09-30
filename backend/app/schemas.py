@@ -438,3 +438,44 @@ class OverviewOut(BaseModel):
     favorites: list[MedicineOut]
     helps_me: list[MedicineOut]
     expiring_soon_days: int
+
+
+# --- напоминания ---
+class NotificationPrefsOut(BaseModel):
+    available: bool                 # есть ли у человека семья с Плюсом
+    email: str
+    email_possible: bool            # на сайте настроена почта, и адрес подтверждён
+    telegram_possible: bool         # на сайте настроен Telegram-бот
+    telegram_bot: str | None
+    email_enabled: bool
+    telegram_enabled: bool
+    telegram_connected: bool
+    telegram_name: str | None
+    notify_low: bool
+    notify_expiry: bool
+    expiry_days: int
+
+
+class NotificationPrefsIn(BaseModel):
+    email_enabled: bool | None = None
+    telegram_enabled: bool | None = None
+    notify_low: bool | None = None
+    notify_expiry: bool | None = None
+    expiry_days: int | None = Field(default=None, ge=1, le=180)
+
+    @model_validator(mode="after")
+    def no_nulls(self):
+        for k in self.model_fields_set:
+            if getattr(self, k) is None:
+                raise ValueError(f"{k}: нужно значение")
+        return self
+
+
+class TelegramLinkIn(BaseModel):
+    # Отдельное согласие на трансграничную передачу: Telegram — иностранная компания.
+    consent: bool
+
+
+class TelegramLinkOut(BaseModel):
+    url: str
+    ttl_minutes: int

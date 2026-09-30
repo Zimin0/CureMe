@@ -46,6 +46,21 @@ class Settings(BaseSettings):
     # Сколько часов действует ссылка из письма.
     email_token_ttl_hours: int = 24
 
+    # Напоминания «скоро закончится» и «истекает срок» (reminders.py).
+    # Фоновые задачи внутри приложения: ежедневная рассылка и приём сообщений Telegram-бота.
+    background_jobs: bool = True
+    # В котором часу по Москве рассылать напоминания.
+    reminders_hour: int = 10
+    # Telegram-бот: токен от @BotFather и имя бота без @ (для ссылки t.me/имя). Пусто — Telegram выключен.
+    telegram_bot_token: str = ""
+    telegram_bot_username: str = ""
+    # Сколько минут действует ссылка привязки Telegram.
+    telegram_link_ttl_minutes: int = 60
+
+    @property
+    def telegram_enabled(self) -> bool:
+        return bool(self.telegram_bot_token and self.telegram_bot_username)
+
     @property
     def email_verification_required(self) -> bool:
         return self.email_verification if self.email_verification is not None else bool(self.smtp_host)

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { api, Category, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
+import { Reminders } from '../components/Reminders'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { avatarColor } from '../format'
 import { versionLabel } from '../version'
@@ -132,6 +133,8 @@ export function Family() {
           ))}
         </div>
       </section>
+
+      <Reminders />
 
       <section className="card stack">
         <h2>Аккаунт</h2>

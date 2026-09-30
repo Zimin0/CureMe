@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session, selectinload
 
+from .. import reminders
 from ..codes import parse_code
 from ..db import get_db
 from ..deps import current_user, get_family
@@ -173,6 +174,7 @@ def consume_medicine(
         raise HTTPException(400, "В аптечке не осталось годных упаковок")
     record_intake(db, med, user.id, body.amount - short, body.comment)
     db.commit()
+    reminders.nudge(fam.id)  # остаток мог опуститься до порога «Напомнить, когда останется»
     return _detail(db, fam, medicine_id, user)
 
 
@@ -206,6 +208,7 @@ def update_package(
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     db.commit()
+    reminders.nudge(fam.id)
     return _detail(db, fam, medicine_id, user)
 
 

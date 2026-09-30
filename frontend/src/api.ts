@@ -64,6 +64,22 @@ export interface Medicine extends MedicineFields {
   updated_at: string
 }
 
+/** Настройки напоминаний «скоро закончится» и «истекает срок» (backend: routers/notifications.py). */
+export interface NotificationPrefs {
+  available: boolean          // есть семья с Плюсом (или платная версия выключена)
+  email: string
+  email_possible: boolean     // на сайте настроена почта, адрес подтверждён
+  telegram_possible: boolean  // на сайте настроен Telegram-бот
+  telegram_bot: string | null
+  email_enabled: boolean
+  telegram_enabled: boolean
+  telegram_connected: boolean
+  telegram_name: string | null
+  notify_low: boolean
+  notify_expiry: boolean
+  expiry_days: number
+}
+
 export interface MedicineDetail extends Medicine { packages: Package[] }
 
 /** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */

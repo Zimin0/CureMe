@@ -19,6 +19,10 @@ services:
       CUREME_SMTP_USER: ${CUREME_SMTP_USER:-}
       CUREME_SMTP_PASSWORD: ${CUREME_SMTP_PASSWORD:-}
       CUREME_MAIL_FROM: ${CUREME_MAIL_FROM:-}
+      # Telegram-бот для напоминаний (DEPLOY.md, раздел 8). Пусто — напоминания только на почту.
+      CUREME_TELEGRAM_BOT_TOKEN: ${CUREME_TELEGRAM_BOT_TOKEN:-}
+      CUREME_TELEGRAM_BOT_USERNAME: ${CUREME_TELEGRAM_BOT_USERNAME:-}
+      CUREME_REMINDERS_HOUR: ${CUREME_REMINDERS_HOUR:-10}
     security_opt: ["no-new-privileges:true"]
   caddy:
     image: caddy:2-alpine
