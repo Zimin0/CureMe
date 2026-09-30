@@ -199,3 +199,8 @@ def test_version_bump_runs_version_checks_frontend_and_docker():
     s = st.select(["VERSION"])
     assert s.backend and s.backend_tests == ["integration/test_version.py"]
     assert s.frontend and not s.frontend_files and s.docker
+
+
+def test_pdf_font_change_runs_report_tests():
+    s = st.select(["backend/app/fonts/DejaVuSans.ttf"])
+    assert s.backend and "integration/test_reports.py" in s.backend_tests

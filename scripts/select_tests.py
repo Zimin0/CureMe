@@ -86,6 +86,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/files.py"],
         "tests": ["integration/test_files.py", "integration/test_access_control.py"],
     },
+    "Выписка для врача (PDF и Excel)": {
+        "sources": ["routers/reports.py", "doctor_report.py"],
+        "tests": ["integration/test_reports.py", "integration/test_access_control.py"],
+    },
     "Администрирование": {
         "sources": ["routers/admin.py"],
         "tests": [
@@ -309,6 +313,9 @@ def select(changed: list[str], full: bool = False, root: Path = ROOT) -> Selecti
         if match(p, BACKEND_MIGRATIONS):
             tests |= set(SECTIONS["Схема базы, миграции, перенос из SQLite"]["tests"])
             sections.add("Схема базы, миграции, перенос из SQLite")
+        if p.startswith(APP + "/fonts/"):  # шрифты PDF выписки для врача
+            tests |= set(SECTIONS["Выписка для врача (PDF и Excel)"]["tests"])
+            sections.add("Выписка для врача (PDF и Excel)")
         if p == "VERSION":  # номер версии читает version.py
             tests |= set(SECTIONS["Версия приложения"]["tests"])
             sections.add("Версия приложения")

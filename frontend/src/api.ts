@@ -253,6 +253,15 @@ export async function uploadFile<T>(path: string, file: Blob, filename = 'photo.
   return res.json()
 }
 
+/** Файл с сервера целиком (PDF, Excel) и его латинское имя из Content-Disposition. */
+export async function fetchFile(path: string, fallbackName: string): Promise<File> {
+  const res = await fetch(`/api${path}`, { headers: authHeaders() })
+  if (!res.ok) return failure(res)
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? fallbackName
+  const blob = await res.blob()
+  return new File([blob], name, { type: blob.type || res.headers.get('Content-Type') || '' })
+}
+
 /** Скачивание файла, для которого нужен токен: обычная ссылка его не передаст. */
 export async function fetchText(path: string): Promise<string> {
   const res = await fetch(`/api${path}`, { headers: authHeaders() })

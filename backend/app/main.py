@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from . import reminders
 from .config import get_settings
 from .db import SessionLocal
-from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications
+from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications, reports
 from .version import app_version
 
 settings = get_settings()
@@ -72,7 +72,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for r in (auth, families, categories, medicines, intakes, assist, files, admin, notifications):
+for r in (auth, families, categories, medicines, intakes, assist, files, reports, admin, notifications):
     app.include_router(r.router)
 
 
