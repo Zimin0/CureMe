@@ -145,6 +145,8 @@ ADMIN_ENDPOINTS = [
     ("GET", "/api/admin/indication-hints", None),
     ("PUT", "/api/admin/indication-hints", {"hints": ["кашель"]}),
     ("PUT", "/api/admin/families/{f}/plan", {"plan": "plus"}),
+    ("GET", "/api/admin/telegram", None),
+    ("PUT", "/api/admin/telegram", {"enabled": True}),
     ("GET", "/api/admin/debug", None),
     ("PUT", "/api/admin/debug", {"enabled": True}),
     ("GET", "/api/admin/billing", None),

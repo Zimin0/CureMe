@@ -22,6 +22,7 @@ from .db import get_db
 from .deps import family_membership
 from .models import AppSetting, Family, Medicine, Membership
 from .schemas import BillingSettings, PlanFeatureOut, PlanOut
+from .services import telegram_active
 
 FREE = "free"
 PLUS = "plus"
@@ -113,8 +114,17 @@ def limit_of(db: Session, family: Family, name: str) -> int | None:
     return None if has_plus(db, family) else FREE_LIMITS[name]
 
 
-def plus_required(feature: str, message: str | None = None) -> HTTPException:
+REMINDERS_WITH_TELEGRAM = "Напоминания в Telegram и на почту"
+REMINDERS_EMAIL_ONLY = "Напоминания на почту"  # пока Telegram выключен в админке, о нём не говорим
+
+
+def feature_title(feature: str, telegram_on: bool = False) -> str:
     title = FEATURES[feature][0]
+    return title if telegram_on or title != REMINDERS_WITH_TELEGRAM else REMINDERS_EMAIL_ONLY
+
+
+def plus_required(feature: str, message: str | None = None) -> HTTPException:
+    title = feature_title(feature)
     return HTTPException(
         status.HTTP_402_PAYMENT_REQUIRED,
         message or f"«{title}» доступно в Капсулке Плюс",
@@ -167,6 +177,7 @@ def plan_out(db: Session, family: Family) -> PlanOut:
     billing = billing_settings(db)
     enabled = billing.enabled
     plus = plus_active(family) or not enabled
+    tg_on = telegram_active(db)
     return PlanOut(
         plan=family.plan,
         plus_until=family.plus_until,
@@ -178,7 +189,7 @@ def plan_out(db: Session, family: Family) -> PlanOut:
         limits={k: (None if plus else v) for k, v in FREE_LIMITS.items()},
         free_limits=FREE_LIMITS,
         usage=usage(db, family),
-        features=[PlanFeatureOut(key=k, title=t, description=d, available=plus) for k, (t, d) in FEATURES.items()],
+        features=[PlanFeatureOut(key=k, title=feature_title(k, tg_on), description=d, available=plus) for k, (_, d) in FEATURES.items()],
     )
 
 
