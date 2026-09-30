@@ -37,7 +37,7 @@ export function Cabinets() {
   if (!me) return null
 
   return (
-    <section className="card stack">
+    <section className="card stack cabinets-card">
       <div className="card-head" style={{ marginBottom: 0 }}>
         <h2>Мои аптечки</h2>
         {!locked && <button className="btn sm" onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>}
