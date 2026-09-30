@@ -7,6 +7,7 @@ import { AuthProvider } from './auth'
 import { ToastProvider } from './components/ui'
 import { PlusProvider } from './plan'
 import '@fontsource-variable/manrope'
+import '@fontsource-variable/comfortaa'
 import './styles.css'
 
 const queryClient = new QueryClient({
