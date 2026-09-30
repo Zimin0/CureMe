@@ -64,39 +64,41 @@ export function DoctorReport() {
           onClick={() => openPlus('export_pdf')} text="PDF и Excel с историей приёма и сводкой по лекарствам доступны в Капсулке Плюс." />
       )}
 
-      {members.length > 1 && (
-        <label className="field"><span>Чья история</span>
-          <select className="input" value={who ?? ''} onChange={e => setMember(Number(e.target.value))}>
-            {members.map(m => <option key={m.user_id} value={m.user_id}>{m.user_id === me?.id ? `${m.name} (я)` : m.name}</option>)}
-          </select>
-          {who !== me?.id && <span className="hint">Комментарии к приёму видит только их автор, поэтому в выписке их не будет.</span>}
-        </label>
-      )}
+      <fieldset className="locked-block" disabled={!available('export_pdf')}>
+        {members.length > 1 && (
+          <label className="field"><span>Чья история</span>
+            <select className="input" value={who ?? ''} onChange={e => setMember(Number(e.target.value))}>
+              {members.map(m => <option key={m.user_id} value={m.user_id}>{m.user_id === me?.id ? `${m.name} (я)` : m.name}</option>)}
+            </select>
+            {who !== me?.id && <span className="hint">Комментарии к приёму видит только их автор, поэтому в выписке их не будет.</span>}
+          </label>
+        )}
 
-      <div className="field"><span>Период</span>
-        <div className="segmented" role="tablist">
-          {PERIODS.map(([k, label]) => (
-            <button key={k} type="button" role="tab" aria-selected={period === k} className={period === k ? 'on' : ''} onClick={() => setPeriod(k)}>{label}</button>
-          ))}
+        <div className="field"><span>Период</span>
+          <div className="segmented" role="tablist">
+            {PERIODS.map(([k, label]) => (
+              <button key={k} type="button" role="tab" aria-selected={period === k} className={period === k ? 'on' : ''} onClick={() => setPeriod(k)}>{label}</button>
+            ))}
+          </div>
         </div>
-      </div>
-      {period === 'custom' && (
-        <div className="row wrap" style={{ gap: 12 }}>
-          <label className="field grow"><span>С</span><input className="input" type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} /></label>
-          <label className="field grow"><span>По</span><input className="input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></label>
-        </div>
-      )}
+        {period === 'custom' && (
+          <div className="row wrap" style={{ gap: 12 }}>
+            <label className="field grow"><span>С</span><input className="input" type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} /></label>
+            <label className="field grow"><span>По</span><input className="input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></label>
+          </div>
+        )}
 
-      <div className="row wrap">
-        <button className="btn primary grow" disabled={badRange || busy !== null} onClick={() => get('pdf')}>
-          {busy === 'pdf' ? <Spinner /> : <FileText size={18} />}PDF
-        </button>
-        <button className="btn grow" disabled={badRange || busy !== null} onClick={() => get('xlsx')}>
-          {busy === 'xlsx' ? <Spinner /> : <FileSpreadsheet size={18} />}Excel
-        </button>
-        {ready && <button className="btn ghost" onClick={() => shareFile(ready)}><Share2 size={18} />Отправить</button>}
-      </div>
-      <p className="small faint">Выписка составлена по вашим отметкам в приложении и не является медицинским документом.</p>
+        <div className="row wrap">
+          <button className="btn primary grow" disabled={badRange || busy !== null} onClick={() => get('pdf')}>
+            {busy === 'pdf' ? <Spinner /> : <FileText size={18} />}PDF
+          </button>
+          <button className="btn grow" disabled={badRange || busy !== null} onClick={() => get('xlsx')}>
+            {busy === 'xlsx' ? <Spinner /> : <FileSpreadsheet size={18} />}Excel
+          </button>
+          {ready && <button className="btn ghost" onClick={() => shareFile(ready)}><Share2 size={18} />Отправить</button>}
+        </div>
+        <p className="small faint">Выписка составлена по вашим отметкам в приложении и не является медицинским документом.</p>
+      </fieldset>
     </section>
   )
 }
