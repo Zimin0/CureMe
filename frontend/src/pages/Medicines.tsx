@@ -71,7 +71,7 @@ export function Medicines() {
             <button key={f.id} className={`chip ${filter === f.id ? 'active' : ''}`} onClick={() => set('filter', f.id)}>{f.label}</button>
           ))}
         </div>
-        <div className="chips">
+        <div className="chips wrap-desktop">
           <button className={`chip ${!cat ? 'active' : ''}`} onClick={() => set('category', '')}>Все категории</button>
           {cats.data?.filter(c => c.medicine_count > 0).map(c => (
             <button key={c.id} className={`chip ${cat === String(c.id) ? 'active' : ''}`} onClick={() => set('category', String(c.id))}>
