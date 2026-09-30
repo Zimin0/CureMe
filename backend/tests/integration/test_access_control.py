@@ -39,6 +39,8 @@ FAMILY_ENDPOINTS = [
     ("POST", "/api/families/{f}/scan", {"raw": "4601669002013"}),
     ("GET", "/api/families/{f}/export.txt", None),
     ("GET", "/api/families/{f}/plan", None),
+    ("GET", "/api/families/{f}/report.pdf", None),
+    ("GET", "/api/families/{f}/report.xlsx?member={u}", None),
 ]
 IDS = [f"{m} {p}" for m, p, _ in FAMILY_ENDPOINTS]
 
