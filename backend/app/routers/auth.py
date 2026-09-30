@@ -7,6 +7,7 @@ from ..deps import signed_in_user
 from ..email_verification import issue_token, mark_verified, needs_verification, send_verification, user_by_token, verification_link
 from ..legal import CONSENT_VERSION
 from ..models import Family, Membership, User, utcnow
+from ..plans import own_families_left
 from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
 from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
@@ -34,6 +35,7 @@ def me_out(user: User, db: Session) -> MeOut:
         email_verified=user.email_verified_at is not None,
         verification_needed=needs_verification(user),
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
+        own_families_left=own_families_left(db, user.id),
     )
 
 

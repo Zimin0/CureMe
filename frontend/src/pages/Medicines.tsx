@@ -4,6 +4,7 @@ import { useDeferredValue } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, Category, Medicine } from '../api'
 import { useFamilyPath } from '../auth'
+import { CabinetSelect } from '../components/Cabinets'
 import { MedicineCard } from '../components/MedicineCard'
 import { Empty, PageLoader } from '../components/ui'
 
@@ -46,6 +47,7 @@ export function Medicines() {
       <div className="page-head">
         <div>
           <h1>Аптечка</h1>
+          <CabinetSelect />
           <p className="sub">{meds.data ? `${meds.data.length} в списке` : ' '}</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
