@@ -30,7 +30,7 @@ export function Layout() {
         {me && me.families.length > 1 && (
           <label className="family-switch small">
             <span className="muted">Аптечка семьи</span>
-            <select value={familyId ?? ''} onChange={e => setFamilyId(Number(e.target.value))}>
+            <select value={familyId ?? ''} title={me.families.find(f => f.id === familyId)?.name} onChange={e => setFamilyId(Number(e.target.value))}>
               {me.families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </label>
