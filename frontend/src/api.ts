@@ -3,7 +3,7 @@ export type Role = 'owner' | 'member'
 export type StockStatus = 'ok' | 'low' | 'out' | 'expiring' | 'expired'
 
 export interface FamilyBrief { id: number; name: string; role: Role }
-export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[] }
+export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[]; own_families_left?: number | null }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 export interface Family { id: number; name: string; invite_code: string; role: Role; members: Member[] }
 /** Публичные сведения о приглашении. full — в бесплатной семье уже предел участников, вступить нельзя. */
@@ -86,6 +86,22 @@ export interface Medicine extends MedicineFields {
   updated_at: string
 }
 
+/** Настройки напоминаний «скоро закончится» и «истекает срок» (backend: routers/notifications.py). */
+export interface NotificationPrefs {
+  available: boolean          // есть семья с Плюсом (или платная версия выключена)
+  email: string
+  email_possible: boolean     // на сайте настроена почта, адрес подтверждён
+  telegram_possible: boolean  // на сайте настроен Telegram-бот
+  telegram_bot: string | null
+  email_enabled: boolean
+  telegram_enabled: boolean
+  telegram_connected: boolean
+  telegram_name: string | null
+  notify_low: boolean
+  notify_expiry: boolean
+  expiry_days: number
+}
+
 export interface MedicineDetail extends Medicine { packages: Package[] }
 
 /** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */
@@ -102,6 +118,9 @@ export interface Intake {
   taken_at: string
   last_at: string
 }
+
+/** Сколько записей истории скрыто без Плюса (history_since: null — видна вся история). */
+export interface OlderHistory { history_since: string | null; hidden: number }
 
 export interface PackageInput {
   quantity: number

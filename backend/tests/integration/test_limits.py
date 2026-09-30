@@ -99,7 +99,11 @@ def test_family_over_limit_keeps_its_data(client, db, owner):
 def test_limit_is_per_family(client, db, owner):
     h, _, f = owner
     fill_medicines(db, f, FREE_MAX_MEDICINES)
-    dacha = client.post("/api/families", headers=h, json={"name": "Дача"}).json()["id"]
+    # Вторая своя аптечка в бесплатной версии закрыта (test_families.py), поэтому
+    # аптечку на даче заводит бабушка и зовёт в неё владельца.
+    hg, g = register(client, "granny@example.com", "Бабушка")
+    dacha = g["families"][0]["id"]
+    assert client.post("/api/families/join", headers=h, json={"code": invite_code(client, hg, dacha)}).status_code == 200
     assert add(client, h, dacha).status_code == 201
 
 

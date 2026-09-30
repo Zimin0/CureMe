@@ -97,6 +97,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
             "integration/test_email_verification.py", "integration/test_plans.py",
         ],
     },
+    "Напоминания: почта и Telegram": {
+        "sources": ["reminders.py", "telegram.py", "routers/notifications.py"],
+        "tests": ["integration/test_reminders.py", "integration/test_access_control.py"],
+    },
     "Тарифы: Бесплатный и Плюс": {
         "sources": ["plans.py"],
         "tests": ["integration/test_plans.py", "integration/test_access_control.py"],

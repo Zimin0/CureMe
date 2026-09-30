@@ -28,6 +28,7 @@ FAMILY_ENDPOINTS = [
     ("PUT", "/api/families/{f}/medicines/{m}/mark", {"is_favorite": True}),
     ("POST", "/api/families/{f}/medicines/{m}/consume", {"amount": 1}),
     ("GET", "/api/families/{f}/intakes", None),
+    ("GET", "/api/families/{f}/intakes/older", None),
     ("PATCH", "/api/families/{f}/intakes/{i}", {"comment": "X"}),
     ("POST", "/api/families/{f}/medicines/{m}/packages", {"quantity": 1}),
     ("PATCH", "/api/families/{f}/medicines/{m}/packages/{p}", {"quantity": 1}),
@@ -109,6 +110,11 @@ def test_account_endpoints_require_login(client):
     assert client.post("/api/families", json={"name": "X"}).status_code == 401
     assert client.post("/api/families/join", json={"code": "X"}).status_code == 401
     assert client.get("/api/indication-hints").status_code == 401
+    assert client.get("/api/notifications").status_code == 401
+    assert client.put("/api/notifications", json={"notify_low": False}).status_code == 401
+    assert client.post("/api/notifications/telegram/link", json={"consent": True}).status_code == 401
+    assert client.delete("/api/notifications/telegram").status_code == 401
+    assert client.post("/api/notifications/test").status_code == 401
 
 
 # --- админка -------------------------------------------------------------------
