@@ -1,8 +1,8 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { Search, X } from 'lucide-react'
+import { Lock, Search, X } from 'lucide-react'
 import { useDeferredValue } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, Family, Intake } from '../api'
+import { api, Family, Intake, OlderHistory } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { IntakeList } from '../components/IntakeList'
 import { Empty, PageLoader } from '../components/ui'
@@ -54,7 +54,19 @@ export function History() {
     getNextPageParam: last => (last.length === PAGE ? last.at(-1)!.taken_at : undefined),
     placeholderData: prev => prev,
   })
+  // Без Плюса видны последние 30 дней; более ранние записи скрыты, но не удалены.
+  const olderQs = medicine ? `?medicine_id=${medicine}` : ''
+  const older = useQuery({
+    queryKey: ['intakes-older', fam(''), olderQs],
+    queryFn: () => api<OlderHistory>(fam(`/intakes/older${olderQs}`)),
+  })
   const items = q.data?.pages.flat() ?? []
+  const locked = !q.hasNextPage && !!older.data?.hidden && (
+    <div className="plus-note" role="note">
+      <Lock size={16} />
+      <span>Более ранняя история доступна в Капсулке Плюс. Записи не удалены: они появятся, как только семья подключит Плюс.</span>
+    </div>
+  )
   const medName = medicine ? items.find(i => String(i.medicine_id) === medicine)?.medicine_name : null
 
   return (
@@ -104,6 +116,7 @@ export function History() {
               text="Нажмите «Принял(а)» на странице лекарства, и приём появится здесь."
               action={<Link className="btn" to="/medicines">К аптечке</Link>} />
           )}
+          {locked}
         </div>
       ) : (
         <section className="card">
@@ -113,6 +126,7 @@ export function History() {
               Показать ещё
             </button>
           )}
+          {locked}
         </section>
       )}
     </div>

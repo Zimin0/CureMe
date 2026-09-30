@@ -39,6 +39,7 @@ it('общая история: по дням, фильтры и дописать
       ])
     }),
     http.get('/api/families/7', () => HttpResponse.json(FAMILY)),
+    http.get('/api/families/7/intakes/older', () => HttpResponse.json({ history_since: null, hidden: 0 })),
     http.patch('/api/families/7/intakes/2', () => HttpResponse.json({}, { status: 403 })),
     http.patch('/api/families/7/intakes/3', async ({ request }) => {
       patched.push(await request.json())
@@ -73,6 +74,7 @@ it('поиск по истории: текст, участник, период �
   const asked: URLSearchParams[] = []
   server.use(
     http.get('/api/families/7', () => HttpResponse.json(FAMILY)),
+    http.get('/api/families/7/intakes/older', () => HttpResponse.json({ history_since: null, hidden: 0 })),
     http.get('/api/families/7/intakes', ({ request }) => {
       const p = new URL(request.url).searchParams
       asked.push(p)
@@ -141,4 +143,14 @@ it('в меню «История приёма» вместо «Экспорт»,
   expect(within(nav).queryByRole('link', { name: 'Экспорт' })).toBeNull()
   await user.click(await screen.findByRole('link', { name: 'Экспорт' }))
   expect(location()).toBe('/export')
+})
+
+it('без Плюса внизу истории замочек: ранние записи скрыты, но не удалены', async () => {
+  server.use(
+    http.get('/api/families/7', () => HttpResponse.json(FAMILY)),
+    http.get('/api/families/7/intakes', () => HttpResponse.json([intake()])),
+    http.get('/api/families/7/intakes/older', () => HttpResponse.json({ history_since: new Date().toISOString(), hidden: 12 })),
+  )
+  renderApp('/history')
+  expect(await screen.findByRole('note')).toHaveTextContent('Более ранняя история доступна в Капсулке Плюс')
 })
