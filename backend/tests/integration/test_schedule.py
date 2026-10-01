@@ -189,7 +189,7 @@ def test_create_needs_plus_but_existing_stays(client, med, db):
     db.commit()  # теперь у семьи free
     r = client.post(f"/api/families/{f}/schedule", headers=h, json={"medicine_id": mid, "times": [480]})
     assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "schedule"
-    r = client.post(f"/api/families/{f}/schedule/{s['id']}/slots", headers=h, json={"times": [600]})
+    r = client.post(f"/api/families/{f}/schedule/{s['id']}/slots", headers=h, json={"days": [0], "times": [600]})
     assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "schedule"
     assert client.get(f"/api/families/{f}/schedule", headers=h).json()[0]["id"] == s["id"]
     assert client.delete(f"/api/families/{f}/schedule/{s['id']}", headers=h).status_code == 204
