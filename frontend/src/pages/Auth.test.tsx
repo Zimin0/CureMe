@@ -145,6 +145,12 @@ describe('согласие на обработку данных', () => {
     expect(screen.getByText(/Telegram FZ-LLC/)).toBeInTheDocument()
   })
 
+  it('согласие доверенного лица открывается без входа', async () => {
+    renderApp('/consent-trusted', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: 'Согласие доверенного лица на получение писем и обработку его данных' })).toBeInTheDocument()
+    expect(screen.getByText(/ч\. 3 ст\. 18/)).toBeInTheDocument()
+  })
+
   it('удаление аккаунта просит пароль и выходит', async () => {
     let body: unknown
     server.use(
