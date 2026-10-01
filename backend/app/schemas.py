@@ -511,3 +511,112 @@ class TelegramLinkIn(BaseModel):
 class TelegramLinkOut(BaseModel):
     url: str
     ttl_minutes: int
+
+
+# --- расписание приёма ---
+MAX_TIMES = 12          # приёмов в день у одного назначения
+MAX_SCHEDULES = 100     # назначений у одного человека
+
+
+def _check_days(days: list[int]) -> list[int]:
+    if any(d < 0 or d > 6 for d in days):
+        raise ValueError("День недели — число от 0 (понедельник) до 6 (воскресенье)")
+    return sorted(set(days))
+
+
+def _check_times(times: list[int]) -> list[int]:
+    if any(t < 0 or t > 1439 for t in times):
+        raise ValueError("Время — число минут от полуночи, от 0 до 1439")
+    return sorted(set(times))
+
+
+class SlotOut(BaseModel):
+    id: int
+    weekday: int                  # 0 — понедельник
+    minute: int                   # минут от полуночи по Москве
+
+
+class ScheduleOut(BaseModel):
+    id: int
+    medicine_id: int | None       # None — лекарство уже удалили из аптечки
+    medicine_name: str
+    unit: str
+    amount: float
+    start_date: date
+    end_date: date | None
+    every_weeks: int
+    slots: list[SlotOut]
+
+
+class ScheduleCreate(BaseModel):
+    """Дни × время: «пн, ср, пт» и «08:00, 20:00» дают шесть приёмов в неделю."""
+
+    medicine_id: int
+    amount: float = Field(default=1, gt=0, le=1_000_000)
+    days: list[int] = Field(default=list(range(7)), min_length=1, max_length=7)  # по умолчанию — каждый день
+    times: list[int] = Field(min_length=1, max_length=MAX_TIMES)
+    start_date: date | None = None                                              # по умолчанию — сегодня
+    end_date: date | None = None
+    every_weeks: int = Field(default=1, ge=1, le=12)
+
+    _days = field_validator("days")(_check_days)
+    _times = field_validator("times")(_check_times)
+
+    @model_validator(mode="after")
+    def _dates(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("Дата окончания раньше даты начала")
+        return self
+
+
+class ScheduleUpdate(BaseModel):
+    amount: float | None = Field(default=None, gt=0, le=1_000_000)
+    start_date: date | None = None
+    end_date: date | None = None
+    every_weeks: int | None = Field(default=None, ge=1, le=12)
+
+
+class SlotsIn(BaseModel):
+    """Добавить приёмы (дни × время) к существующему назначению."""
+
+    days: list[int] = Field(min_length=1, max_length=7)
+    times: list[int] = Field(min_length=1, max_length=MAX_TIMES)
+
+    _days = field_validator("days")(_check_days)
+    _times = field_validator("times")(_check_times)
+
+
+class SlotsRemove(BaseModel):
+    """Убрать приёмы серией: все, что попадают на выбранные дни и время.
+
+    Пустой days — любой день, пустой times — любое время. «Больше не пью по вторникам в 16:00» —
+    это days=[1], times=[960]; «совсем не пью по вторникам» — days=[1], times=[].
+    """
+
+    days: list[int] = Field(default_factory=list, max_length=7)
+    times: list[int] = Field(default_factory=list, max_length=24 * 60)
+
+    _days = field_validator("days")(_check_days)
+    _times = field_validator("times")(_check_times)
+
+
+class SlotMove(BaseModel):
+    """Перетащить один приём на другой день и/или время."""
+
+    weekday: int | None = Field(default=None, ge=0, le=6)
+    minute: int | None = Field(default=None, ge=0, le=1439)
+
+
+class OccurrenceOut(BaseModel):
+    """Конкретный приём на конкретную дату и отметка, принят ли он (по истории приёма)."""
+
+    schedule_id: int
+    slot_id: int
+    medicine_id: int | None
+    medicine_name: str
+    unit: str
+    amount: float
+    date: date
+    minute: int
+    taken: bool
+    taken_at: datetime | None
