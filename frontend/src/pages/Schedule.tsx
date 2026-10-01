@@ -83,7 +83,7 @@ export function Schedule() {
           <h1>Расписание</h1>
           <p className="sub">Назначенные таблетки: что, когда и сколько принимать.</p>
         </div>
-        <button className="btn primary" onClick={() => setEditor('new')}><Plus size={18} />Добавить</button>
+        <button className={`btn ${locked ? 'plus-cta' : 'primary'}`} onClick={() => setEditor('new')}><Plus size={18} />Добавить</button>
       </div>
 
       {list.length === 0 && <ScheduleNotify />}
