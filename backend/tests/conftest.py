@@ -45,6 +45,12 @@ def pytest_collection_modifyitems(items):
             item.add_marker(level)
 
 
+@pytest.fixture(autouse=True)
+def no_trial_by_default(monkeypatch):
+    """Новые аккаунты в тестах бесплатные: пробный Плюс включает только test_trial.py (фикстура trial_on)."""
+    monkeypatch.setattr("app.plans.DEFAULT_TRIAL_DAYS", 0)
+
+
 @pytest.fixture
 def engine(tmp_path):
     url = TEST_DATABASE_URL or f"sqlite:///{tmp_path / 'test.db'}"

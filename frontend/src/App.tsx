@@ -21,12 +21,14 @@ import { Trusted } from './pages/Trusted'
 import { Schedule } from './pages/Schedule'
 import { NoFamily } from './pages/NoFamily'
 import { Plus } from './pages/Plus'
+import { Landing } from './pages/Landing'
 import { versionLabel } from './version'
 
 function Protected() {
   const { me, loading, familyId } = useAuth()
   const loc = useLocation()
   if (loading) return <PageLoader />
+  if (!me && loc.pathname === '/') return <Landing />  // гостям на главном адресе — приветственная страница
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   if (me.access_blocked) return <ClosedGate />
   if (me.consent_needed) return <ConsentGate />

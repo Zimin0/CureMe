@@ -12,6 +12,30 @@ const EMPTY_OVERVIEW: Overview = {
 const location = () => screen.getByTestId('location').textContent
 
 describe('маршрутизация и доступ', () => {
+  it('гостю на главном адресе показывает приветственную страницу с кнопкой «Попробовать»', async () => {
+    server.use(http.get('/api/auth/access', () => HttpResponse.json({ closed: false, trial_days: 5 })))
+    renderApp('/', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: /Домашняя аптечка, в которой всё под контролем/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Попробовать бесплатно' })[0]).toHaveAttribute('href', '/register')
+    expect(await screen.findByText(/5 дней Капсулки Плюс в подарок/)).toBeInTheDocument()
+    expect(screen.queryByText(/Стоимость Плюса/)).not.toBeInTheDocument()
+  })
+
+  it('на приветственной странице цена Плюса идёт с пометкой «не оферта», пробный срок 0 не рекламируется', async () => {
+    server.use(http.get('/api/auth/access', () => HttpResponse.json({ closed: false, trial_days: 0, price_month: 149, price_year: 990 })))
+    renderApp('/', { loggedIn: false })
+    expect(await screen.findByText(/149 ₽ в месяц или 990 ₽ в год/)).toBeInTheDocument()
+    expect(screen.getByText(/не является публичной офертой/)).toBeInTheDocument()
+    expect(screen.queryByText(/в подарок/)).not.toBeInTheDocument()
+  })
+
+  it('в закрытом режиме кнопка ведёт ко входу', async () => {
+    server.use(http.get('/api/auth/access', () => HttpResponse.json({ closed: true, trial_days: 5 })))
+    renderApp('/', { loggedIn: false })
+    const links = await screen.findAllByRole('link', { name: 'Войти' })
+    expect(links.every(l => l.getAttribute('href') === '/login')).toBe(true)
+  })
+
   it('гостя отправляет на вход и запоминает, куда он шёл', async () => {
     renderApp('/medicines?filter=low', { loggedIn: false })
     expect(await screen.findByRole('heading', { name: 'С возвращением' })).toBeInTheDocument()
@@ -33,7 +57,7 @@ describe('маршрутизация и доступ', () => {
   it('протухший токен разлогинивает', async () => {
     localStorage.setItem('cureme.token', 'old')
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ detail: 'Нужно войти в аккаунт' }, { status: 401 })))
-    renderApp('/', { loggedIn: false })
+    renderApp('/login', { loggedIn: false })
     expect(await screen.findByRole('heading', { name: 'С возвращением' })).toBeInTheDocument()
     expect(localStorage.getItem('cureme.token')).toBeNull()
   })

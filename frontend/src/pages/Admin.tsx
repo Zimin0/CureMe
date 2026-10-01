@@ -531,7 +531,7 @@ function DebugTab() {
 }
 
 // ---------- тарифы ----------
-type Billing = { enabled: boolean; price_month: number | null; price_year: number | null }
+type Billing = { enabled: boolean; price_month: number | null; price_year: number | null; trial_days: number }
 
 const planText = (f: { plan: PlanName; plus_until: string | null; plus_active: boolean }) =>
   f.plus_active ? (f.plus_until ? `Плюс до ${fmtDate(f.plus_until)}` : 'Плюс бессрочно')
@@ -546,19 +546,22 @@ function PlansTab() {
   const [q, setQ] = useState('')
   const [edit, setEdit] = useState<AdminUser | null>(null)
   const [prices, setPrices] = useState<{ month: string; year: string } | null>(null)
+  const [trial, setTrial] = useState<string | null>(null)
   useEffect(() => {
     if (billing.data && prices === null) {
       setPrices({ month: billing.data.price_month?.toString() ?? '', year: billing.data.price_year?.toString() ?? '' })
     }
-  }, [billing.data, prices])
+    if (billing.data && trial === null) setTrial(String(billing.data.trial_days))
+  }, [billing.data, prices, trial])
 
   const save = useMutation({
     mutationFn: (b: Billing) => api<Billing>('/admin/billing', { method: 'PUT', body: b }),
     onSuccess: (b, sent) => {
+      const trialChanged = sent.trial_days !== billing.data?.trial_days
       const priceChanged = sent.price_month !== billing.data?.price_month || sent.price_year !== billing.data?.price_year
       qc.setQueryData(['admin', 'billing'], b)
       qc.invalidateQueries({ queryKey: ['plan'] })
-      toast(priceChanged ? 'Стоимость сохранена'
+      toast(trialChanged ? 'Пробный срок сохранён' : priceChanged ? 'Стоимость сохранена'
         : b.enabled ? 'Платная версия включена' : 'Платная версия выключена: всем доступно всё')
     },
     onError: (e: Error) => toast(e.message, 'error'),
@@ -601,6 +604,21 @@ function PlansTab() {
           </div>
           <span className="muted small">Показывается на странице «Капсулка Плюс» и в шторке. Пустое поле — эта цена не показывается. Пока нет оплаты, цена указана только для сведения.</span>
           <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={save.isPending}>Сохранить стоимость</button>
+        </form>
+      )}
+      {trial !== null && (
+        <form className="card stack" style={{ padding: 16 }} onSubmit={(e: FormEvent) => {
+          e.preventDefault()
+          const n = Math.round(Number(trial))
+          if (!Number.isFinite(n) || n < 0 || n > 90) { toast('Срок от 0 до 90 дней', 'error'); return }
+          save.mutate({ ...billing.data!, trial_days: n })
+        }}>
+          <b>Пробный Плюс новым аккаунтам</b>
+          <label className="field"><span>Дней в подарок</span>
+            <input className="input" type="number" min={0} max={90} inputMode="numeric" value={trial} onChange={e => setTrial(e.target.value)} />
+          </label>
+          <span className="muted small">Выдаётся один раз на аккаунт, когда человек подтвердил почту (если проверка почты выключена, при регистрации). Потом аккаунт возвращается на бесплатный тариф, деньги не списываются. 0 — подарок выключен. Срок читается при выдаче: уже выданные не меняются. Условия показываются на приветственной странице.</span>
+          <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={save.isPending}>Сохранить срок</button>
         </form>
       )}
       <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'аккаунта', 'аккаунтов', 'аккаунтов')}. Нажмите на человека, чтобы включить или продлить Плюс вручную. Плюс действует на все аптечки, где он главный владелец (самый ранний владелец семьи); платящий участник чужой аптечки ей Плюс не даёт.</p>

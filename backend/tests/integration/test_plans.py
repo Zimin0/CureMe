@@ -19,7 +19,7 @@ def admin(client):
 
 
 def enable_billing(client, h, on=True):
-    r = client.put("/api/admin/billing", headers=h, json={"enabled": on})
+    r = client.put("/api/admin/billing", headers=h, json={"enabled": on, "trial_days": 0})
     assert r.status_code == 200 and r.json()["enabled"] is on
 
 
@@ -202,13 +202,13 @@ def test_plus_feature_dependency_returns_402_with_header(client, admin, session_
 def test_admin_sets_plus_price_and_family_sees_it(client, admin):
     h, f = admin
     assert client.get(f"/api/families/{f}/plan", headers=h).json()["price_month"] is None
-    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "price_month": 149, "price_year": 990})
+    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "price_month": 149, "price_year": 990, "trial_days": 0})
     assert r.status_code == 200
-    assert client.get("/api/admin/billing", headers=h).json() == {"enabled": False, "price_month": 149, "price_year": 990}
+    assert client.get("/api/admin/billing", headers=h).json() == {"enabled": False, "price_month": 149, "price_year": 990, "trial_days": 0}
     p = client.get(f"/api/families/{f}/plan", headers=h).json()
     assert (p["price_month"], p["price_year"]) == (149, 990)
     # переключатель не стирает цену, если фронтенд прислал её обратно; пустая цена убирается
-    client.put("/api/admin/billing", headers=h, json={"enabled": True, "price_month": 149, "price_year": None})
+    client.put("/api/admin/billing", headers=h, json={"enabled": True, "price_month": 149, "price_year": None, "trial_days": 0})
     p = client.get(f"/api/families/{f}/plan", headers=h).json()
     assert p["billing_enabled"] and p["price_month"] == 149 and p["price_year"] is None
 

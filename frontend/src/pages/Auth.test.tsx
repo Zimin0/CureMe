@@ -160,7 +160,7 @@ describe('согласие на обработку данных', () => {
     await user.click(await screen.findByRole('button', { name: 'Удалить аккаунт' }))
     await user.type(screen.getByLabelText('Пароль для подтверждения'), 'secret123')
     await user.click(screen.getByRole('button', { name: 'Удалить навсегда' }))
-    await waitFor(() => expect(location()).toMatch(/^\/login/))
+    expect(await screen.findByRole('heading', { name: /Домашняя аптечка/ })).toBeInTheDocument()  // после выхода гость видит приветственную страницу
     expect(body).toEqual({ password: 'secret123' })
   })
 })

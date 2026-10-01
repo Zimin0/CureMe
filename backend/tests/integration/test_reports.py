@@ -115,7 +115,7 @@ def test_stranger_is_not_a_member(client, fam):
 
 def test_plus_only_when_billing_on(client, fam):
     f, h = fam["f"], fam["h"]
-    assert client.put("/api/admin/billing", headers=h, json={"enabled": True}).status_code == 200
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": True, "trial_days": 0}).status_code == 200
     for ext in ("pdf", "xlsx"):
         r = client.get(f"/api/families/{f}/report.{ext}", headers=h)
         assert r.status_code == 402 and r.headers["x-plus-feature"] == "export_pdf"
