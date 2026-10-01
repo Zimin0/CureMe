@@ -7,6 +7,7 @@ import { useFamilyPath } from '../auth'
 import { COURSES, EVERY_DAY, addDays, mskToday } from '../schedule'
 import { DayChips, TimesPicker } from './SchedulePickers'
 import { Stepper } from './QuantityInput'
+import { PlusBanner, usePlan } from '../plan'
 import { Sheet, useToast } from './ui'
 
 /**
@@ -19,6 +20,8 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const qc = useQueryClient()
   const toast = useToast()
   const editing = !!schedule
+  const { available } = usePlan()
+  const locked = !editing && !available('schedule')
   const [medId, setMedId] = useState<number | null>(schedule?.medicine_id ?? null)
   const [search, setSearch] = useState('')
   const [amount, setAmount] = useState(schedule?.amount ?? 1)
@@ -51,6 +54,11 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   return (
     <Sheet title={editing ? `Расписание: ${schedule.medicine_name}` : 'Добавить в расписание'} onClose={onClose}>
       <div className="stack lg">
+        {locked && (
+          <PlusBanner testId="plus-banner" title="Расписание — в Капсулке Плюс" to="/plus" cta="Узнать про Плюс"
+            text="Подключите Плюс, и можно будет добавлять приёмы в расписание. Уже созданное останется." />
+        )}
+        <fieldset className="locked-block stack lg" disabled={locked}>
         {!editing && (
           <section className="stack" style={{ gap: 8 }}>
             <h3>1. Лекарство из аптечки</h3>
@@ -106,6 +114,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
         <button className="btn primary block" disabled={!ready || save.isPending} onClick={() => save.mutate()}>
           {editing ? 'Сохранить' : 'Добавить в расписание'}
         </button>
+        </fieldset>
       </div>
     </Sheet>
   )

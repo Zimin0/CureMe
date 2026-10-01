@@ -13,6 +13,7 @@ export const FEATURE_TITLES: Record<PlusFeature, string> = {
   full_history: 'Вся история приёма',
   export_pdf: 'Экспорт в PDF и Excel для врача',
   cabinets: 'Несколько своих аптечек',
+  schedule: 'Расписание приёма',
   no_limits: 'Без лимитов',
 }
 

@@ -179,3 +179,15 @@ def test_occurrences_range_limit(client, med):
     r = client.get(f"/api/families/{f}/schedule/occurrences", headers=h,
                    params={"since": "2026-10-01", "until": "2026-12-01"})
     assert r.status_code == 400
+
+
+def test_create_needs_plus_but_existing_stays(client, med, db):
+    from app.models import AppSetting
+    h, _, f, mid = med
+    s = create(client, h, f, mid)  # платная версия выключена: всем можно
+    db.add(AppSetting(key="billing", value={"enabled": True}))
+    db.commit()  # теперь у семьи free
+    r = client.post(f"/api/families/{f}/schedule", headers=h, json={"medicine_id": mid, "times": [480]})
+    assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "schedule"
+    assert client.get(f"/api/families/{f}/schedule", headers=h).json()[0]["id"] == s["id"]
+    assert client.delete(f"/api/families/{f}/schedule/{s['id']}", headers=h).status_code == 204
