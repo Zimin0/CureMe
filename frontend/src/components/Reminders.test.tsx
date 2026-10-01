@@ -48,8 +48,11 @@ it('без Плюса показывает замочек и не даёт вк�
   renderWithProviders(<Reminders />)
   expect(await screen.findByText('Узнать про Плюс')).toHaveAttribute('href', '/plus')
   expect(screen.getByTestId('plus-banner')).toBeInTheDocument()
-  expect(screen.getByLabelText(/На почту/)).toBeDisabled()
-  expect(screen.getByText('Подключить Telegram')).toBeDisabled()
+  // В бесплатной версии настроек нет совсем: только описание и баннер Плюса.
+  expect(screen.queryByText('Куда')).not.toBeInTheDocument()
+  expect(screen.queryByText('О чём')).not.toBeInTheDocument()
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
 it('если на сайте нет почты и бота — объясняет это', async () => {

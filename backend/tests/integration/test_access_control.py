@@ -144,7 +144,7 @@ ADMIN_ENDPOINTS = [
     ("DELETE", "/api/admin/categories/{c}", None),
     ("GET", "/api/admin/indication-hints", None),
     ("PUT", "/api/admin/indication-hints", {"hints": ["кашель"]}),
-    ("PUT", "/api/admin/families/{f}/plan", {"plan": "plus"}),
+    ("PUT", "/api/admin/users/{u}/plan", {"plan": "plus"}),
     ("GET", "/api/admin/telegram", None),
     ("PUT", "/api/admin/telegram", {"enabled": True}),
     ("GET", "/api/admin/debug", None),

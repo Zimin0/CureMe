@@ -1,6 +1,6 @@
 """Семьи: приглашения, роли, выход из семьи."""
 
-from tests.conftest import fid, register
+from tests.conftest import fid, grant_plus, register
 
 
 def invite_code(client, h, family_id):
@@ -139,8 +139,8 @@ def test_free_plan_allows_one_own_cabinet(client, owner):
 def test_plus_in_own_family_unlocks_more_cabinets(client, owner):
     h, _, first = owner
     enable_billing(client, h)
-    assert client.put(f"/api/admin/families/{first}/plan", headers=h, json={"plan": "plus", "plus_until": None}).status_code == 200
-    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] is None
+    grant_plus(client, h, first)
+    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] == 4  # потолок Плюса 5, одна уже есть
     assert client.post("/api/families", headers=h, json={"name": "Дача"}).status_code == 201
     assert client.post("/api/families", headers=h, json={"name": "Машина"}).status_code == 201
 

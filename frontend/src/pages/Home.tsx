@@ -69,6 +69,14 @@ export function Home() {
         <Link to="/medicines?filter=expired" className={`stat ${data.expired.length ? 'danger' : ''}`}><span className="label"><AlertTriangle size={15} />Просрочено</span><span className="value">{data.expired.length}</span></Link>
       </div>
 
+      <section className="brand-card" aria-label="О приложении">
+        <img src="/icon.svg" alt="" />
+        <div>
+          <div className="brand-name">Капсулка</div>
+          <div className="small muted">Домашняя аптечка всей семьи</div>
+        </div>
+      </section>
+
       <div className="two-col">
         <section>
           <div className="section-title"><h2>Требует внимания</h2>{attention > 0 && <Link to="/medicines?filter=attention">Все</Link>}</div>

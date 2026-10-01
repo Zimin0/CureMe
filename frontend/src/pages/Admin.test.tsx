@@ -127,10 +127,10 @@ describe('админка: закрытый режим', () => {
     await waitFor(() => expect(body).toEqual({ closed: true, user_ids: [2] }))
   })
 
-  it('тарифы: включение платной версии и Плюс семье со сроком', async () => {
-    const fam = {
-      id: 7, name: 'Семья Никиты', invite_code: 'ABC', created_at: '2026-09-26T10:00:00Z', medicine_count: 3,
-      members: [{ user_id: 1, name: 'Никита', email: 'nikita@example.com', role: 'owner', joined_at: '2026-09-26T10:00:00Z' }],
+  it('тарифы: включение платной версии и Плюс аккаунту со сроком', async () => {
+    const person = {
+      id: 1, name: 'Никита', email: 'nikita@example.com', is_admin: true, email_verified: true, created_at: '2026-09-26T10:00:00Z',
+      families: [{ id: 7, name: 'Семья Никиты', role: 'owner' }, { id: 8, name: 'С собой', role: 'owner' }],
       plan: 'free', plus_until: null, plus_active: false,
     }
     let billing: Record<string, unknown> | undefined
@@ -139,10 +139,10 @@ describe('админка: закрытый режим', () => {
       stats,
       http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false, price_month: null, price_year: 990 })),
       http.put('/api/admin/billing', async ({ request }) => { billing = await request.json() as Record<string, unknown>; return HttpResponse.json(billing) }),
-      http.get('/api/admin/families', () => HttpResponse.json([fam])),
-      http.put('/api/admin/families/7/plan', async ({ request }) => {
+      http.get('/api/admin/users', () => HttpResponse.json([person])),
+      http.put('/api/admin/users/1/plan', async ({ request }) => {
         plan = await request.json() as typeof plan
-        return HttpResponse.json({ ...fam, ...plan, plus_active: true })
+        return HttpResponse.json({ ...person, ...plan, plus_active: true })
       }),
     )
     const { user } = renderApp('/admin?tab=plans', { me: ADMIN })
@@ -156,8 +156,9 @@ describe('админка: закрытый режим', () => {
     await user.click(screen.getByRole('button', { name: 'Сохранить стоимость' }))
     await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: 149, price_year: 990 }))
 
-    await user.click(screen.getByText('Семья Никиты'))
-    const sheet = await screen.findByRole('dialog', { name: 'Тариф: Семья Никиты' })
+    expect(screen.getByText('Семья Никиты, С собой')).toBeInTheDocument()  // аптечки, на которые действует Плюс человека
+    await user.click(screen.getByText('Семья Никиты, С собой'))
+    const sheet = await screen.findByRole('dialog', { name: 'Тариф: Никита' })
     await user.click(within(sheet).getByRole('radio', { name: 'Плюс' }))
     await user.click(within(sheet).getByRole('button', { name: '+1 месяц' }))
     await user.click(within(sheet).getByRole('button', { name: 'Сохранить' }))
