@@ -17,6 +17,7 @@ import { MedicineDetail } from './pages/MedicineDetail'
 import { MedicineForm } from './pages/MedicineForm'
 import { Medicines } from './pages/Medicines'
 import { Scan } from './pages/Scan'
+import { Schedule } from './pages/Schedule'
 import { NoFamily } from './pages/NoFamily'
 import { Plus } from './pages/Plus'
 import { versionLabel } from './version'
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="medicines/:id/edit" element={<MedicineForm />} />
         <Route path="scan" element={<Scan />} />
         <Route path="find" element={<Find />} />
+        <Route path="schedule" element={<Schedule />} />
         <Route path="history" element={<History />} />
         <Route path="family" element={<Family />} />
         <Route path="plus" element={<Plus />} />
