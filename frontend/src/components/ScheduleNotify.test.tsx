@@ -64,9 +64,9 @@ it('приглашает доверенного только с подтверж
   await waitFor(() => expect(s.puts.at(-1)).toEqual({ escalate_enabled: true, escalate_consent: true }))
 }, 15_000)
 
-it('без Плюса показывает замочек', async () => {
+it('без Плюса показывает замочек и не показывает настройки почты', async () => {
   backend(prefs({ available: false }))
   renderWithProviders(<ScheduleNotify />)
   expect(await screen.findByText('Узнать про Плюс')).toHaveAttribute('href', '/plus')
-  expect(screen.getByLabelText(/Напоминать мне на почту/)).toBeDisabled()
+  expect(screen.queryByLabelText(/Напоминать мне на почту/)).not.toBeInTheDocument()
 })
