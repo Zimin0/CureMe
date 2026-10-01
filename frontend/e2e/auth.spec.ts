@@ -4,9 +4,10 @@ import { uniqueEmail } from './helpers'
 test('регистрация, выход и повторный вход', async ({ page }) => {
   const email = uniqueEmail('new')
   await page.goto('/')
-  await expect(page).toHaveURL(/\/login/)
+  // гостю на главном адресе показывается приветственная страница с кнопкой «Попробовать»
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Домашняя аптечка')
 
-  await page.getByRole('link', { name: 'Зарегистрироваться' }).click()
+  await page.getByRole('link', { name: 'Попробовать бесплатно' }).first().click()
   await page.getByLabel('Как вас зовут').fill('Никита')
   await page.getByLabel('Почта').fill(email)
   await page.getByLabel(/^Пароль/).fill('secret123')

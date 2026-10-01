@@ -122,7 +122,7 @@ def test_join_by_code(client, owner):
 
 
 def enable_billing(client, h, on=True):
-    assert client.put("/api/admin/billing", headers=h, json={"enabled": on}).status_code == 200
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": on, "trial_days": 0}).status_code == 200
 
 
 def test_free_plan_allows_one_own_cabinet(client, owner):

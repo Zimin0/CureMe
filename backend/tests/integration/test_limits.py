@@ -14,7 +14,7 @@ FREE_MAX_MEDICINES = FREE_LIMITS["medicines"]
 def owner(client):
     """Владелец семьи; он же первый аккаунт, то есть администратор, и включает платную версию."""
     h, u = register(client)
-    assert client.put("/api/admin/billing", headers=h, json={"enabled": True}).status_code == 200
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": True, "trial_days": 0}).status_code == 200
     return h, u, u["families"][0]["id"]
 
 

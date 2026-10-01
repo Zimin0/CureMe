@@ -79,6 +79,7 @@ LIMIT_FEATURE = {"members": "no_limits", "medicines": "no_limits", "own_families
                  "history_days": "full_history"}
 
 BILLING = "billing"  # ключ в app_settings
+DEFAULT_TRIAL_DAYS = 5  # пробный Плюс при первом подтверждении почты; меняется в админке «Тарифы»
 PLUS_HEADER = "X-Plus-Feature"  # в ответе 402: какую функцию Плюса открыть в шторке
 
 
@@ -88,6 +89,7 @@ def billing_settings(db: Session) -> BillingSettings:
     value = (row.value if row else None) or {}
     return BillingSettings(
         enabled=bool(value.get("enabled")), price_month=value.get("price_month"), price_year=value.get("price_year"),
+        trial_days=value.get("trial_days", DEFAULT_TRIAL_DAYS),
     )
 
 
@@ -99,6 +101,22 @@ def set_billing_settings(db: Session, body: BillingSettings) -> BillingSettings:
         db.add(AppSetting(key=BILLING, value=body.model_dump()))
     db.commit()
     return body
+
+
+def grant_trial(db: Session, user: User) -> bool:
+    """Дарит пробный Плюс новому аккаунту один раз. Вызывать, когда почта подтверждена (без коммита).
+
+    Срок берётся из настройки trial_days (0 — выключено). Оплаченный или уже выданный Плюс не трогаем.
+    После окончания аккаунт просто возвращается на бесплатный тариф, деньги не списываются.
+    """
+    days = billing_settings(db).trial_days
+    if days <= 0 or user.trial_granted_at is not None or plus_active(user):
+        return False
+    now = datetime.now(timezone.utc)
+    user.plan = PLUS
+    user.plus_until = now + timedelta(days=days)
+    user.trial_granted_at = now
+    return True
 
 
 def _aware(dt: datetime) -> datetime:

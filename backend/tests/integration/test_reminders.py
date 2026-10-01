@@ -208,7 +208,7 @@ def test_several_families_are_named(client, db, home, outbox):
 def test_free_family_gets_nothing_when_billing_on(client, db, home, outbox):
     h, u, f = home
     add(client, h, f, "Нурофен", 3, min_quantity=5)
-    assert client.put("/api/admin/billing", headers=h, json={"enabled": True}).status_code == 200
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": True, "trial_days": 0}).status_code == 200
     assert remind(db, u["id"]) == 0 and outbox == []
     p = client.get("/api/notifications", headers=h).json()
     assert p["available"] is False
@@ -358,7 +358,7 @@ def test_admin_turns_telegram_on_and_off(client, monkeypatch):
     monkeypatch.setattr(get_settings(), "telegram_bot_token", "123:TEST")
     monkeypatch.setattr(get_settings(), "telegram_bot_username", "kapsulka_bot")
     assert client.get("/api/auth/access").json()["telegram"] is False  # бот есть, переключатель выключен
-    r = client.put("/api/admin/telegram", headers=admin, json={"enabled": True})
+    r = client.put("/api/admin/telegram", headers=admin, json={"enabled": True, "trial_days": 0})
     assert r.json() == {"enabled": True, "configured": True}
     assert client.get("/api/auth/access").json()["telegram"] is True
     assert client.get("/api/notifications", headers=admin).json()["telegram_possible"] is True

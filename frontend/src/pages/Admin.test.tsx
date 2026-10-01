@@ -137,7 +137,7 @@ describe('админка: закрытый режим', () => {
     let plan: { plan: string; plus_until: string | null } | undefined
     server.use(
       stats,
-      http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false, price_month: null, price_year: 990 })),
+      http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false, price_month: null, price_year: 990, trial_days: 5 })),
       http.put('/api/admin/billing', async ({ request }) => { billing = await request.json() as Record<string, unknown>; return HttpResponse.json(billing) }),
       http.get('/api/admin/users', () => HttpResponse.json([person])),
       http.put('/api/admin/users/1/plan', async ({ request }) => {
@@ -148,13 +148,21 @@ describe('админка: закрытый режим', () => {
     const { user } = renderApp('/admin?tab=plans', { me: ADMIN })
     window.confirm = () => true
     await user.click(await screen.findByRole('checkbox', { name: /Платная версия включена/ }))
-    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: null, price_year: 990 }))  // цена не стирается
+    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: null, price_year: 990, trial_days: 5 }))  // цена не стирается
 
     // стоимость подписки
     expect(screen.getByLabelText('В год, ₽')).toHaveValue(990)
     await user.type(screen.getByLabelText('В месяц, ₽'), '149')
     await user.click(screen.getByRole('button', { name: 'Сохранить стоимость' }))
-    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: 149, price_year: 990 }))
+    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: 149, price_year: 990, trial_days: 5 }))
+
+    // пробный срок для новых аккаунтов
+    const trialInput = screen.getByLabelText('Дней пробного периода')
+    expect(trialInput).toHaveValue(5)
+    await user.clear(trialInput)
+    await user.type(trialInput, '14')
+    await user.click(screen.getByRole('button', { name: 'Сохранить срок' }))
+    await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: 149, price_year: 990, trial_days: 14 }))
 
     expect(screen.getByText('Семья Никиты, С собой')).toBeInTheDocument()  // аптечки, на которые действует Плюс человека
     await user.click(screen.getByText('Семья Никиты, С собой'))
