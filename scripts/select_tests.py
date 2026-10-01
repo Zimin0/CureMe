@@ -68,6 +68,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/schedule.py", "schedule.py"],
         "tests": ["integration/test_schedule.py", "integration/test_intakes.py", "integration/test_access_control.py"],
     },
+    "Уведомления по расписанию и доверенный человек": {
+        "sources": ["schedule_notify.py", "routers/schedule_notify.py"],
+        "tests": ["integration/test_schedule_notify.py", "integration/test_reminders.py", "integration/test_access_control.py"],
+    },
     "Категории": {
         "sources": ["routers/categories.py"],
         "tests": ["integration/test_categories.py", "integration/test_access_control.py"],
