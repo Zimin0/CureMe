@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models import Intake
-from tests.conftest import register
+from tests.conftest import grant_plus, register
 
 
 @pytest.fixture
@@ -207,6 +207,6 @@ def test_free_family_sees_only_last_30_days(client, db, owner, med):
     assert client.patch(f"/api/families/{f}/intakes/{old_id}", headers=h, json={"comment": "x"}).status_code == 404
     assert db.get(Intake, old_id) is not None  # запись на месте
 
-    assert client.put(f"/api/admin/families/{f}/plan", headers=h, json={"plan": "plus", "plus_until": None}).status_code == 200
+    grant_plus(client, h, f)
     assert len(history(client, h, f)) == 2
     assert client.get(older, headers=h).json() == {"history_since": None, "hidden": 0}

@@ -18,7 +18,7 @@ export const MAIL_PROVIDER = 'ООО «ЯНДЕКС» (ИНН 7736207543, 119021
 
 /** Редакция документов. Меняется вместе с CONSENT_VERSION в backend/app/legal.py. */
 export const LEGAL_VERSION = '2026-09-29.1'
-export const LEGAL_DATE = '29 сентября 2026 г.'
+export const LEGAL_DATE = '30 сентября 2026 г.'
 
 /** Короткое предупреждение о том, что сервис не врач. Показывается в подборе и в карточке лекарства. */
 export const MEDICAL_NOTE =

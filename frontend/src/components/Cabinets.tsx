@@ -47,7 +47,10 @@ export function Cabinets() {
         </p>
         <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>
       </fieldset>
-      {locked && (
+      {locked && me.plus_active && (
+        <p className="muted small" role="note">Достигнут потолок: не больше 5 своих аптечек. Нужно больше — напишите нам.</p>
+      )}
+      {locked && !me.plus_active && (
         <PlusBanner title="Новая аптечка — в Капсулке Плюс" cta="Новая аптечка" onClick={() => openPlus('cabinets')}
           text="В бесплатной версии одна своя аптечка, больше — в Капсулке Плюс." />
       )}

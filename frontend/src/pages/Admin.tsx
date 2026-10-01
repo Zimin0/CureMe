@@ -533,18 +533,18 @@ function DebugTab() {
 // ---------- тарифы ----------
 type Billing = { enabled: boolean; price_month: number | null; price_year: number | null }
 
-const planText = (f: AdminFamily) =>
+const planText = (f: { plan: PlanName; plus_until: string | null; plus_active: boolean }) =>
   f.plus_active ? (f.plus_until ? `Плюс до ${fmtDate(f.plus_until)}` : 'Плюс бессрочно')
     : f.plan === 'plus' ? 'Плюс истёк' : 'Бесплатный'
 
-/** Платная версия: общий переключатель и ручное включение Плюса семьям (оплаты пока нет). */
+/** Платная версия: общий переключатель и ручное включение Плюса аккаунтам (оплаты пока нет). Плюс действует на все аптечки, где человек главный владелец. */
 function PlansTab() {
   const toast = useToast()
   const qc = useQueryClient()
   const billing = useQuery({ queryKey: ['admin', 'billing'], queryFn: () => api<Billing>('/admin/billing') })
-  const fams = useQuery({ queryKey: ['admin', 'families'], queryFn: () => api<AdminFamily[]>('/admin/families') })
+  const people = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminUser[]>('/admin/users') })
   const [q, setQ] = useState('')
-  const [edit, setEdit] = useState<AdminFamily | null>(null)
+  const [edit, setEdit] = useState<AdminUser | null>(null)
   const [prices, setPrices] = useState<{ month: string; year: string } | null>(null)
   useEffect(() => {
     if (billing.data && prices === null) {
@@ -565,10 +565,10 @@ function PlansTab() {
   })
   const toPrice = (s: string) => (s.trim() ? Math.round(Number(s)) : null)
 
-  if (billing.isLoading || fams.isLoading || !billing.data) return <PageLoader />
+  if (billing.isLoading || people.isLoading || !billing.data) return <PageLoader />
   const needle = q.trim().toLowerCase()
-  const list = (fams.data ?? []).filter(f => !needle || `${f.name} ${f.members.map(m => `${m.name} ${m.email}`).join(' ')}`.toLowerCase().includes(needle))
-  const plusCount = (fams.data ?? []).filter(f => f.plus_active).length
+  const list = (people.data ?? []).filter(u => !needle || `${u.name} ${u.email} ${u.families.map(f => f.name).join(' ')}`.toLowerCase().includes(needle))
+  const plusCount = (people.data ?? []).filter(u => u.plus_active).length
 
   return (
     <>
@@ -576,11 +576,11 @@ function PlansTab() {
         <input type="checkbox" checked={billing.data.enabled} disabled={save.isPending}
           onChange={e => {
             const on = e.target.checked
-            if (!on || confirm('Включить платную версию? Семьи без Плюса получат лимиты бесплатной версии: 4 участника, 60 лекарств, 1 своя аптечка, история за 30 дней.')) save.mutate({ ...billing.data!, enabled: on })
+            if (!on || confirm('Включить платную версию? Аккаунты без Плюса получат лимиты бесплатной версии: 4 участника, 60 лекарств, 1 своя аптечка, история за 30 дней.')) save.mutate({ ...billing.data!, enabled: on })
           }} />
         <span>
           <b>Платная версия включена</b><br />
-          <span className="muted small">Пока выключено, всем семьям доступны все функции Плюса. Включите, когда будут готовы оплата и оферта.</span>
+          <span className="muted small">Пока выключено, всем доступны все функции Плюса. Включите, когда будут готовы оплата и оферта.</span>
         </span>
       </label>
       {prices && (
@@ -588,7 +588,7 @@ function PlansTab() {
           e.preventDefault()
           save.mutate({ ...billing.data!, price_month: toPrice(prices.month), price_year: toPrice(prices.year) })
         }}>
-          <b>Стоимость Плюса для всей семьи</b>
+          <b>Стоимость Плюса для аккаунта</b>
           <div className="row wrap" style={{ gap: 12 }}>
             <label className="field grow"><span>В месяц, ₽</span>
               <input className="input" type="number" min={1} max={100000} inputMode="numeric" placeholder="149"
@@ -603,22 +603,23 @@ function PlansTab() {
           <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={save.isPending}>Сохранить стоимость</button>
         </form>
       )}
-      <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'семьи', 'семей', 'семей')}. Нажмите на семью, чтобы включить или продлить Плюс вручную.</p>
-      <div className="search"><Search size={18} /><input className="input" placeholder="Семья, имя или почта" value={q} onChange={e => setQ(e.target.value)} /></div>
+      <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'аккаунта', 'аккаунтов', 'аккаунтов')}. Нажмите на человека, чтобы включить или продлить Плюс вручную. Плюс действует на все аптечки, где он главный владелец (самый ранний владелец семьи); платящий участник чужой аптечки ей Плюс не даёт.</p>
+      <div className="search"><Search size={18} /><input className="input" placeholder="Имя, почта или аптечка" value={q} onChange={e => setQ(e.target.value)} /></div>
       <section className="card flush">
         {list.length === 0 && <div style={{ padding: 18 }} className="muted">Ничего не нашли</div>}
-        {list.map(f => (
-          <button key={f.id} className="list-row admin-row" onClick={() => setEdit(f)}>
-            <div className="avatar" style={{ background: avatarColor(f.id + 7) }}><House size={18} /></div>
+        {list.map(u => (
+          <button key={u.id} className="list-row admin-row" onClick={() => setEdit(u)}>
+            <div className="avatar" style={{ background: avatarColor(u.id) }}>{u.name.slice(0, 1).toUpperCase()}</div>
             <div className="grow">
-              <div style={{ fontWeight: 700 }} className="ellipsis">{f.name}</div>
-              <div className="small muted ellipsis">{f.members.map(m => m.name).join(', ') || 'Нет участников'}</div>
+              <div style={{ fontWeight: 700 }} className="ellipsis">{u.name}</div>
+              <div className="small muted ellipsis">{u.email}</div>
+              <div className="small muted ellipsis">{u.families.filter(f => f.role === 'owner').map(f => f.name).join(', ') || 'Своих аптечек нет'}</div>
             </div>
-            <span className={`badge ${f.plus_active ? 'plus' : ''}`}>{f.plus_active && <Sparkles size={12} />}{planText(f)}</span>
+            <span className={`badge ${u.plus_active ? 'plus' : ''}`}>{u.plus_active && <Sparkles size={12} />}{planText(u)}</span>
           </button>
         ))}
       </section>
-      {edit && <PlanSheet family={edit} onClose={() => setEdit(null)} />}
+      {edit && <PlanSheet person={edit} onClose={() => setEdit(null)} />}
     </>
   )
 }
@@ -630,11 +631,11 @@ function dateInput(iso: string | null): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function PlanSheet({ family, onClose }: { family: AdminFamily; onClose: () => void }) {
+function PlanSheet({ person, onClose }: { person: AdminUser; onClose: () => void }) {
   const toast = useToast()
   const refresh = useRefresh()
-  const [plan, setPlan] = useState<PlanName>(family.plan)
-  const [until, setUntil] = useState(dateInput(family.plus_until))
+  const [plan, setPlan] = useState<PlanName>(person.plan)
+  const [until, setUntil] = useState(dateInput(person.plus_until))
 
   const addMonths = (n: number) => {
     const base = until ? new Date(until) : new Date()
@@ -644,15 +645,15 @@ function PlanSheet({ family, onClose }: { family: AdminFamily; onClose: () => vo
   }
   const save = useMutation({
     // «Плюс до 12.10» — включительно: до конца этого дня по местному времени.
-    mutationFn: () => api<AdminFamily>(`/admin/families/${family.id}/plan`, {
+    mutationFn: () => api<AdminUser>(`/admin/users/${person.id}/plan`, {
       method: 'PUT', body: { plan, plus_until: plan === 'plus' && until ? new Date(`${until}T23:59:59`).toISOString() : null },
     }),
-    onSuccess: f => { refresh(); toast(`${f.name}: ${planText(f)}`); onClose() },
+    onSuccess: u => { refresh(); toast(`${u.name}: ${planText(u)}`); onClose() },
     onError: (e: Error) => toast(e.message, 'error'),
   })
 
   return (
-    <Sheet title={`Тариф: ${family.name}`} onClose={onClose}>
+    <Sheet title={`Тариф: ${person.name}`} onClose={onClose}>
       <form className="stack" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate() }}>
         <div className="segmented" role="radiogroup" aria-label="Тариф">
           <button type="button" role="radio" aria-checked={plan === 'free'} className={plan === 'free' ? 'on' : ''} onClick={() => setPlan('free')}>Бесплатный</button>
@@ -670,7 +671,7 @@ function PlanSheet({ family, onClose }: { family: AdminFamily; onClose: () => vo
             </div>
           </>
         )}
-        <p className="muted small">Сейчас: {planText(family)}.</p>
+        <p className="muted small">Сейчас: {planText(person)}. Действует на все аптечки, где {person.name} главный владелец.</p>
         <button className="btn primary block" disabled={save.isPending}>{save.isPending ? 'Сохраняем…' : 'Сохранить'}</button>
       </form>
     </Sheet>

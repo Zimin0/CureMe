@@ -27,6 +27,10 @@ class User(Base):
     # Когда и какую редакцию согласия на обработку персональных данных человек принял (152-ФЗ).
     consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consent_version: Mapped[str | None] = mapped_column(String(20))
+    # Тариф аккаунта: free | plus. Плюс действует на все аптечки, где человек главный владелец. Правила — в plans.py.
+    plan: Mapped[str] = mapped_column(String(16), default="free", server_default="free")
+    # До какого момента действует Плюс. Пусто при plan = plus — бессрочно.
+    plus_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Когда человек перешёл по ссылке из письма. Пусто — почта не подтверждена.
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Хеш (SHA-256) одноразового токена из последнего письма и время отправки: сам токен в базе не храним,
@@ -44,10 +48,6 @@ class Family(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     invite_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
-    # Тариф семьи: free | plus. Подписка общая на всю семью. Правила и лимиты — в plans.py.
-    plan: Mapped[str] = mapped_column(String(16), default="free", server_default="free")
-    # До какого момента действует Плюс. Пусто при plan = plus — бессрочно.
-    plus_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="family", cascade="all, delete-orphan")

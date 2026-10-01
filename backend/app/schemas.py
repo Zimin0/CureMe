@@ -73,6 +73,7 @@ class MeOut(UserOut):
     families: list[FamilyBrief]
     # Сколько ещё своих аптечек можно создать: None — без ограничений (Плюс или платная версия выключена).
     own_families_left: int | None = None
+    plus_active: bool = False  # у аккаунта оплачен Плюс (нужно, чтобы отличить «лимит бесплатной» от «потолка Плюса»)
     # Только после смены своего пароля: старый токен уже не действует, вот новый.
     access_token: str | None = None
 
@@ -204,6 +205,9 @@ class AdminUserOut(BaseModel):
     email_verified: bool
     created_at: datetime
     families: list[FamilyBrief]
+    plan: str = "free"
+    plus_until: datetime | None = None
+    plus_active: bool = False  # Плюс аккаунта оплачен и не истёк
 
 
 class AdminUserUpdate(BaseModel):
@@ -222,15 +226,18 @@ class AdminFamilyOut(BaseModel):
     created_at: datetime
     medicine_count: int
     members: list[MemberOut]
+    # Тариф главного владельца аптечки (только для чтения: менять нужно у аккаунта).
     plan: str = "free"
     plus_until: datetime | None = None
     plus_active: bool = False  # Плюс оплачен и не истёк
+    owner_id: int | None = None
+    owner_name: str | None = None
 
 
 # --- тарифы (plans.py) ---
 class BillingSettings(BaseModel):
     enabled: bool = False  # платная версия включена: у семей без Плюса действуют лимиты
-    # Стоимость Плюса для всей семьи в рублях; пусто — цена не показывается.
+    # Стоимость Плюса для аккаунта в рублях; пусто — цена не показывается.
     price_month: int | None = Field(default=None, ge=1, le=100_000)
     price_year: int | None = Field(default=None, ge=1, le=1_000_000)
 
@@ -248,7 +255,8 @@ class PlanFeatureOut(BaseModel):
 
 
 class PlanOut(BaseModel):
-    plan: str                          # free | plus — что записано у семьи
+    plan: str                          # free | plus — что записано у аккаунта главного владельца семьи
+    owner_name: str | None = None      # чей это Плюс: имя главного владельца семьи
     plus_until: datetime | None        # до какого момента Плюс; пусто — бессрочно
     plus_active: bool                  # Плюс оплачен и не истёк
     billing_enabled: bool              # платная версия включена администратором
