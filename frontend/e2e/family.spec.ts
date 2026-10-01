@@ -6,7 +6,7 @@ test('приглашение по ссылке: второй человек ви
   const med = await addMedicineApi(request, owner, { name: 'Ибупрофен', indications: 'головная боль', packages: [{ quantity: 10 }] })
 
   await loginAs(page, owner, '/family')
-  const code = (await page.locator('.invite-code').textContent())!.trim()
+  const code = (await page.locator('.invite-link').textContent())!.trim().split('/join/')[1]
   expect(code).toMatch(/^[A-Z2-9]{8}$/)
 
   // второй человек в отдельном браузере (свои cookies и localStorage)
@@ -46,7 +46,7 @@ test('участник не видит кнопок владельца', async (
   await loginAs(page, member, '/family')
   await expect(page.getByRole('heading', { name: 'Семья Никита' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Переименовать' })).toHaveCount(0)
-  await expect(page.getByTitle('Сменить код')).toHaveCount(0)
+  await expect(page.getByTitle('Создать новую ссылку')).toHaveCount(0)
 })
 
 test('версия приложения видна внизу раздела «Семья» и совпадает с сервером', async ({ page, request }) => {
