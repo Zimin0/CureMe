@@ -45,6 +45,22 @@ it('в бесплатной версии вторая своя аптечка п
   expect(await screen.findByRole('dialog', { name: 'Доступно в Капсулке Плюс' })).toBeInTheDocument()
   expect(screen.getByText('Несколько своих аптечек')).toBeInTheDocument()
   expect(created).toBe(false)
+  // Аптечка одна — списка для выбора нет.
+  expect(screen.queryByRole('button', { name: /Семья Никита/ })).not.toBeInTheDocument()
+})
+
+it('список аптечек виден, когда их больше одной', async () => {
+  mockFamilies()
+  const me = { ...ME, families: [...ME.families, { id: 8, name: 'Дача', role: 'member' as const }] }
+  renderApp('/family', { me })
+  expect(await screen.findByRole('button', { name: /Дача/ })).toBeInTheDocument()
+})
+
+it('при Плюсе потолок своих аптечек показан без предложения купить Плюс', async () => {
+  mockFamilies()
+  renderApp('/family', { me: { ...ME, own_families_left: 0, plus_active: true } })
+  expect(await screen.findByText(/не больше 5 своих аптечек/)).toBeInTheDocument()
+  expect(screen.queryByText(/в Капсулке Плюс/)).not.toBeInTheDocument()
 })
 
 it('на странице «Аптечка» есть переключатель, когда аптечек несколько', async () => {

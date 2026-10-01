@@ -4,7 +4,7 @@ import pytest
 
 from app.models import Medicine
 from app.plans import FREE_LIMITS, PLUS_HEADER
-from tests.conftest import register
+from tests.conftest import grant_plus, register
 
 FREE_MAX_MEMBERS = FREE_LIMITS["members"]
 FREE_MAX_MEDICINES = FREE_LIMITS["medicines"]
@@ -47,7 +47,7 @@ def add(client, h, f, name="Нурофен"):
 @pytest.fixture
 def plus(client, owner):
     h, _, f = owner
-    assert client.put(f"/api/admin/families/{f}/plan", headers=h, json={"plan": "plus", "plus_until": None}).status_code == 200
+    grant_plus(client, h, f)
 
 
 def test_usage_is_shown_in_family(client, owner):

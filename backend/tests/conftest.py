@@ -95,6 +95,14 @@ def fid(user) -> int:
     return user["families"][0]["id"]
 
 
+def grant_plus(client, h, family_id, plan="plus", until=None):
+    """Админ (h) включает Плюс аккаунту главного владельца аптечки. Возвращает ответ API."""
+    fam = next(x for x in client.get("/api/admin/families", headers=h).json() if x["id"] == family_id)
+    r = client.put(f"/api/admin/users/{fam['owner_id']}/plan", headers=h, json={"plan": plan, "plus_until": until})
+    assert r.status_code == 200, r.text
+    return r
+
+
 @pytest.fixture
 def owner(client):
     """Зарегистрированный владелец семьи: (заголовки, пользователь, id семьи)."""
