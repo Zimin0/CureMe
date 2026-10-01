@@ -27,11 +27,23 @@ services:
       CUREME_TELEGRAM_BOT_USERNAME: ${CUREME_TELEGRAM_BOT_USERNAME:-}
       CUREME_REMINDERS_HOUR: ${CUREME_REMINDERS_HOUR:-10}
     security_opt: ["no-new-privileges:true"]
+    # Журналы (в них IP-адреса посетителей) не копятся бесконечно: Docker сам стирает старые при переполнении.
+    # Ротация идёт по размеру, а не по времени: при малом трафике журнал живёт до пересоздания контейнера
+    # (каждый деплой). Срок «30 дней» из Политики держится на том, что деплои идут чаще.
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on: [app]
     ports: ["80:80", "443:443", "443:443/udp"]
+    # Журналы (в них IP-адреса посетителей) не копятся бесконечно: Docker сам стирает старые при переполнении.
+    # Ротация идёт по размеру, а не по времени: при малом трафике журнал живёт до пересоздания контейнера
+    # (каждый деплой). Срок «30 дней» из Политики держится на том, что деплои идут чаще.
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     environment:
       CUREME_DOMAIN: ${CUREME_DOMAIN:?укажите домен в .env}
       CUREME_OLD_DOMAIN: ${CUREME_OLD_DOMAIN:-}
