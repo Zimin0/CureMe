@@ -7,6 +7,7 @@ const FEATURES: Plan['features'] = [
   { key: 'full_history', title: 'Вся история приёма', description: 'Бесплатно видны последние 30 дней.', available: true },
   { key: 'export_pdf', title: 'Экспорт в PDF и Excel для врача', description: 'Файл для врача.', available: true },
   { key: 'cabinets', title: 'Несколько своих аптечек', description: 'Бесплатно — одна своя.', available: true },
+  { key: 'schedule', title: 'Расписание приёма', description: 'Добавляйте назначения в расписание.', available: true },
   { key: 'no_limits', title: 'Без лимитов', description: 'Бесплатно — до 4 участников и 60 лекарств.', available: true },
 ]
 const FREE_LIMITS = { members: 4, medicines: 60, own_families: 1, history_days: 30 }

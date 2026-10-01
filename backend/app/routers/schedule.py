@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from ..deps import current_user, get_family
+from ..plans import require_plus
 from ..models import Family, Medicine, Schedule, ScheduleSlot, User
 from ..reminders import MSK
 from ..schedule import occurrences
@@ -86,6 +87,7 @@ def create_schedule(
     body: ScheduleCreate, fam: Family = Depends(get_family), user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    require_plus(db, fam, "schedule")  # создание платное; уже созданное у бесплатных остаётся
     med = db.scalar(select(Medicine).where(Medicine.id == body.medicine_id, Medicine.family_id == fam.id))
     if not med:
         raise HTTPException(404, "Лекарство не найдено")
@@ -134,6 +136,7 @@ def add_slots(
     schedule_id: int, body: SlotsIn, fam: Family = Depends(get_family), user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    require_plus(db, fam, "schedule")  # новые приёмы к существующему назначению тоже платные
     s = _mine(db, fam, user, schedule_id)
     _add_slots(db, s, body.days, body.times)
     db.commit()
