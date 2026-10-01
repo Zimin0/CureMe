@@ -103,6 +103,49 @@ export interface NotificationPrefs {
   expiry_days: number
 }
 
+// --- расписание приёма: backend/app/routers/schedule.py ---
+export interface ScheduleSlot { id: number; weekday: number; minute: number }  // weekday 0 — понедельник; minute — от полуночи по Москве
+export interface Schedule {
+  id: number
+  medicine_id: number | null  // null — лекарство удалили из аптечки
+  medicine_name: string
+  unit: string
+  amount: number
+  start_date: string
+  end_date: string | null
+  every_weeks: number
+  slots: ScheduleSlot[]
+}
+export interface Occurrence {
+  schedule_id: number
+  slot_id: number
+  medicine_id: number | null
+  medicine_name: string
+  unit: string
+  amount: number
+  date: string
+  minute: number
+  taken: boolean
+  taken_at: string | null
+}
+
+// --- уведомления по расписанию: backend/app/routers/schedule_notify.py ---
+export type TrustedStatus = 'pending' | 'confirmed' | 'declined' | 'revoked'
+export interface Trusted { name: string; email: string; status: TrustedStatus; confirmed_at: string | null }
+export interface SchedulePrefs {
+  available: boolean        // есть семья с Плюсом (или платная версия выключена)
+  email: string
+  email_possible: boolean   // на сайте настроена почта, адрес подтверждён
+  enabled: boolean
+  lead_minutes: number      // напомнить за сколько минут до приёма
+  repeat_minutes: number    // напомнить снова через сколько минут после приёма, если он не отмечен
+  escalate_enabled: boolean
+  escalate_minutes: number  // письмо доверенному: через сколько минут после повторного напоминания
+  share_medicine_name: boolean
+  escalate_consent_at: string | null  // когда разрешено сообщать доверенному (null — не разрешено)
+  trusted: Trusted | null
+}
+
 export interface MedicineDetail extends Medicine { packages: Package[] }
 
 /** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */

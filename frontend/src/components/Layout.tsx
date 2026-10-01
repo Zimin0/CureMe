@@ -1,4 +1,4 @@
-import { History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
+import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 
@@ -9,6 +9,7 @@ const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?
   { to: '/scan', label: 'Сканировать', icon: ScanLine },
   { to: '/find', label: 'Найти', icon: Stethoscope },
   { to: '/family', label: 'Семья', icon: Users },
+  { to: '/schedule', label: 'Расписание', short: 'Приём', icon: CalendarClock },
   { to: '/history', label: 'История приёма', short: 'История', icon: History },
 ]
 
@@ -47,7 +48,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <nav className="bottom-nav six" aria-label="Навигация">
+      <nav className="bottom-nav seven" aria-label="Навигация">
         {LINKS.map(({ to, label, short, icon: Icon, end }) =>
           to === '/scan' ? (
             <NavLink key={to} to={to} className="scan-link" aria-label={label}>

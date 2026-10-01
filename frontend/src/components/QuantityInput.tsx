@@ -4,7 +4,7 @@ import { fmtQty } from '../format'
 
 const COUNTABLE = ['таб', 'капс', 'шт', 'пак', 'амп']
 
-function Stepper({ value, onChange, min = 0, label }: { value: number; onChange: (v: number) => void; min?: number; label: string }) {
+export function Stepper({ value, onChange, min = 0, label }: { value: number; onChange: (v: number) => void; min?: number; label: string }) {
   // Пока поле редактируют, держим введённый текст как есть: иначе пустое поле сразу превращается в 0,
   // и этот ноль нельзя стереть.
   const [draft, setDraft] = useState<string | null>(null)
