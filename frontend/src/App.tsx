@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api'
 import { useAuth } from './auth'
@@ -37,7 +38,13 @@ function Protected() {
 /** Режим отладки (включается в админке): версия приложения вверху любой страницы. */
 function DebugBar() {
   const q = useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean; debug?: boolean }>('/auth/access'), staleTime: 60_000 })
-  if (!q.data?.debug) return null
+  const on = !!q.data?.debug
+  // Плашка закреплена сверху: сдвигаем контент, чтобы она не перекрывала заголовки
+  useEffect(() => {
+    document.body.classList.toggle('has-debug-bar', on)
+    return () => document.body.classList.remove('has-debug-bar')
+  }, [on])
+  if (!on) return null
   return <div className="debug-bar" data-testid="debug-bar">{versionLabel()}</div>
 }
 

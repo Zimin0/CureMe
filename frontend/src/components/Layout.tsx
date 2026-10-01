@@ -18,7 +18,6 @@ export function Layout() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="brand"><img src="/icon.svg" alt="" />Капсулка</div>
         {LINKS.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className="side-link">
             <Icon size={20} />{label}
@@ -46,7 +45,6 @@ export function Layout() {
       </aside>
 
       <main className="main">
-        <header className="topbar"><div className="brand"><img src="/icon.svg" alt="" />Капсулка</div></header>
         <Outlet />
       </main>
 

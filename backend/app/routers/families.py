@@ -6,7 +6,7 @@ from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..limits import ensure_can_add_member, members_full
 from ..models import Family, Membership, Schedule, User
-from ..plans import LIMIT_FEATURE, own_families_left, plan_out, plus_required
+from ..plans import LIMIT_FEATURE, PLUS_OWN_FAMILIES_MAX, own_families_left, plan_out, plus_active, plus_required
 from ..ratelimit import client_ip, limiter
 from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, PlanOut, RoleIn
 from ..security import new_invite_code
@@ -31,6 +31,11 @@ def new_family(body: FamilyIn, user: User = Depends(current_user), db: Session =
     # Бесплатно — одна своя аптечка. Вступать в чужие по приглашению можно всегда,
     # а уже созданные сверх лимита аптечки не трогаем.
     if own_families_left(db, user.id) == 0:
+        if plus_active(user):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Можно завести не больше {PLUS_OWN_FAMILIES_MAX} своих аптечек. Нужно больше — напишите нам.",
+            )
         raise plus_required(
             LIMIT_FEATURE["own_families"],
             "В бесплатной версии можно завести одну свою аптечку. В Капсулке Плюс — сколько угодно: дача, машина, бабушка.",
