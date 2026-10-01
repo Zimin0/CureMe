@@ -136,6 +136,7 @@ def add_slots(
     schedule_id: int, body: SlotsIn, fam: Family = Depends(get_family), user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    require_plus(db, fam, "schedule")  # новые приёмы к существующему назначению тоже платные
     s = _mine(db, fam, user, schedule_id)
     _add_slots(db, s, body.days, body.times)
     db.commit()
