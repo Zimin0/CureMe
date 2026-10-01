@@ -9,6 +9,7 @@ import { ScheduleRemove } from '../components/ScheduleRemove'
 import { SlotSheet } from '../components/SlotSheet'
 import { Empty, PageLoader, useToast } from '../components/ui'
 import { fmtQty } from '../format'
+import { usePlan } from '../plan'
 import {
   addDays, DAY_SHORT, fmtDay, fmtMinute, mondayOf, mskMinute, mskToday, repeatText, scheduleText, weekdayOf,
 } from '../schedule'
@@ -28,6 +29,8 @@ const STATE_BADGE: Record<State, string> = { taken: 'ok', due: 'accent', missed:
 
 export function Schedule() {
   const fam = useFamilyPath()
+  const { available } = usePlan()
+  const locked = !available('schedule')
   const qc = useQueryClient()
   const toast = useToast()
   const today = mskToday()
@@ -83,10 +86,12 @@ export function Schedule() {
         <button className="btn primary" onClick={() => setEditor('new')}><Plus size={18} />Добавить</button>
       </div>
 
+      {list.length === 0 && <ScheduleNotify />}
+
       {list.length === 0 ? (
         <Empty icon={<CalendarClock size={40} />} title="Расписание пока пустое"
           text="Добавьте лекарство из аптечки, выберите дни и время приёма, и оно появится здесь."
-          action={<button className="btn primary" onClick={() => setEditor('new')}><Plus size={18} />Добавить в расписание</button>} />
+          action={<button className={`btn ${locked ? 'plus-cta' : 'primary'}`} onClick={() => setEditor('new')}><Plus size={18} />Добавить в расписание</button>} />
       ) : (
         <>
           <section className="card stack" aria-label="Приёмы на день">
@@ -154,7 +159,7 @@ export function Schedule() {
         </>
       )}
 
-      <ScheduleNotify />
+      {list.length > 0 && <ScheduleNotify />}
 
       {editor && <ScheduleEditor schedule={editor === 'new' ? undefined : editor} onClose={() => setEditor(null)} />}
       {removeTarget && <ScheduleRemove schedule={removeTarget} onClose={() => setRemoving(null)} />}
