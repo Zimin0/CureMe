@@ -54,7 +54,7 @@ export default defineConfig({
         // OCR весит ~8 МБ: не качаем его всем заранее, а кешируем при первом использовании.
         globIgnores: ['ocr/**'],
         runtimeCaching: [{ urlPattern: /\/ocr\//, handler: 'CacheFirst', options: { cacheName: 'ocr' } }],
-        navigateFallbackDenylist: [/^\/api/, /^\/docs/],
+        navigateFallbackDenylist: [/^\/api/, /^\/docs/, /^\/\.well-known/],
       },
     }),
   ],
