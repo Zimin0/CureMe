@@ -46,6 +46,7 @@ export function Home() {
   return (
     <div className="page">
       <section className="hero">
+        <img className="hero-logo" src="/icon.svg" alt="Капсулка" />
         <h1>{greeting()}, {me?.name}</h1>
         <p>
           {data.total_medicines === 0
@@ -68,14 +69,6 @@ export function Home() {
         <Link to="/medicines?filter=attention" className={`stat ${data.expiring.length ? 'warning' : ''}`}><span className="label"><CalendarClock size={15} />Скоро истекают</span><span className="value">{data.expiring.length}</span></Link>
         <Link to="/medicines?filter=expired" className={`stat ${data.expired.length ? 'danger' : ''}`}><span className="label"><AlertTriangle size={15} />Просрочено</span><span className="value">{data.expired.length}</span></Link>
       </div>
-
-      <section className="brand-card" aria-label="О приложении">
-        <img src="/icon.svg" alt="" />
-        <div>
-          <div className="brand-name">Капсулка</div>
-          <div className="small muted">Домашняя аптечка всей семьи</div>
-        </div>
-      </section>
 
       <div className="two-col">
         <section>
