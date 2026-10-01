@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { Occurrence, Schedule as ScheduleT } from '../api'
-import { server } from '../test/server'
+import { planFixture, server } from '../test/server'
 import { medicine, renderApp } from '../test/utils'
 
 // Фиксируем «сейчас» — среда 7 октября 2026, 12:00 по Москве, чтобы статусы приёмов не зависели от времени запуска.
@@ -104,4 +104,18 @@ it('неделя: нажатие на плашку открывает перен
   await user.click(within(sheet).getByRole('radio', { name: 'Чт' }))
   await user.click(within(sheet).getByRole('button', { name: 'Перенести' }))
   await waitFor(() => expect(moved).toEqual([{ weekday: 3, minute: 960 }]))
+})
+
+it('без Плюса форма «Добавить в расписание» закрыта плашкой и недоступна', async () => {
+  server.use(
+    http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false }))),
+    http.get('/api/families/7/schedule', () => HttpResponse.json([])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([])),
+    http.get('/api/families/7/medicines', () => HttpResponse.json([medicine({ id: 1, name: 'Амепрозол' })])),
+  )
+  const { user } = renderApp('/schedule')
+  await user.click((await screen.findAllByRole('button', { name: /Добавить/ }))[0])
+  expect(await screen.findByTestId('plus-banner')).toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: 'Добавить в расписание' }).at(-1)).toBeDisabled()
+  expect(screen.getByRole('group', { name: 'Повтор' }).closest('fieldset')).toBeDisabled()
 })
