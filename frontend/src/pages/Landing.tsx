@@ -21,7 +21,7 @@ const PLUS = [
   { icon: History, title: 'Вся история приёма', text: 'Кто и что принимал, без ограничения в 30 дней.' },
   { icon: FileText, title: 'Файл для врача', text: 'Список лекарств и история в PDF и Excel, чтобы показать на приёме.' },
   { icon: Layers, title: 'Несколько аптечек', text: 'Дача, машина, бабушка: у каждой своя аптечка.' },
-  { icon: Sparkles, title: 'Без лимитов', text: 'Сколько угодно участников и лекарств.' },
+  { icon: Sparkles, title: 'Без ограничений бесплатного тарифа', text: 'Больше участников и лекарств в аптечке.' },
 ]
 
 function Phone({ children, label }: { children: React.ReactNode; label: string }) {
@@ -37,7 +37,7 @@ function MockExpiry() {
   return (
     <Phone label="Пример экрана: лекарства и сроки годности">
       <div className="lp-mock-title">Срок годности</div>
-      {[['Нурофен', 'истёк 3 дня назад', 'bad'], ['Парацетамол', 'ещё 12 дней', 'warn'], ['Активированный уголь', 'до марта 2027', 'ok']].map(([n, d, k]) => (
+      {[['Мазь', 'истёк 3 дня назад', 'bad'], ['Сироп', 'ещё 12 дней', 'warn'], ['Витамины', 'до марта 2027', 'ok']].map(([n, d, k]) => (
         <div key={n} className="lp-mock-row"><Pill size={16} /><div className="grow"><b>{n}</b><span>{d}</span></div><i className={`dot ${k}`} /></div>
       ))}
     </Phone>
@@ -77,7 +77,7 @@ export function Landing() {
           <p>Капсулка помнит, какие лекарства есть у вас дома, когда истекает срок и сколько осталось. Вся семья смотрит в одну аптечку с телефона.</p>
           <div className="lp-cta">
             <Link className="btn primary lp-btn" to={cta}>{ctaText}</Link>
-            {!closed && trial > 0 && <span className="lp-note"><Sparkles size={14} /> {trial} {trial === 1 ? 'день' : trial < 5 ? 'дня' : 'дней'} Капсулки Плюс в подарок</span>}
+            {!closed && trial > 0 && <span className="lp-note"><Sparkles size={14} /> {trial} {trial === 1 ? 'день' : trial < 5 ? 'дня' : 'дней'} Капсулки Плюс, пробный период</span>}
           </div>
           <p className="lp-small">Без карты. Регистрация по почте за минуту.</p>
         </div>
@@ -101,7 +101,7 @@ export function Landing() {
         <div className="lp-plus-head">
           <span className="lp-plus-chip big"><Sparkles size={14} /> Капсулка Плюс</span>
           <h2>Когда аптечкой пользуется вся семья</h2>
-          <p>Плюс добавляет то, что экономит время и нервы: расписание, напоминания и файл для врача. Один Плюс действует на все ваши аптечки.</p>
+          <p>Плюс добавляет то, что экономит время и нервы: расписание, напоминания и файл для врача. Один Плюс действует на все ваши аптечки, до 5 своих.</p>
         </div>
         <div className="lp-plus-body">
           <div className="lp-hero-art"><MockSchedule /></div>
@@ -113,7 +113,7 @@ export function Landing() {
         </div>
         <div className="lp-plus-cta">
           {!closed && trial > 0
-            ? <p><b>Попробуйте Плюс {trial} {trial === 1 ? 'день' : trial < 5 ? 'дня' : 'дней'} бесплатно.</b> Он включится сам после подтверждения почты. Потом аккаунт вернётся на бесплатный тариф, деньги не списываются.</p>
+            ? <p><b>Пробный период Плюса: {trial} {trial === 1 ? 'день' : trial < 5 ? 'дня' : 'дней'} бесплатно.</b> Он включится сам после подтверждения почты. Потом аккаунт вернётся на бесплатный тариф, деньги не списываются.</p>
             : <p>Основные функции Капсулки бесплатны. Плюс нужен, если хочется большего.</p>}
           {price && <p className="lp-small">Стоимость Плюса: {price}. Цена указана для сведения и не является публичной офертой.</p>}
           <Link className="btn primary lp-btn" to={cta}>{ctaText}</Link>

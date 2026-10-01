@@ -17,7 +17,7 @@ describe('маршрутизация и доступ', () => {
     renderApp('/', { loggedIn: false })
     expect(await screen.findByRole('heading', { name: /Домашняя аптечка, в которой всё под контролем/ })).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Попробовать бесплатно' })[0]).toHaveAttribute('href', '/register')
-    expect(await screen.findByText(/5 дней Капсулки Плюс в подарок/)).toBeInTheDocument()
+    expect(await screen.findByText(/5 дней Капсулки Плюс, пробный период/)).toBeInTheDocument()
     expect(screen.queryByText(/Стоимость Плюса/)).not.toBeInTheDocument()
   })
 
@@ -26,7 +26,7 @@ describe('маршрутизация и доступ', () => {
     renderApp('/', { loggedIn: false })
     expect(await screen.findByText(/149 ₽ в месяц или 990 ₽ в год/)).toBeInTheDocument()
     expect(screen.getByText(/не является публичной офертой/)).toBeInTheDocument()
-    expect(screen.queryByText(/в подарок/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/пробный период/)).not.toBeInTheDocument()
   })
 
   it('в закрытом режиме кнопка ведёт ко входу', async () => {

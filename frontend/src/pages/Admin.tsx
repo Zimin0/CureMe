@@ -614,7 +614,7 @@ function PlansTab() {
           save.mutate({ ...billing.data!, trial_days: n })
         }}>
           <b>Пробный Плюс новым аккаунтам</b>
-          <label className="field"><span>Дней в подарок</span>
+          <label className="field"><span>Дней пробного периода</span>
             <input className="input" type="number" min={0} max={90} inputMode="numeric" value={trial} onChange={e => setTrial(e.target.value)} />
           </label>
           <span className="muted small">Выдаётся один раз на аккаунт, когда человек подтвердил почту (если проверка почты выключена, при регистрации). Потом аккаунт возвращается на бесплатный тариф, деньги не списываются. 0 — подарок выключен. Срок читается при выдаче: уже выданные не меняются. Условия показываются на приветственной странице.</span>

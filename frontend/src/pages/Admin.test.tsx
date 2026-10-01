@@ -157,7 +157,7 @@ describe('админка: закрытый режим', () => {
     await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: 149, price_year: 990, trial_days: 5 }))
 
     // пробный срок для новых аккаунтов
-    const trialInput = screen.getByLabelText('Дней в подарок')
+    const trialInput = screen.getByLabelText('Дней пробного периода')
     expect(trialInput).toHaveValue(5)
     await user.clear(trialInput)
     await user.type(trialInput, '14')
