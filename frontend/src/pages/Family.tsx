@@ -48,7 +48,7 @@ export function Family() {
     },
     onError,
   })
-  const regen = useMutation({ mutationFn: () => api<FamilyT>(fam('/invite'), { method: 'POST' }), onSuccess: d => onFam(d, 'Новый код создан, старый больше не работает'), onError })
+  const regen = useMutation({ mutationFn: () => api<FamilyT>(fam('/invite'), { method: 'POST' }), onSuccess: d => onFam(d, 'Новая ссылка создана, старая больше не работает'), onError })
   const doRename = useMutation({
     mutationFn: (name: string) => api<FamilyT>(fam(''), { method: 'PATCH', body: { name } }),
     onSuccess: d => { onFam(d, 'Название изменено'); setRename(null); refresh() }, onError,
@@ -107,12 +107,12 @@ export function Family() {
         <p className="muted small">Отправьте ссылку. По ней можно создать аккаунт или войти в существующий, и аптечка сразу станет общей.</p>
         <div className="invite-box">
           <div>
-            <div className="small muted">Код приглашения</div>
-            <div className="invite-code">{f.invite_code}</div>
+            <div className="small muted">Ссылка-приглашение</div>
+            <div className="invite-link">{link}</div>
           </div>
           <div className="row" style={{ gap: 8 }}>
             <button className="icon-btn" title="Скопировать ссылку" onClick={copyLink}><Copy size={18} /></button>
-            {owner && <button className="icon-btn" title="Сменить код" onClick={() => confirm('Старая ссылка перестанет работать. Продолжить?') && regen.mutate()}><RefreshCw size={18} /></button>}
+            {owner && <button className="icon-btn" title="Создать новую ссылку" onClick={() => confirm('Старая ссылка перестанет работать. Продолжить?') && regen.mutate()}><RefreshCw size={18} /></button>}
           </div>
         </div>
         <button className="btn primary block" onClick={copyLink}><Share2 size={18} />Поделиться ссылкой</button>
