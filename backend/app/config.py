@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
     # Адрес сайта для ссылок в письмах, например https://kapsulka.ru. Пусто — берём из запроса.
     public_url: str = ""
+    # Коды подтверждения сайта из Яндекс Вебмастера и Google Search Console (мета-тег на главной). Пусто — тега нет.
+    yandex_verification: str = ""
+    google_verification: str = ""
     # Почта (SMTP). Пока smtp_host пуст, письма не отправляются, а пишутся в лог приложения.
     smtp_host: str = ""
     smtp_port: int = 465

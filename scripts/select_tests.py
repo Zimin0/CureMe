@@ -72,6 +72,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["schedule_notify.py", "routers/schedule_notify.py"],
         "tests": ["integration/test_schedule_notify.py", "integration/test_reminders.py", "integration/test_access_control.py"],
     },
+    "Поисковая оптимизация (SEO)": {
+        "sources": ["seo.py"],
+        "tests": ["integration/test_seo.py"],
+    },
     "Категории": {
         "sources": ["routers/categories.py"],
         "tests": ["integration/test_categories.py", "integration/test_access_control.py"],

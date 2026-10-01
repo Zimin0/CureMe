@@ -6,6 +6,13 @@
 
 ## [Не выпущено]
 
+## [1.15.0] — 2026-10-01
+
+### Добавлено
+- SEO: у публичных страниц (главная, политика, соглашение, согласие) свои title, description, canonical, Open Graph; на главной ещё структурированные данные schema.org (WebApplication) и текст, который поисковик видит без JavaScript. Закрытые разделы получают noindex.
+- `/robots.txt` (закрывает API, вход и разделы аккаунта) и `/sitemap.xml`.
+- Переменные `CUREME_YANDEX_VERIFICATION` и `CUREME_GOOGLE_VERIFICATION`: мета-тег подтверждения сайта в Яндекс Вебмастере и Google Search Console.
+
 ## [1.14.0] — 2026-10-01
 
 ### Добавлено
