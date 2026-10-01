@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
+from datetime import date
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import reminders
+from . import reminders, seo
 from .config import get_settings
 from .db import SessionLocal
 from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications, reports, schedule, schedule_notify
@@ -88,14 +89,33 @@ def version():
     return app_version()
 
 
+def _base(request: Request) -> str:
+    return seo.base_url(settings.public_url, str(request.base_url))
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots(request: Request):
+    return Response(seo.robots_txt(_base(request)), media_type="text/plain; charset=utf-8")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap(request: Request):
+    built = (app_version()["built_at"] or "")[:10] or date.today().isoformat()
+    return Response(seo.sitemap_xml(_base(request), built), media_type="application/xml")
+
+
 # Собранный фронтенд отдаём тем же сервером: одно приложение — один адрес.
 dist = settings.frontend_dist
 if dist.is_dir():
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
-    def spa(path: str):
+    def spa(path: str, request: Request):
         file = (dist / path).resolve()
         if path and file.is_file() and dist.resolve() in file.parents:
             return FileResponse(file)
-        return FileResponse(dist / "index.html")
+        # index.html отдаём с мета-тегами под адрес (seo.py): публичные страницы индексируются, остальные нет
+        template = (dist / "index.html").read_text(encoding="utf-8")
+        return HTMLResponse(seo.render_index(template, path, _base(request), {
+            "yandex-verification": settings.yandex_verification, "google-site-verification": settings.google_verification,
+        }))

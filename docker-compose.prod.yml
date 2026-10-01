@@ -11,6 +11,9 @@ services:
       CUREME_API_DOCS: "false"
       # Ссылки в письмах ведут на основной домен, а не на тот, что пришёл в заголовке Host.
       CUREME_PUBLIC_URL: https://${CUREME_DOMAIN}
+      # Коды подтверждения сайта в Яндекс Вебмастере и Google Search Console (DEPLOY.md, раздел «Поиск»). Пусто — тега нет.
+      CUREME_YANDEX_VERIFICATION: ${CUREME_YANDEX_VERIFICATION:-}
+      CUREME_GOOGLE_VERIFICATION: ${CUREME_GOOGLE_VERIFICATION:-}
       # Почта для писем «Подтвердите почту». Значения берутся из /opt/cureme/.env (см. DEPLOY.md, раздел 7).
       # Пока CUREME_SMTP_HOST пуст, письма не отправляются и подтверждение почты выключено.
       CUREME_SMTP_HOST: ${CUREME_SMTP_HOST:-}
