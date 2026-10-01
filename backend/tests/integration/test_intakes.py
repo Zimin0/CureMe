@@ -195,7 +195,7 @@ def test_free_family_sees_only_last_30_days(client, db, owner, med):
     assert len(history(client, h, f)) == 2
     assert client.get(older, headers=h).json() == {"history_since": None, "hidden": 0}
 
-    assert client.put("/api/admin/billing", headers=h, json={"enabled": True}).status_code == 200
+    assert client.put("/api/admin/billing", headers=h, json={"enabled": True, "trial_days": 0}).status_code == 200
     [recent] = history(client, h, f)
     assert recent["comment"] == ""
     assert history(client, h, f, q="старое") == []  # поиск тоже не достаёт скрытое

@@ -82,6 +82,10 @@ class AccessOut(BaseModel):
     closed: bool
     telegram: bool = False  # Telegram на сайте включён (бот настроен и переключатель в админке)
     debug: bool = False  # режим отладки: показывать версию приложения на каждой странице
+    # Для приветственной страницы гостей: пробный Плюс и (если задана и платная версия включена) цена.
+    trial_days: int = 0
+    price_month: int | None = None
+    price_year: int | None = None
 
 
 class DebugSettings(BaseModel):
@@ -240,6 +244,8 @@ class BillingSettings(BaseModel):
     # Стоимость Плюса для аккаунта в рублях; пусто — цена не показывается.
     price_month: int | None = Field(default=None, ge=1, le=100_000)
     price_year: int | None = Field(default=None, ge=1, le=1_000_000)
+    # Сколько дней Плюса дарим при первом подтверждении почты; 0 — пробный период выключен.
+    trial_days: int = Field(default=5, ge=0, le=90)
 
 
 class AdminPlanIn(BaseModel):

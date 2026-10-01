@@ -8,7 +8,7 @@ from ..email_verification import issue_token, mark_verified, needs_verification,
 from ..legal import CONSENT_VERSION
 from ..limits import ensure_can_add_member
 from ..models import Family, Membership, User, utcnow
-from ..plans import own_families_left, plus_active
+from ..plans import billing_settings, grant_trial, own_families_left, plus_active
 from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
 from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
@@ -68,6 +68,8 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     else:
         create_family(db, f"Семья {user.name}", user)
     token = issue_token(user) if needs_verification(user) else None
+    if token is None:
+        grant_trial(db, user)  # почту не проверяем (нет SMTP): подарок сразу; иначе его даёт подтверждение почты
     db.commit()
     db.refresh(user)
     if token:
@@ -166,6 +168,7 @@ def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(ge
     if expired:
         raise HTTPException(status.HTTP_410_GONE, "Ссылка устарела. Войдите и отправьте письмо ещё раз")
     mark_verified(user)
+    grant_trial(db, user)
     db.commit()
     return Response(status_code=204)
 
@@ -173,4 +176,10 @@ def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(ge
 @router.get("/access", response_model=AccessOut)
 def access(db: Session = Depends(get_db)):
     """Открыт ли сайт для всех и включён ли режим отладки. Нужен страницам входа и регистрации до того, как человек вошёл."""
-    return AccessOut(closed=access_settings(db)["closed"], debug=debug_enabled(db), telegram=telegram_active(db))
+    billing = billing_settings(db)
+    return AccessOut(
+        closed=access_settings(db)["closed"], debug=debug_enabled(db), telegram=telegram_active(db),
+        trial_days=billing.trial_days,
+        price_month=billing.price_month if billing.enabled else None,
+        price_year=billing.price_year if billing.enabled else None,
+    )

@@ -10,7 +10,7 @@ def close_site(client, admin_h, user_ids=()):
 
 
 def test_site_is_open_by_default(client):
-    assert client.get("/api/auth/access").json() == {"closed": False, "telegram": False, "debug": False}
+    assert client.get("/api/auth/access").json() .items() >= {"closed": False, "telegram": False, "debug": False}.items()
     h, _ = register(client)
     assert client.get("/api/admin/access", headers=h).json() == {"closed": False, "user_ids": []}
 
@@ -21,7 +21,7 @@ def test_closed_mode_blocks_others_but_keeps_their_rights(client):
     other_h, other = register(client, "other@example.com", "Чужой")
     assert close_site(client, admin_h, [tester["id"], 999]) == {"closed": True, "user_ids": [tester["id"]]}
 
-    assert client.get("/api/auth/access").json() == {"closed": True, "telegram": False, "debug": False}
+    assert client.get("/api/auth/access").json() .items() >= {"closed": True, "telegram": False, "debug": False}.items()
     # администратор и тестировщик работают как раньше
     assert client.get(f"/api/families/{fid(admin)}/medicines", headers=admin_h).status_code == 200
     assert client.get(f"/api/families/{fid(tester)}/medicines", headers=tester_h).status_code == 200

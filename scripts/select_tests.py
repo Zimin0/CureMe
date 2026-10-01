@@ -50,7 +50,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/families.py"],
         "tests": [
             "integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py",
-            "integration/test_plans.py",
+            "integration/test_plans.py", "integration/test_trial.py",
         ],
     },
     "Лекарства, упаковки, остатки": {
