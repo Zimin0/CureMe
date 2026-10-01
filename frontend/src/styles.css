@@ -519,6 +519,8 @@ a.intake-med { color: var(--primary); }
 .plus-banner strong { font-size: 18px; }
 .plus-banner p { margin: 6px 0 0; font-size: 14px; opacity: .92; }
 .plus-banner .plus-btn { background: #fff; color: #7048e8; font-weight: 700; flex: none; }
+.btn.plus-cta { background: linear-gradient(135deg, #7048e8, #9b6dff); color: #fff; border-color: transparent; font-weight: 700; }
+.btn.plus-cta:hover { filter: brightness(.95); }
 .plus-hero {
   background: linear-gradient(135deg, var(--plus-soft), var(--primary-soft));
   border-radius: var(--radius); padding: 22px; display: flex; gap: 14px; align-items: center;

@@ -84,7 +84,7 @@ export function ScheduleNotify() {
           text="Подключите Плюс, и мы напомним о приёме и сообщим доверенному человеку, если вы забыли." />
       )}
 
-      <fieldset className="locked-block stack" disabled={locked}>
+      {!locked && <fieldset className="locked-block stack">
         <label className="check">
           <input type="checkbox" checked={p.enabled} disabled={!p.email_possible && !p.enabled}
             onChange={e => set({ enabled: e.target.checked })} />
@@ -169,7 +169,7 @@ export function ScheduleNotify() {
             </div>
           </>
         )}
-      </fieldset>
+      </fieldset>}
     </section>
   )
 }
