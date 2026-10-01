@@ -41,12 +41,12 @@ export function Cabinets() {
       <div className="card-head" style={{ marginBottom: 0 }}>
         <h2>Мои аптечки</h2>
       </div>
-      <fieldset className="locked-block" disabled={locked}>
-        <p className="muted small">
+      <div className="stack">
+        <p className="small">
           Отдельные аптечки для дачи, машины или бабушки. У каждой свои лекарства и свои участники.
         </p>
-        <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>
-      </fieldset>
+        {!locked && <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setName('')}><Plus size={16} />Новая аптечка</button>}
+      </div>
       {locked && me.plus_active && (
         <p className="muted small" role="note">Достигнут потолок: не больше 5 своих аптечек. Нужно больше — напишите нам.</p>
       )}
