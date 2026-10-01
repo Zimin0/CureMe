@@ -6,7 +6,7 @@ import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
 import { ClosedGate, ConsentGate, Join, Login, Register, VerifyEmail, VerifyGate } from './pages/Auth'
-import { Consent, Privacy, TelegramConsent, Terms } from './pages/Legal'
+import { Consent, Privacy, TelegramConsent, Terms, TrustedConsent } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
 import { Family } from './pages/Family'
@@ -63,6 +63,7 @@ export default function App() {
       <Route path="/consent" element={<Consent />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/consent-telegram" element={<TelegramConsent />} />
+      <Route path="/consent-trusted" element={<TrustedConsent />} />
       <Route element={<Protected />}>
         <Route index element={<Home />} />
         <Route path="medicines" element={<Medicines />} />

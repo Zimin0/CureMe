@@ -47,9 +47,11 @@ export function Trusted() {
               <div className="alert info">
                 <span className="small">
                   Нажимая «Согласен(на)», вы разрешаете Капсулке использовать вашу почту и имя, которые ввёл(а) {info.user_name},
-                  только для этих писем. Письма приходят, пока вы не отпишетесь по ссылке в любом из них; данные хранятся до
-                  отказа или пока {info.user_name} не уберёт вас из списка. Подробнее в <a href="/privacy">Политике</a>;
-                  вопросы и запросы на удаление: <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>.
+                  только для этих писем. Письма приходят, пока вы не отпишетесь по ссылке в любом из них. Имя и почта хранятся, пока вы
+                  не отпишетесь, {info.user_name} не уберёт вас из списка (или не удалит аккаунт) либо вы не потребуете удаления;
+                  если вы не ответите, через 30 дней мы их удалим.
+                  Оператор: {OPERATOR.name}. Полный текст: <a href="/consent-trusted">согласие доверенного лица</a> и{' '}
+                  <a href="/privacy">Политика</a>; вопросы и запросы на удаление: <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>.
                 </span>
               </div>
               <button className="btn primary block" disabled={act.isPending} onClick={() => act.mutate('confirm')}>Согласен(на) получать письма</button>
