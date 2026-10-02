@@ -26,4 +26,6 @@ case "$CUREME_DATABASE_URL" in
     ;;
 esac
 
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-server-header
+# --no-access-log: журнал запросов с IP-адресами посетителей не ведём (Политика: IP в журналах не более 30 дней;
+# проще и надёжнее не писать их вовсе, чем стирать). Ошибки приложения по-прежнему видны в логах.
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-server-header --no-access-log
