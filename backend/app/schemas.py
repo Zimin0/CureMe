@@ -139,10 +139,6 @@ class FamilyOut(BaseModel):
     members: list[MemberOut]
 
 
-class AddMemberIn(BaseModel):
-    email: EmailStr
-
-
 class RoleIn(BaseModel):
     role: str = Field(pattern="^(owner|member)$")
 

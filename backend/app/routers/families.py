@@ -8,7 +8,7 @@ from ..limits import ensure_can_add_member, members_full
 from ..models import Family, Membership, Schedule, User
 from ..plans import LIMIT_FEATURE, PLUS_OWN_FAMILIES_MAX, own_families_left, plan_out, plus_active, plus_required
 from ..ratelimit import client_ip, limiter
-from ..schemas import AddMemberIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, PlanOut, RoleIn
+from ..schemas import FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, PlanOut, RoleIn
 from ..security import new_invite_code
 from .auth import create_family
 
@@ -67,23 +67,6 @@ def rename_family(body: FamilyIn, m: Membership = Depends(family_owner), db: Ses
 def regenerate_invite(m: Membership = Depends(family_owner), db: Session = Depends(get_db)):
     m.family.invite_code = new_invite_code()
     db.commit()
-    return family_out(m.family, m.role)
-
-
-@router.post("/families/{family_id}/members", response_model=FamilyOut)
-def add_member(body: AddMemberIn, m: Membership = Depends(family_owner), db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
-    if not user:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            "Такого аккаунта пока нет. Отправьте человеку ссылку-приглашение, и он зарегистрируется по ней.",
-        )
-    if any(x.user_id == user.id for x in m.family.memberships):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Этот человек уже в семье")
-    ensure_can_add_member(db, m.family)
-    db.add(Membership(family=m.family, user=user, role="member"))
-    db.commit()
-    db.refresh(m.family)
     return family_out(m.family, m.role)
 
 
