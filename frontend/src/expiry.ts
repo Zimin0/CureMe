@@ -24,7 +24,7 @@ const fullYear = (y: number) => (y < 100 ? 2000 + y : y)
 function make(y: number, m: number, d?: number): Date | null {
   y = fullYear(y)
   if (m < 1 || m > 12 || y < 2000 || y > 2100) return null
-  const day = d ?? lastDay(y, m) // только месяц и год → годен до конца месяца
+  const day = d ?? 1 // только месяц и год → по умолчанию 1 число месяца
   if (day < 1 || day > lastDay(y, m)) return null
   return new Date(y, m - 1, day)
 }
@@ -46,7 +46,7 @@ function candidates(raw: string): Candidate[] {
   const dmy = new RegExp(String.raw`(?<!\d)(\d{1,2})${sep}(\d{1,2})${sep}(\d{4}|\d{2})(?!\d)`, 'g')
   const taken = new Set<number>()
   while ((m = dmy.exec(text))) {
-    // OCR часто путает 3 и 5, 8 и 6 в дне: «51.01.2028». Месяц и год при этом верные — берём конец месяца.
+    // OCR часто путает 3 и 5, 8 и 6 в дне: «51.01.2028». Месяц и год при этом верные — берём 1 число месяца.
     push(make(+m[3], +m[2], +m[1]) ?? (m[3].length === 4 ? make(+m[3], +m[2]) : null), m.index, m[0].length)
     for (let i = m.index; i < m.index + m[0].length; i++) taken.add(i)
   }
