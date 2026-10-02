@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import signed_in_user
-from ..email_verification import issue_token, mark_verified, needs_verification, send_verification, user_by_token, verification_link
+from ..email_verification import code_matches, issue_code, mark_verified, needs_verification, send_verification
 from ..legal import CONSENT_VERSION
 from ..limits import ensure_can_add_member
 from ..models import Family, Membership, User, utcnow
@@ -67,14 +67,14 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         db.add(Membership(family=family, user=user, role="member"))
     else:
         create_family(db, f"Семья {user.name}", user)
-    token = issue_token(user) if needs_verification(user) else None
-    if token is None:
+    code = issue_code(user) if needs_verification(user) else None
+    if code is None:
         grant_trial(db, user)  # почту не проверяем (нет SMTP): подарок сразу; иначе его даёт подтверждение почты
     db.commit()
     db.refresh(user)
-    if token:
+    if code:
         # Письмо уходит уже после ответа: человек не ждёт почтовый сервер.
-        background.add_task(send_verification, user.email, user.name, verification_link(request, token))
+        background.add_task(send_verification, user.email, user.name, code)
     return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
 
 
@@ -143,30 +143,31 @@ def delete_me(body: DeleteAccountIn, user: User = Depends(signed_in_user), db: S
 
 
 @router.post("/verify-email/resend", status_code=204)
-def resend_verification(request: Request, background: BackgroundTasks,
+def resend_verification(background: BackgroundTasks,
                         user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
-    """Отправить письмо со ссылкой ещё раз. Старая ссылка перестаёт работать."""
+    """Отправить письмо с новым кодом. Старый код перестаёт работать."""
     if user.email_verified_at:
         raise HTTPException(status.HTTP_409_CONFLICT, "Почта уже подтверждена")
     # Чтобы через нас нельзя было засыпать чей-то ящик письмами: раз в минуту и не больше 5 в час.
     limiter.hit(f"verify-resend-min:{user.id}", limit=1, window=60)
     limiter.hit(f"verify-resend-hour:{user.id}", limit=5, window=3600)
-    token = issue_token(user)
+    code = issue_code(user)
     db.commit()
-    background.add_task(send_verification, user.email, user.name, verification_link(request, token))
+    background.add_task(send_verification, user.email, user.name, code)
     return Response(status_code=204)
 
 
 @router.post("/verify-email", status_code=204)
-def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(get_db)):
-    """Переход по ссылке из письма. Входить не нужно: ссылку часто открывают в почтовом
-    приложении на телефоне, где человек в Капсулку не входил."""
-    limiter.hit(f"verify-email:{client_ip(request)}", limit=30, window=600)
-    user, expired = user_by_token(db, body.token)
-    if not user:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Ссылка недействительна или уже использована")
+def verify_email(body: VerifyEmailIn, user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
+    """Ввод кода из письма. Попыток мало, чтобы шестизначный код нельзя было подобрать."""
+    limiter.hit(f"verify-email:{user.id}", limit=5, window=900)
+    if user.email_verified_at:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Почта уже подтверждена")
+    ok, expired = code_matches(user, body.code)
+    if not ok:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код неверный или уже использован")
     if expired:
-        raise HTTPException(status.HTTP_410_GONE, "Ссылка устарела. Войдите и отправьте письмо ещё раз")
+        raise HTTPException(status.HTTP_410_GONE, "Код устарел. Отправьте письмо ещё раз")
     mark_verified(user)
     grant_trial(db, user)
     db.commit()

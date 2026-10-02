@@ -84,7 +84,7 @@ backend/
   app/websearch.py   поиск лекарства по штрихкоду через поисковики и разбор заголовков аптек
   app/search.py      подбор по болезни: нормализация, грубый стемминг, синонимы
   app/mailer.py      отправка писем по SMTP (без настроек — в лог)
-  app/email_verification.py  подтверждение почты: одноразовая ссылка, в базе только хеш токена
+  app/email_verification.py  подтверждение почты: 6-значный код из письма, в базе только хеш
   app/doctor_report.py  выписка для врача: данные собирает collect(), PDF рисует fpdf2 (шрифт DejaVu в app/fonts), Excel пишет openpyxl
   alembic/           миграции схемы
   tests/             pytest: unit/ (функции), integration/ (API на настоящей базе), migrations/ (Alembic)
