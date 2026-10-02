@@ -643,6 +643,7 @@ class SchedulePrefsOut(BaseModel):
     escalate_minutes: int
     share_medicine_name: bool
     escalate_consent_at: datetime | None  # когда разрешено сообщать доверенному (None — не разрешено)
+    escalate_consent_version: str | None = None
     trusted: TrustedOut | None
 
 

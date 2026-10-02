@@ -12,7 +12,7 @@ from ..models import Membership, SchedulePrefs, TrustedContact, User, utcnow
 from ..plans import plus_required
 from ..ratelimit import client_ip, limiter
 from ..reminders import can_email, plus_family_ids
-from ..schedule_notify import CONSENT_VERSION, contact_by_token, new_nonce, send_trusted_request
+from ..schedule_notify import CONSENT_VERSION, SHARE_CONSENT_VERSION, contact_by_token, new_nonce, send_trusted_request
 from ..schemas import SchedulePrefsIn, SchedulePrefsOut, TrustedIn, TrustedOut, TrustedPublicOut, TrustedTokenIn
 
 router = APIRouter(prefix="/api/schedule-notifications", tags=["schedule-notifications"])
@@ -49,6 +49,7 @@ def _out(db: Session, user: User) -> SchedulePrefsOut:
         escalate_enabled=bool(prefs and prefs.escalate_enabled), escalate_minutes=prefs.escalate_minutes if prefs else 10,
         share_medicine_name=bool(prefs and prefs.share_medicine_name),
         escalate_consent_at=prefs.escalate_consent_at if prefs else None,
+        escalate_consent_version=prefs.escalate_consent_version if prefs else None,
         trusted=TrustedOut(name=c.name, email=c.email, status=c.status, confirmed_at=c.confirmed_at) if c else None,
     )
 
@@ -69,9 +70,9 @@ def update_prefs(body: SchedulePrefsIn, user: User = Depends(current_user), db: 
         if not consent:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 "Отметьте, что разрешаете сообщать доверенному человеку о неотмеченном приёме")
-        data["escalate_consent_at"] = utcnow()
+        data["escalate_consent_at"], data["escalate_consent_version"] = utcnow(), SHARE_CONSENT_VERSION
     elif data.get("escalate_enabled") is False:
-        data["escalate_consent_at"] = None  # выключили — разрешение снято, при новом включении спросим снова
+        data["escalate_consent_at"] = data["escalate_consent_version"] = None  # выключили — разрешение снято, при новом включении спросим снова
     if data.get("enabled") and not can_email(user):
         raise HTTPException(status.HTTP_409_CONFLICT, "Отправка писем на сайте пока не настроена")
     prefs = _prefs(db, user)
@@ -135,6 +136,7 @@ def remove_trusted(user: User = Depends(current_user), db: Session = Depends(get
     prefs = db.get(SchedulePrefs, user.id)
     if prefs:
         prefs.escalate_enabled = False
+        prefs.escalate_consent_at = prefs.escalate_consent_version = None  # доверенного нет — разрешение снято
     db.commit()
     return Response(status_code=204)
 

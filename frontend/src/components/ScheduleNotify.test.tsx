@@ -9,7 +9,7 @@ import { ScheduleNotify } from './ScheduleNotify'
 function prefs(over: Partial<SchedulePrefs> = {}): SchedulePrefs {
   return {
     available: true, email: 'nikita@example.com', email_possible: true, enabled: false, lead_minutes: 10, repeat_minutes: 10,
-    escalate_enabled: false, escalate_minutes: 10, share_medicine_name: false, escalate_consent_at: null, trusted: null, ...over,
+    escalate_enabled: false, escalate_minutes: 10, share_medicine_name: false, escalate_consent_at: null, escalate_consent_version: null, trusted: null, ...over,
   }
 }
 
@@ -55,12 +55,12 @@ it('приглашает доверенного только с подтверж
   await user.click(send)
   expect(await screen.findByText('Ждём согласия')).toBeInTheDocument()
   expect(s.invites).toEqual([{ name: 'Мама', email: 'mama@example.com', attest: true }])
-  expect(screen.getByLabelText(/Сообщать ему/)).toBeDisabled()  // пока он не согласился
+  expect(screen.getByLabelText(/Разрешаю передавать указанному мной доверенному лицу/)).toBeDisabled()  // пока он не согласился
 
   s.current = { ...s.current, trusted: { ...s.current.trusted!, status: 'confirmed', confirmed_at: '2026-10-01T10:00:00Z' } }
-  await user.click(await screen.findByLabelText(/Я разрешаю Капсулке сообщать/))
-  await waitFor(() => expect(screen.getByLabelText(/Сообщать ему/)).toBeEnabled(), { timeout: 7000 })
-  await user.click(screen.getByLabelText(/Сообщать ему/))
+  const consent = await screen.findByLabelText(/Разрешаю передавать указанному мной доверенному лицу сведения о факте выполнения\/пропуска запланированного приёма препарата/)
+  await waitFor(() => expect(consent).toBeEnabled(), { timeout: 7000 })
+  await user.click(consent)
   await waitFor(() => expect(s.puts.at(-1)).toEqual({ escalate_enabled: true, escalate_consent: true }))
 }, 15_000)
 
