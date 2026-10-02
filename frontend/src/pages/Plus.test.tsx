@@ -37,6 +37,7 @@ describe('публичная страница /plus для гостей', () => 
     renderApp('/plus', { loggedIn: false })
     expect(await screen.findByRole('heading', { name: 'Капсулка Плюс' })).toBeInTheDocument()
     expect(screen.getByText('199 ₽ в месяц или 1 990 ₽ в год')).toBeInTheDocument()
+    expect(screen.getByText(/без физической доставки/)).toBeInTheDocument()
     expect(screen.getByText(/по умолчанию выключена/)).toBeInTheDocument()
     expect(screen.getByText(/Кнопка «Отключить автопродление»/)).toBeInTheDocument()
     expect(screen.getByText(/неиспользованный оставшийся период/)).toBeInTheDocument()
