@@ -1,3 +1,15 @@
+# Журналы Caddy (в них бывают IP-адреса посетителей) пишем в файл и стираем по времени:
+# Политика обещает хранить веб-журналы не более 30 дней, а ротация по размеру этого не гарантирует.
+{
+	log {
+		output file /data/logs/caddy.log {
+			roll_size 10MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+	}
+}
+
 # Caddy сам получает и продлевает сертификат Let's Encrypt для домена.
 {$CUREME_DOMAIN} {
 	encode zstd gzip
