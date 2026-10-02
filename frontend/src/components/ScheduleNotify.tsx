@@ -10,6 +10,7 @@ const KEY = ['schedule-notifications']
 const LEAD = [5, 10, 15, 30, 60]
 const REPEAT = [5, 10, 15, 30]
 const ESCALATE = [10, 15, 30, 60]
+const SHARE_CONSENT = 'Разрешаю передавать указанному мной доверенному лицу сведения о факте выполнения/пропуска запланированного приёма препарата'
 const STATUS: Record<TrustedStatus, { label: string; badge: string }> = {
   pending: { label: 'Ждём согласия', badge: 'info' },
   confirmed: { label: 'Согласился(ась)', badge: 'ok' },
@@ -47,7 +48,6 @@ export function ScheduleNotify() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [attest, setAttest] = useState(false)
-  const [allow, setAllow] = useState(false)  // разрешение сообщать доверенному, что приём не отмечен
   const onError = (e: Error) => toast(e.message, 'error')
   const save = useMutation({
     mutationFn: (body: Partial<SchedulePrefs> & { escalate_consent?: boolean }) => api<SchedulePrefs>('/schedule-notifications', { method: 'PUT', body }),
@@ -127,18 +127,24 @@ export function ScheduleNotify() {
                   {(t.status === 'declined' || t.status === 'revoked') && (
                     <p className="muted small">Этот человек отказался получать письма, его имя и почта удалены. Чтобы пригласить кого-то, уберите эту запись и добавьте заново.</p>
                   )}
-                  {!p.escalate_enabled && (
+                  <div className="stack consent-box" style={{ gap: 8 }} data-testid="share-consent">
+                    <h3>Отдельное согласие</h3>
                     <label className="check">
-                      <input type="checkbox" checked={allow} onChange={e => setAllow(e.target.checked)} />
-                      <span className="small">Я разрешаю Капсулке сообщать этому человеку, что я не отметил(а) плановый приём: из письма он поймёт, что мне назначены лекарства
-                        (<Link to="/consent">Согласие, п. 4.1</Link>)</span>
+                      <input type="checkbox" checked={p.escalate_enabled} disabled={!p.escalate_enabled && t.status !== 'confirmed'}
+                        onChange={e => set(e.target.checked ? { escalate_enabled: true, escalate_consent: true } : { escalate_enabled: false })} />
+                      <span><b>{SHARE_CONSENT}</b>{t.status !== 'confirmed' && <><br /><span className="muted small">Включится, когда этот человек сам согласится по ссылке из письма</span></>}</span>
                     </label>
-                  )}
-                  <label className="check">
-                    <input type="checkbox" checked={p.escalate_enabled} disabled={!p.escalate_enabled && (t.status !== 'confirmed' || !allow)}
-                      onChange={e => set(e.target.checked ? { escalate_enabled: true, escalate_consent: true } : { escalate_enabled: false })} />
-                    <span>Сообщать ему, если я не отметил(а) приём{t.status !== 'confirmed' && <><br /><span className="muted small">Заработает, когда он согласится</span></>}</span>
-                  </label>
+                    <details className="small muted">
+                      <summary>Что это значит</summary>
+                      <p>Такое письмо сообщает доверенному лицу сведения о вашем здоровье: что вам назначен приём лекарства и что он не отмечен. Согласие даётся отдельно от
+                        регистрации и Пользовательского соглашения, добровольно и только на эту передачу; отказ от него не ограничивает остальные функции. Адресат — только указанный вами человек, письмо
+                        без названия препарата, если вы не включили эту опцию ниже. Снять согласие можно здесь же, сняв отметку: письма прекратятся сразу, дата и редакция согласия сохраняются в учёте оператора
+                        (<Link to="/privacy">Политика</Link>).</p>
+                    </details>
+                    {p.escalate_enabled && p.escalate_consent_at && (
+                      <span className="muted small">Согласие дано {new Date(p.escalate_consent_at).toLocaleString('ru-RU')}. Чтобы отозвать, снимите отметку.</span>
+                    )}
+                  </div>
                   {p.escalate_enabled && (
                     <>
                       <h3>Написать ему через</h3>

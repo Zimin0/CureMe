@@ -261,6 +261,7 @@ class SchedulePrefs(Base):
     # Когда пользователь отдельно разрешил сообщать доверенному, что приём не отмечен (Согласие, п. 4.1):
     # письмо доверенному раскрывает сведения о здоровье. Без этой даты такие письма не уходят.
     escalate_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    escalate_consent_version: Mapped[str | None] = mapped_column(String(32))  # редакция текста этого разрешения
 
 
 class TrustedContact(Base):
