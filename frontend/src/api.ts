@@ -143,6 +143,7 @@ export interface SchedulePrefs {
   escalate_minutes: number  // письмо доверенному: через сколько минут после повторного напоминания
   share_medicine_name: boolean
   escalate_consent_at: string | null  // когда разрешено сообщать доверенному (null — не разрешено)
+  escalate_consent_version?: string | null
   trusted: Trusted | null
 }
 

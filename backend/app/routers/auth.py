@@ -182,4 +182,5 @@ def access(db: Session = Depends(get_db)):
         trial_days=billing.trial_days,
         price_month=billing.price_month if billing.enabled else None,
         price_year=billing.price_year if billing.enabled else None,
+        billing_enabled=billing.enabled, listed_price_month=billing.price_month, listed_price_year=billing.price_year,
     )

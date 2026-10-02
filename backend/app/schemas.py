@@ -86,6 +86,10 @@ class AccessOut(BaseModel):
     trial_days: int = 0
     price_month: int | None = None
     price_year: int | None = None
+    # Для публичной страницы /plus: цена тарифа как её задал администратор, даже пока платная версия выключена.
+    billing_enabled: bool = False
+    listed_price_month: int | None = None
+    listed_price_year: int | None = None
 
 
 class DebugSettings(BaseModel):
@@ -137,10 +141,6 @@ class FamilyOut(BaseModel):
     invite_code: str
     role: str
     members: list[MemberOut]
-
-
-class AddMemberIn(BaseModel):
-    email: EmailStr
 
 
 class RoleIn(BaseModel):
@@ -647,6 +647,7 @@ class SchedulePrefsOut(BaseModel):
     escalate_minutes: int
     share_medicine_name: bool
     escalate_consent_at: datetime | None  # когда разрешено сообщать доверенному (None — не разрешено)
+    escalate_consent_version: str | None = None
     trusted: TrustedOut | None
 
 

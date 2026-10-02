@@ -50,19 +50,14 @@ def test_members_are_listed_owner_first(client):
     assert [(m["name"], m["role"]) for m in fam["members"]] == [("Никита", "owner"), ("Мама", "member")]
 
 
-def test_add_member_by_email(client, owner):
+def test_owner_cannot_add_member_by_email(client, owner):
+    """Человек вступает только сам, по ссылке: владелец не добавляет чужой аккаунт по почте."""
     h, _, f = owner
-    assert client.post(f"/api/families/{f}/members", headers=h, json={"email": "ghost@example.com"}).status_code == 404
     register(client, "dad@example.com", "Папа")
-    fam = client.post(f"/api/families/{f}/members", headers=h, json={"email": "DAD@example.com"}).json()
-    assert [m["name"] for m in fam["members"]] == ["Никита", "Папа"]
-    assert client.post(f"/api/families/{f}/members", headers=h, json={"email": "dad@example.com"}).status_code == 409
-
-
-def test_member_cannot_add_members(client):
-    _, (h2, _), f = two_members(client)
-    register(client, "dad@example.com", "Папа")
-    assert client.post(f"/api/families/{f}/members", headers=h2, json={"email": "dad@example.com"}).status_code == 403
+    for email in ("dad@example.com", "ghost@example.com"):
+        r = client.post(f"/api/families/{f}/members", headers=h, json={"email": email})
+        assert r.status_code in (404, 405)
+    assert [m["name"] for m in client.get(f"/api/families/{f}", headers=h).json()["members"]] == ["Никита"]
 
 
 def test_roles(client):

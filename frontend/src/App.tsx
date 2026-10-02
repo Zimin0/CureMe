@@ -6,7 +6,7 @@ import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
 import { ClosedGate, ConsentGate, Join, Login, Register, VerifyEmail, VerifyGate } from './pages/Auth'
-import { Consent, Privacy, TelegramConsent, Terms, TrustedConsent } from './pages/Legal'
+import { Consent, Offer, Privacy, ShareConsent, TelegramConsent, Terms, TrustedConsent } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
 import { Family } from './pages/Family'
@@ -20,7 +20,7 @@ import { Scan } from './pages/Scan'
 import { Trusted } from './pages/Trusted'
 import { Schedule } from './pages/Schedule'
 import { NoFamily } from './pages/NoFamily'
-import { Plus } from './pages/Plus'
+import { Plus, PlusPublic } from './pages/Plus'
 import { Landing } from './pages/Landing'
 import { versionLabel } from './version'
 
@@ -29,6 +29,7 @@ function Protected() {
   const loc = useLocation()
   if (loading) return <PageLoader />
   if (!me && loc.pathname === '/') return <Landing />  // гостям на главном адресе — приветственная страница
+  if (!me && loc.pathname === '/plus') return <PlusPublic />  // тариф, цена и реквизиты открыты без входа
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   if (me.access_blocked) return <ClosedGate />
   if (me.consent_needed) return <ConsentGate />
@@ -64,8 +65,10 @@ export default function App() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/consent" element={<Consent />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/offer" element={<Offer />} />
       <Route path="/consent-telegram" element={<TelegramConsent />} />
       <Route path="/consent-trusted" element={<TrustedConsent />} />
+      <Route path="/consent-share" element={<ShareConsent />} />
       <Route element={<Protected />}>
         <Route index element={<Home />} />
         <Route path="medicines" element={<Medicines />} />
