@@ -23,7 +23,7 @@ def members_full(db: Session, family: Family) -> bool:
 
 
 def ensure_can_add_member(db: Session, family: Family, joining: bool = False) -> None:
-    """joining — человек сам вступает по приглашению; иначе владелец добавляет его по почте."""
+    """joining — человек сам вступает по приглашению; иначе его добавляет администратор сервиса."""
     if not members_full(db, family):
         return
     limit = limit_of(db, family, "members")
