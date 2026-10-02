@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Share2, Shield, Sparkles, Trash2, UserPlus } from 'lucide-react'
+import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Share2, Shield, Sparkles, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, Family as FamilyT } from '../api'
@@ -24,7 +24,6 @@ export function Family() {
   const { data: f, isLoading } = useQuery({ queryKey: key, queryFn: () => api<FamilyT>(fam('')) })
   const { plan } = usePlan()
 
-  const [email, setEmail] = useState('')
   const [rename, setRename] = useState<string | null>(null)
 
   const onFam = (d: FamilyT, msg?: string) => { qc.setQueryData(key, d); if (msg) toast(msg) }
@@ -32,10 +31,6 @@ export function Family() {
   const onError = (e: Error) => { if (!(e instanceof ApiError && e.status === 402)) toast(e.message, 'error') }
   const membersFull = useLimitReached('members')
 
-  const addMember = useMutation({
-    mutationFn: () => api<FamilyT>(fam('/members'), { body: { email } }),
-    onSuccess: d => { onFam(d, 'Участник добавлен'); setEmail(''); qc.invalidateQueries({ queryKey: ['plan'] }) }, onError,
-  })
   const setRole = useMutation({
     mutationFn: ({ uid, role }: { uid: number; role: string }) => api<FamilyT>(fam(`/members/${uid}`), { method: 'PATCH', body: { role } }),
     onSuccess: d => onFam(d, 'Роль изменена'), onError,
@@ -104,7 +99,7 @@ export function Family() {
 
       <section className="card stack">
         <h2>Пригласить в семью</h2>
-        <p className="muted small">Отправьте ссылку. По ней можно создать аккаунт или войти в существующий, и аптечка сразу станет общей.</p>
+        <p className="muted small">Отправьте ссылку человеку сами. Он создаст аккаунт или войдёт в свой, сам примет документы и вступит в семью. Почту человека указывать не нужно.</p>
         <div className="invite-box">
           <div>
             <div className="small muted">Ссылка-приглашение</div>
@@ -120,12 +115,6 @@ export function Family() {
           <div className="alert warn">
             <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> участников сколько угодно.</span>
           </div>
-        )}
-        {owner && (
-          <form className="row" onSubmit={e => { e.preventDefault(); addMember.mutate() }}>
-            <input className="input grow" type="email" required placeholder="Или добавить по почте, если аккаунт уже есть" value={email} onChange={e => setEmail(e.target.value)} />
-            <button className="btn" disabled={addMember.isPending}><UserPlus size={18} /></button>
-          </form>
         )}
       </section>
 

@@ -135,19 +135,6 @@ def test_member_limit_on_register_with_invite(client, owner):
     assert client.post("/api/auth/login", json={"email": "late@example.com", "password": "secret123"}).status_code == 401
 
 
-def test_member_limit_on_add_by_email(client, owner):
-    h, _, f = owner
-    fill_members(client, h, f, FREE_MAX_MEMBERS)
-    register(client, "fifth@example.com", "Пятый")
-    r = client.post(f"/api/families/{f}/members", headers=h, json={"email": "fifth@example.com"})
-    assert r.status_code == 402 and "4 участника" in r.json()["detail"]
-
-    # Кто-то вышел — место освободилось.
-    uid = client.get(f"/api/families/{f}", headers=h).json()["members"][-1]["user_id"]
-    assert client.delete(f"/api/families/{f}/members/{uid}", headers=h).status_code == 204
-    assert client.post(f"/api/families/{f}/members", headers=h, json={"email": "fifth@example.com"}).status_code == 200
-
-
 def test_admin_is_not_limited(client, owner):
     """Администратор сервиса может добавить участника сверх лимита (например, по просьбе семьи)."""
     h, _, f = owner  # первый аккаунт — администратор
