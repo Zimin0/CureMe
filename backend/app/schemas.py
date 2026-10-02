@@ -86,6 +86,10 @@ class AccessOut(BaseModel):
     trial_days: int = 0
     price_month: int | None = None
     price_year: int | None = None
+    # Для публичной страницы /plus: цена тарифа как её задал администратор, даже пока платная версия выключена.
+    billing_enabled: bool = False
+    listed_price_month: int | None = None
+    listed_price_year: int | None = None
 
 
 class DebugSettings(BaseModel):

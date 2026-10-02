@@ -20,7 +20,7 @@ import { Scan } from './pages/Scan'
 import { Trusted } from './pages/Trusted'
 import { Schedule } from './pages/Schedule'
 import { NoFamily } from './pages/NoFamily'
-import { Plus } from './pages/Plus'
+import { Plus, PlusPublic } from './pages/Plus'
 import { Landing } from './pages/Landing'
 import { versionLabel } from './version'
 
@@ -29,6 +29,7 @@ function Protected() {
   const loc = useLocation()
   if (loading) return <PageLoader />
   if (!me && loc.pathname === '/') return <Landing />  // гостям на главном адресе — приветственная страница
+  if (!me && loc.pathname === '/plus') return <PlusPublic />  // тариф, цена и реквизиты открыты без входа
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   if (me.access_blocked) return <ClosedGate />
   if (me.consent_needed) return <ConsentGate />
