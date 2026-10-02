@@ -12,3 +12,9 @@ export const SELLER = {
   email: OPERATOR.email,
   site: SITE,
 }
+
+/**
+ * Показывать ли ИНН и статус НПД публично. Владелец просил скрыть их до подачи на модерацию ЮKassa (2026-10-02):
+ * перед подачей поставьте true и поднимите версию.
+ */
+export const SHOW_SELLER_ID = false
