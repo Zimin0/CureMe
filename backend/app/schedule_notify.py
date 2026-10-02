@@ -35,9 +35,9 @@ log = logging.getLogger("cureme.schedule")
 GRACE = timedelta(minutes=30)       # сколько после нужного момента ещё пытаемся отправить
 TRUSTED_PER_DAY = 12                # писем доверенному человеку в сутки, чтобы не заспамить его при сбое
 INVITE_TTL = timedelta(days=30)        # неотвеченное приглашение через месяц удаляется вместе с почтой
-OPERATOR_LINE = "Оператор: Зименков Никита Вячеславович, вопросы: work_notifications_zimino@mail.ru"
-SHARE_CONSENT_VERSION = "share-2026-10-02.1"  # редакция отдельного разрешения пользователя сообщать доверенному (ScheduleNotify.tsx)
-CONSENT_VERSION = "trusted-2026-09-30.1"  # редакция текста согласия на странице доверенного (TrustedConsent.tsx)
+OPERATOR_LINE = "Оператор: Зименков Никита Вячеславович, вопросы: kapsulka.ai@yandex.ru"
+SHARE_CONSENT_VERSION = "share-2026-10-02.2"  # редакция отдельного разрешения пользователя сообщать доверенному (ScheduleNotify.tsx)
+CONSENT_VERSION = "trusted-2026-10-02.1"  # редакция текста согласия на странице доверенного (TrustedConsent.tsx)
 STAGES = ("pre", "repeat", "trusted")
 
 
