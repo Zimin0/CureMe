@@ -1,7 +1,7 @@
 {
   "name": "cureme-frontend",
   "private": true,
-  "version": "1.17.6",
+  "version": "1.18.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

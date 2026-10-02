@@ -102,7 +102,7 @@ class TelegramSettings(BaseModel):
 
 
 class VerifyEmailIn(BaseModel):
-    token: str = Field(min_length=1, max_length=100)
+    code: str = Field(pattern=r"^\d{6}$")
 
 
 class AccessSettings(BaseModel):

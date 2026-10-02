@@ -8,7 +8,7 @@ from app.config import get_settings
 from app.models import User
 from app.plans import grant_trial
 from tests.conftest import register
-from tests.integration.test_email_verification import outbox, token_from  # noqa: F401
+from tests.integration.test_email_verification import outbox, code_from  # noqa: F401
 
 
 @pytest.fixture(autouse=True)
@@ -55,8 +55,8 @@ def test_trial_zero_days_means_off(client, row):
 def test_trial_given_after_email_confirmation_only_once(client, outbox, row, session_factory):
     h, u = register(client, "c@example.com")
     assert u["plus_active"] is False  # до подтверждения почты подарка нет
-    token = token_from(outbox[0])
-    assert client.post("/api/auth/verify-email", json={"token": token}).status_code == 204
+    code = code_from(outbox[0])
+    assert client.post("/api/auth/verify-email", headers=h, json={"code": code}).status_code == 204
     u = row("c@example.com")
     assert u.plan == "plus" and u.trial_granted_at is not None
     # Подарок уже использован: после окончания второй раз не выдаётся.

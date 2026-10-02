@@ -88,3 +88,8 @@ def test_without_smtp_letter_goes_to_log(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger="cureme.mail"):
         assert mailer.send_mail("masha@example.com", "Тема", "Ссылка: https://x/verify-email#abc")
     assert "https://x/verify-email#abc" in caplog.text
+
+
+def test_message_has_date_header(smtp):
+    msg = mailer.build_message("masha@example.com", "Тема", "Текст")
+    assert msg["Date"] and msg["Auto-Submitted"] == "auto-generated"
