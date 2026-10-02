@@ -339,8 +339,9 @@ def test_escalation_needs_users_own_permission(client, setup, db, outbox):
     assert client.get("/api/schedule-notifications", headers=h).json()["escalate_consent_at"] is None
     p = client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True, "escalate_consent": True}).json()
     assert p["escalate_enabled"] and p["escalate_consent_at"]  # дата сохранена
+    assert p["escalate_consent_version"].startswith("share-")  # и редакция текста
     p = client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": False}).json()
-    assert p["escalate_consent_at"] is None  # выключил: разрешение снято, при включении спросим снова
+    assert p["escalate_consent_at"] is None and p["escalate_consent_version"] is None  # выключил: разрешение снято, при включении спросим снова
     assert client.put("/api/schedule-notifications", headers=h, json={"escalate_enabled": True}).status_code == 422
 
 

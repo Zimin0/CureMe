@@ -21,3 +21,12 @@ describe('юридические страницы', () => {
     expect(await screen.findByText(/пока не опубликована/)).toBeInTheDocument()
   })
 })
+
+describe('согласие на передачу сведений доверенному лицу', () => {
+  it('страница /consent-share: редакция, получатель, отзыв', async () => {
+    renderApp('/consent-share', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: /Согласие на передачу доверенному лицу/ })).toBeInTheDocument()
+    expect(screen.getByText('Редакция согласия: share-2026-10-02.1.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '6. Срок и отзыв' })).toBeInTheDocument()
+  })
+})
