@@ -11,13 +11,21 @@ describe('юридические страницы', () => {
     expect(screen.getByRole('link', { name: /kapsulka\.ru\/offer/ })).toHaveAttribute('href', '/offer')
   })
 
-  it('Политика осталась в прежней редакции', async () => {
+  it('Политика: редакция от 2 октября', async () => {
     renderApp('/privacy')
-    expect(await screen.findByText('Редакция от 1 октября 2026 г.')).toBeInTheDocument()
+    expect(await screen.findByText('Редакция от 2 октября 2026 г.')).toBeInTheDocument()
   })
 
-  it('страница оферты сообщает, что оферта не опубликована', async () => {
+  it('страница оферты: автопродление по отдельному согласию и возврат, ИНН скрыт флагом', async () => {
     renderApp('/offer')
-    expect(await screen.findByText(/пока не опубликована/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Публичная оферта «Капсулка Плюс»' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '4. Автопродление' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '5. Отказ от услуги и возврат' })).toBeInTheDocument()
+    expect(screen.queryByText(/470418719903/)).not.toBeInTheDocument()
+  })
+
+  it('Политика называет платёжный сервис ЮKassa', async () => {
+    renderApp('/privacy')
+    expect(await screen.findByText(/5\.9\. Оплата\./)).toBeInTheDocument()
   })
 })
