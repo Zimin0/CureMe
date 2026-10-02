@@ -12,7 +12,7 @@ import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr, formatdate, make_msgid
 
 from .config import get_settings
 
@@ -27,6 +27,9 @@ def build_message(to: str, subject: str, text: str, html: str | None = None) -> 
     msg["From"] = formataddr((s.mail_from_name, sender))
     msg["To"] = to
     msg["Subject"] = subject
+    # Date обязателен по RFC 5322; smtplib его не добавляет, а Gmail без него чаще шлёт в спам или отклоняет.
+    msg["Date"] = formatdate(localtime=True)
+    msg["Auto-Submitted"] = "auto-generated"
     msg["Message-ID"] = make_msgid(domain=sender.rpartition("@")[2] or None)
     msg.set_content(text)
     if html:

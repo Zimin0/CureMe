@@ -95,7 +95,7 @@ function UsersTab({ meId }: { meId: number }) {
               <div className="small muted ellipsis">{u.email}</div>
               <div className="small faint ellipsis">{u.families.length ? u.families.map(f => f.name).join(', ') : 'Ни в одной семье'}</div>
             </div>
-            {!u.email_verified && <span className="badge low" title="Человек ещё не перешёл по ссылке из письма">Почта не подтверждена</span>}
+            {!u.email_verified && <span className="badge low" title="Человек ещё не ввёл код из письма">Почта не подтверждена</span>}
             {u.is_admin && <span className="badge accent"><Shield size={12} />Админ</span>}
           </button>
         ))}
