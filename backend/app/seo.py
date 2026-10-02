@@ -58,7 +58,7 @@ PAGES = {
 DISALLOW = [
     "/api/", "/admin", "/login", "/register", "/join/", "/verify-email", "/trusted",
     "/medicines", "/scan", "/find", "/schedule", "/history", "/family", "/export",
-    "/consent-telegram", "/consent-trusted",
+    "/consent-telegram", "/consent-trusted", "/consent-share",
 ]
 
 

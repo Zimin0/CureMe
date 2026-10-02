@@ -143,10 +143,6 @@ class FamilyOut(BaseModel):
     members: list[MemberOut]
 
 
-class AddMemberIn(BaseModel):
-    email: EmailStr
-
-
 class RoleIn(BaseModel):
     role: str = Field(pattern="^(owner|member)$")
 
@@ -651,6 +647,7 @@ class SchedulePrefsOut(BaseModel):
     escalate_minutes: int
     share_medicine_name: bool
     escalate_consent_at: datetime | None  # когда разрешено сообщать доверенному (None — не разрешено)
+    escalate_consent_version: str | None = None
     trusted: TrustedOut | None
 
 
