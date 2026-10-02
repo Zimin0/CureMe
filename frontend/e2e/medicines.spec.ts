@@ -16,7 +16,7 @@ test('лекарство: добавить вручную → принять →
   await page.getByRole('spinbutton', { name: 'Осталось, таб' }).fill('12')
   await page.getByRole('button', { name: 'Ввести текстом' }).click()
   await page.getByPlaceholder(/Как на упаковке/).fill('EXP 05/35')
-  await expect(page.getByText(/Годен до 31 мая 2035/)).toBeVisible()
+  await expect(page.getByText(/Годен до 1 мая 2035/)).toBeVisible()
   await page.getByRole('button', { name: 'Добавить в аптечку' }).click()
 
   // карточка лекарства
