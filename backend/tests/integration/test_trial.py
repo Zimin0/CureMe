@@ -5,9 +5,8 @@ import pytest
 
 from app import mailer
 from app.config import get_settings
-from app.db import get_db
-from app.main import app
 from app.models import User
+from app.plans import grant_trial
 from tests.conftest import register
 from tests.integration.test_email_verification import outbox, token_from  # noqa: F401
 
@@ -17,9 +16,13 @@ def trial_on(monkeypatch):
     monkeypatch.setattr("app.plans.DEFAULT_TRIAL_DAYS", 5)
 
 
-def user_row(client, email):
-    db = next(app.dependency_overrides[get_db]())
-    return db.query(User).filter(User.email == email).one()
+@pytest.fixture
+def row(session_factory):
+    """Строка пользователя из базы; сессия закрывается сразу: открытая транзакция на Postgres повисла бы на сносе схемы."""
+    def get(email):
+        with session_factory() as s:
+            return s.query(User).filter(User.email == email).one()
+    return get
 
 
 def test_trial_days_default_and_admin_can_change(client):
@@ -32,46 +35,44 @@ def test_trial_days_default_and_admin_can_change(client):
     assert client.put("/api/admin/billing", headers=h, json={"trial_days": -1}).status_code == 422
 
 
-def test_trial_granted_on_register_without_email_check(client):
-    h, u = register(client, "new@example.com")
-    row = user_row(client, "new@example.com")
-    assert row.plan == "plus" and row.trial_granted_at is not None
-    left = row.plus_until.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)
+def test_trial_granted_on_register_without_email_check(client, row):
+    h, me = register(client, "new@example.com")
+    u = row("new@example.com")
+    assert u.plan == "plus" and u.trial_granted_at is not None
+    left = u.plus_until.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)
     assert timedelta(days=4, hours=23) < left <= timedelta(days=5)
-    assert u["plus_active"] is True
+    assert me["plus_active"] is True
 
 
-def test_trial_zero_days_means_off(client):
+def test_trial_zero_days_means_off(client, row):
     h, _ = register(client)
     client.put("/api/admin/billing", headers=h, json={"trial_days": 0})
     register(client, "b@example.com")
-    row = user_row(client, "b@example.com")
-    assert row.plan == "free" and row.trial_granted_at is None
+    u = row("b@example.com")
+    assert u.plan == "free" and u.trial_granted_at is None
 
 
-def test_trial_given_after_email_confirmation_only_once(client, outbox):
+def test_trial_given_after_email_confirmation_only_once(client, outbox, row, session_factory):
     h, u = register(client, "c@example.com")
     assert u["plus_active"] is False  # до подтверждения почты подарка нет
     token = token_from(outbox[0])
     assert client.post("/api/auth/verify-email", json={"token": token}).status_code == 204
-    row = user_row(client, "c@example.com")
-    assert row.plan == "plus" and row.trial_granted_at is not None
+    u = row("c@example.com")
+    assert u.plan == "plus" and u.trial_granted_at is not None
     # Подарок уже использован: после окончания второй раз не выдаётся.
-    row.plan, row.plus_until = "free", None
-    db = next(app.dependency_overrides[get_db]())
-    db.merge(row)
-    db.commit()
-    from app.plans import grant_trial
-    assert grant_trial(db, db.get(User, row.id)) is False
+    with session_factory() as db:
+        user = db.get(User, u.id)
+        user.plan, user.plus_until = "free", None
+        db.commit()
+        assert grant_trial(db, user) is False
 
 
-def test_trial_not_granted_to_paid_plus(client):
+def test_trial_not_granted_to_paid_plus(client, session_factory):
     h, u = register(client)
     # админ (первый аккаунт) получил подарок при регистрации; платный Плюс бессрочно не перезаписывается
-    db = next(app.dependency_overrides[get_db]())
-    row = db.get(User, u["id"])
-    row.trial_granted_at = None
-    row.plan, row.plus_until = "plus", None
-    from app.plans import grant_trial
-    assert grant_trial(db, row) is False
-    assert row.plus_until is None
+    with session_factory() as db:
+        user = db.get(User, u["id"])
+        user.trial_granted_at = None
+        user.plan, user.plus_until = "plus", None
+        assert grant_trial(db, user) is False
+        assert user.plus_until is None
