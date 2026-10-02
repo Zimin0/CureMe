@@ -116,6 +116,7 @@ export function Landing() {
             ? <p><b>Пробный период Плюса: {trial} {trial === 1 ? 'день' : trial < 5 ? 'дня' : 'дней'} бесплатно.</b> Он включится сам после подтверждения почты. Потом аккаунт вернётся на бесплатный тариф, деньги не списываются.</p>
             : <p>Основные функции Капсулки бесплатны. Плюс нужен, если хочется большего.</p>}
           {price && <p className="lp-small">Стоимость Плюса: {price}. Цена указана для сведения и не является публичной офертой.</p>}
+          <p className="lp-small"><Link to="/plus">Тариф, стоимость и условия оплаты</Link></p>
           <Link className="btn primary lp-btn" to={cta}>{ctaText}</Link>
         </div>
       </section>
@@ -136,6 +137,10 @@ export function Landing() {
       <footer className="lp-foot">
         <p className="lp-small">Капсулка помогает вести учёт лекарств и не заменяет консультацию врача. Перед применением лекарств читайте инструкцию и советуйтесь со специалистом.</p>
         <LegalLinks />
+        <nav className="legal-links small" aria-label="Тариф">
+          <Link to="/plus">Капсулка Плюс: тариф и оплата</Link>
+          <Link to="/offer">Публичная оферта</Link>
+        </nav>
       </footer>
     </div>
   )

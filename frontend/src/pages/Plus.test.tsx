@@ -30,3 +30,24 @@ describe('страница «Капсулка Плюс»', () => {
     expect(screen.getByText(/не является публичной офертой/)).toBeInTheDocument()
   })
 })
+
+describe('публичная страница /plus для гостей', () => {
+  it('открывается без входа: цена, условия оплаты, реквизиты исполнителя', async () => {
+    server.use(http.get('/api/auth/access', () => HttpResponse.json({ closed: false, listed_price_month: 199, listed_price_year: 1990, billing_enabled: false })))
+    renderApp('/plus', { loggedIn: false })
+    expect(await screen.findByRole('heading', { name: 'Капсулка Плюс' })).toBeInTheDocument()
+    expect(screen.getByText('199 ₽ в месяц или 1 990 ₽ в год')).toBeInTheDocument()
+    expect(screen.getByText(/без физической доставки/)).toBeInTheDocument()
+    expect(screen.getByText(/по умолчанию выключена/)).toBeInTheDocument()
+    expect(screen.getByText(/Кнопка «Отключить автопродление»/)).toBeInTheDocument()
+    expect(screen.getByText(/неиспользованный оставшийся период/)).toBeInTheDocument()
+    expect(screen.queryByText(/ИНН/)).not.toBeInTheDocument()  // скрыт флагом SHOW_SELLER_ID до модерации
+    expect(screen.getByText(/Зименков Никита Вячеславович/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'публичная оферта' })).toHaveAttribute('href', '/offer')
+  })
+
+  it('без цены в настройках не выдумывает её', async () => {
+    renderApp('/plus', { loggedIn: false })
+    expect(await screen.findByText(/Стоимость будет указана здесь/)).toBeInTheDocument()
+  })
+})

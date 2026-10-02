@@ -76,3 +76,11 @@ def test_trial_not_granted_to_paid_plus(client, session_factory):
         user.plan, user.plus_until = "plus", None
         assert grant_trial(db, user) is False
         assert user.plus_until is None
+
+
+def test_access_exposes_listed_price_while_billing_off(client):
+    h, _ = register(client)
+    client.put("/api/admin/billing", headers=h, json={"enabled": False, "price_month": 199, "price_year": 1990, "trial_days": 5})
+    a = client.get("/api/auth/access").json()
+    assert a["price_month"] is None and a["billing_enabled"] is False  # лендинг цену не рекламирует
+    assert a["listed_price_month"] == 199 and a["listed_price_year"] == 1990  # /plus её показывает

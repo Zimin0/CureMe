@@ -51,3 +51,14 @@ def test_verification_meta_only_on_home():
     assert '<meta name="yandex-verification" content="abc123" />' in seo.render_index(TEMPLATE, "/", BASE, v)
     assert "google-site-verification" not in seo.render_index(TEMPLATE, "/", BASE, v)
     assert "yandex-verification" not in seo.render_index(TEMPLATE, "/terms", BASE, v)
+
+
+@pytest.mark.parametrize("path", ["/plus", "/offer"])
+def test_plan_and_offer_pages_indexable(path):
+    out = seo.render_index(TEMPLATE, path, BASE)
+    assert f'href="{BASE}{path}"' in out and "index, follow" in out
+
+
+def test_plus_not_disallowed_but_in_sitemap(client):
+    assert "Disallow: /plus" not in client.get("/robots.txt").text
+    assert "/plus" in client.get("/sitemap.xml").text
