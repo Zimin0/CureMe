@@ -399,5 +399,5 @@ def test_invitation_names_operator(client, setup, outbox):
     h, *_ = setup
     add_trusted(client, h)
     text = body(outbox[-1])
-    assert "Оператор: Зименков Никита Вячеславович" in text and "work_notifications_zimino@mail.ru" in text
+    assert "Оператор: Зименков Никита Вячеславович" in text and "kapsulka.ai@yandex.ru" in text
     assert "https://kapsulka.test/consent-trusted" in text and "через 30 дней" in text
