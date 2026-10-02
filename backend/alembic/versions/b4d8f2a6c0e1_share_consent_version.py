@@ -20,8 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     with op.batch_alter_table('schedule_prefs') as b:
         b.add_column(sa.Column('escalate_consent_version', sa.String(length=32), nullable=True))
-    # Уже данные разрешения относятся к прежней формулировке: помечаем редакцией «до отдельного согласия».
-    op.execute("UPDATE schedule_prefs SET escalate_consent_version = 'legacy-p4.1' WHERE escalate_consent_at IS NOT NULL")
+    # Разрешения, данные без отдельной отметки, отдельным согласием не считаются: письма доверенному
+    # приостанавливаются, пока человек сам не поставит новую отметку.
+    op.execute("UPDATE schedule_prefs SET escalate_enabled = false, escalate_consent_at = NULL WHERE escalate_consent_at IS NOT NULL")
 
 
 def downgrade() -> None:
