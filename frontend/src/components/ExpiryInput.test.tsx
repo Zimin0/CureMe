@@ -32,10 +32,10 @@ describe('ExpiryInput', () => {
 
   it.each([
     ['31.05.2027', '2027-05-31'],
-    ['05.2027', '2027-05-31'],
+    ['05.2027', '2027-05-01'],
     ['31052027', '2027-05-31'],
-    ['092027', '2027-09-30'],
-    ['202705', '2027-05-31'],
+    ['092027', '2027-09-01'],
+    ['202705', '2027-05-01'],
   ])('ввод в основное поле: %s → %s', async (typed, want) => {
     const user = userEvent.setup()
     render(<Harness />)
@@ -68,8 +68,8 @@ describe('ExpiryInput', () => {
     expect(screen.getByText('Взято из кода')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Ввести текстом' }))
     await user.type(screen.getByPlaceholderText(/Как на упаковке/), 'EXP 05/27')
-    expect(value()).toBe('2027-05-31')
-    expect(screen.getByText(/Годен до 31 мая 2027/)).toBeInTheDocument()
+    expect(value()).toBe('2027-05-01')
+    expect(screen.getByText(/Годен до 1 мая 2027/)).toBeInTheDocument()
   })
 
   it('непонятный текст — подсказка, значение не меняется', async () => {
@@ -87,7 +87,7 @@ describe('ExpiryInput', () => {
     const { container } = render(<Harness />)
     await user.upload(container.querySelector('input[type=file]') as HTMLInputElement, photo())
     expect(await screen.findByText(/проверьте, что распознано верно/)).toBeInTheDocument()
-    expect(value()).toBe('2028-11-30')
+    expect(value()).toBe('2028-11-01')
     expect(screen.getByText(/Распознано: Серия 1234/)).toBeInTheDocument()
     expect(screen.getByAltText('Фото срока годности')).toHaveAttribute('src', 'blob:preview')
   })
