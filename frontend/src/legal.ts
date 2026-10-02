@@ -4,7 +4,7 @@
  */
 export const OPERATOR = {
   name: 'Зименков Никита Вячеславович',
-  email: 'work_notifications_zimino@mail.ru',
+  email: 'kapsulka.ai@yandex.ru',
 }
 
 export const SITE = 'kapsulka.ru'
@@ -17,8 +17,8 @@ export const SITE = 'kapsulka.ru'
 export const MAIL_PROVIDER = 'ООО «ЯНДЕКС» (ИНН 7736207543, 119021, г. Москва, ул. Льва Толстого, д. 16)'
 
 /** Редакция документов. Меняется вместе с CONSENT_VERSION в backend/app/legal.py. */
-export const LEGAL_VERSION = '2026-10-01.1'
-export const LEGAL_DATE = '1 октября 2026 г.'
+export const LEGAL_VERSION = '2026-10-02.2'
+export const LEGAL_DATE = '2 октября 2026 г.'
 
 /** Короткое предупреждение о том, что сервис не врач. Показывается в подборе и в карточке лекарства. */
 export const MEDICAL_NOTE =
