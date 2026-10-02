@@ -16,12 +16,12 @@ describe('юридические страницы', () => {
     expect(await screen.findByText('Редакция от 2 октября 2026 г.')).toBeInTheDocument()
   })
 
-  it('страница оферты: автопродление по отдельному согласию и возврат, ИНН скрыт флагом', async () => {
+  it('страница оферты: автопродление по отдельному согласию и возврат, ИНН показан флагом', async () => {
     renderApp('/offer')
     expect(await screen.findByRole('heading', { name: 'Публичная оферта «Капсулка Плюс»' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '4. Автопродление' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '5. Отказ от услуги и возврат' })).toBeInTheDocument()
-    expect(screen.queryByText(/470418719903/)).not.toBeInTheDocument()
+    expect(screen.getByText(/ИНН 470418719903/)).toBeInTheDocument()
   })
 
   it('Политика называет платёжный сервис ЮKassa', async () => {
