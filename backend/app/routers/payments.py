@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 
 def _status(db: Session, user: User) -> PayStatus:
+    payments.sync_pending(db, user)
     rows = db.scalars(select(Payment).where(Payment.user_id == user.id).order_by(Payment.id.desc()).limit(10))
     return PayStatus(
         enabled=payments.payments_enabled(db), plus_active=plus_active(user), plus_until=user.plus_until,

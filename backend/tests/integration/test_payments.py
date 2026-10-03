@@ -117,6 +117,42 @@ def test_webhook_activates_plus_once(client, shop, yk, session_factory):
     assert me["payments"][0]["status"] == "succeeded" and me["plus_active"] is True
 
 
+def test_return_to_plus_activates_when_webhook_did_not_arrive(client, shop, yk, session_factory):
+    h, u = shop
+    pay(client, h)
+    assert client.get("/api/payments/me", headers=h).json()["plus_active"] is False  # ещё не оплачено
+    yk.objects["yk-1"]["status"] = "succeeded"  # уведомление не пришло, человек вернулся на /plus
+    me = client.get("/api/payments/me", headers=h).json()
+    assert me["plus_active"] is True and me["payments"][0]["status"] == "succeeded"
+    assert user_row(session_factory, u["id"]).plan == "plus"
+    first = user_row(session_factory, u["id"]).plus_until
+    client.get("/api/payments/me", headers=h)
+    assert user_row(session_factory, u["id"]).plus_until == first  # повторный запрос Плюс не продлевает
+
+
+def test_me_still_opens_when_yookassa_is_down(client, shop, yk):
+    h, _ = shop
+    pay(client, h)
+    yk.fail = True
+    r = client.get("/api/payments/me", headers=h)
+    assert r.status_code == 200 and r.json()["plus_active"] is False
+
+
+def test_admin_can_recheck_payment_in_yookassa(client, shop, yk, session_factory):
+    h, u = shop
+    pay(client, h)
+    pid = client.get("/api/admin/payments", headers=h).json()[0]["id"]
+    yk.objects["yk-1"]["status"] = "succeeded"
+    r = client.post(f"/api/admin/payments/{pid}/sync", headers=h)
+    assert r.status_code == 200 and r.json()["status"] == "succeeded"
+    assert user_row(session_factory, u["id"]).plan == "plus"
+    assert client.post("/api/admin/payments/9999/sync", headers=h).status_code == 404
+    other, _ = register(client, "other2@example.com")
+    assert client.post(f"/api/admin/payments/{pid}/sync", headers=other).status_code == 403
+    yk.fail = True
+    assert client.post(f"/api/admin/payments/{pid}/sync", headers=h).status_code == 502
+
+
 def test_second_payment_extends_from_current_end(client, shop, yk, session_factory):
     h, u = shop
     for _ in range(2):

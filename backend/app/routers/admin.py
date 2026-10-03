@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from .. import payments
 from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
@@ -368,6 +369,20 @@ def _payment(db: Session, pid: int) -> Payment:
     if not p:
         raise _not_found("Оплата")
     return p
+
+
+@router.post("/payments/{payment_id}/sync", response_model=AdminPaymentOut)
+def sync_payment_now(payment_id: int, db: Session = Depends(get_db)):
+    """Спрашивает платёж у ЮKassa и выдаёт Плюс, если он оплачен (когда уведомление не дошло)."""
+    p = _payment(db, payment_id)
+    if not p.yk_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "У платежа нет номера в ЮKassa")
+    try:
+        payments.sync_payment(db, p.yk_id)
+    except payments.PaymentError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    db.refresh(p)
+    return _payment_out(db, p)
 
 
 @router.put("/payments/{payment_id}/receipt", response_model=AdminPaymentOut)
