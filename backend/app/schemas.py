@@ -450,10 +450,33 @@ class MedicineOut(MedicineBase):
     photo_url: str | None
     created_at: datetime
     updated_at: datetime
+    # Заполняются только в поиске по всем аптечкам семьи (R05): из какой аптечки лекарство.
+    family_id: int | None = None
+    family_name: str | None = None
 
 
 class MedicineDetail(MedicineOut):
     packages: list[PackageOut]
+
+
+class MoveIn(BaseModel):
+    """Перенос лекарств в другую аптечку той же семьи (R17)."""
+
+    to_family_id: int
+    medicine_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class MoveOut(BaseModel):
+    moved: int    # перенесено карточек
+    merged: int   # из них слито с такими же по штрихкоду
+    to_family_id: int
+
+
+class SplitIn(BaseModel):
+    """Разделение аптечки: выбранные лекарства уходят в новую аптечку (R18)."""
+
+    name: str = Field(min_length=1, max_length=100)
+    medicine_ids: list[int] = Field(min_length=1, max_length=500)
 
 
 class ConsumeIn(BaseModel):

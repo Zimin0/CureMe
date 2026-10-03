@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from .. import compression, households
+from .. import cabinet_ops, compression, households
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..models import Family, Membership, OwnerTransfer, User
 from ..plans import plan_out
 from ..ratelimit import client_ip, limiter
-from ..schemas import CompressIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut
+from ..schemas import CompressIn, FamilyIn, MoveOut, SplitIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut
 
 router = APIRouter(prefix="/api", tags=["families"])
 
@@ -49,6 +49,15 @@ def new_family(body: FamilyIn, user: User = Depends(current_user), db: Session =
     fam = households.create_cabinet(db, user, body.name.strip())
     db.commit()
     return family_out(fam, user.household_role, db, viewer_id=user.id)
+
+
+@router.post("/families/{family_id}/split", response_model=MoveOut, status_code=201)
+def split_family(body: SplitIn, m: Membership = Depends(family_membership), user: User = Depends(current_user),
+                 db: Session = Depends(get_db)):
+    """Разделение аптечки (R18): выбранные лекарства уходят в новую аптечку семьи, если есть место (R03)."""
+    _, out = cabinet_ops.split_cabinet(db, user, m.family, body.name.strip(), body.medicine_ids)
+    db.commit()
+    return out
 
 
 @router.get("/families/{family_id}", response_model=FamilyOut)

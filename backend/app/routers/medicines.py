@@ -3,20 +3,21 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session, selectinload
 
-from .. import reminders
+from .. import cabinet_ops, reminders
 from ..codes import parse_code
 from ..db import get_db
-from ..deps import current_user, get_family
+from ..deps import current_user, family_membership, get_family
 from ..limits import ensure_can_add_medicine
 from ..lookup import remember_product
-from ..models import Category, Family, Medicine, MedicineCategory, Package, User, UserMark
+from ..models import Category, Family, Medicine, MedicineCategory, Membership, Package, User, UserMark
 from ..schemas import (
-    ConsumeIn, MarkIn, MedicineDetail, MedicineIn, MedicineOut, MedicineUpdate, PackageIn, PackageOut,
-    PackageUpdate,
+    ConsumeIn, MarkIn, MedicineDetail, MedicineIn, MedicineOut, MedicineUpdate, MoveIn, MoveOut, PackageIn,
+    PackageOut, PackageUpdate,
 )
+from ..plans import require_plus
 from ..search import best_match
 from .files import _drop_photo
-from ..services import consume, load_medicines, medicine_out, member_names, record_intake
+from ..services import consume, load_household_medicines, load_medicines, medicine_out, member_names, record_intake
 
 router = APIRouter(prefix="/api/families/{family_id}/medicines", tags=["medicines"])
 
@@ -67,12 +68,22 @@ def list_medicines(
     q: str | None = Query(default=None, max_length=200),
     category_id: int | None = None,
     filter: str | None = Query(default=None, pattern="^(favorites|helps_me|attention|expired|low)$"),
+    scope: str | None = Query(default=None, pattern="^all$", description="all — по всем аптечкам семьи (Плюс)"),
     fam: Family = Depends(get_family),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    names = member_names(db, fam.id)
-    items = [medicine_out(m, user.id, names) for m in load_medicines(db, fam.id)]
+    if scope == "all":
+        require_plus(db, fam, "search_all")
+        names: dict[int, dict[int, str]] = {}
+        items = []
+        for cab, med in load_household_medicines(db, fam):
+            out = medicine_out(med, user.id, names.setdefault(cab.id, member_names(db, cab.id)))
+            out.family_id, out.family_name = cab.id, cab.name
+            items.append(out)
+    else:
+        names = member_names(db, fam.id)
+        items = [medicine_out(m, user.id, names) for m in load_medicines(db, fam.id)]
     if category_id is not None:
         items = [m for m in items if category_id in m.category_ids]
     if filter == "favorites":
@@ -97,6 +108,18 @@ def list_medicines(
 
 def filter_none(xs):
     return [x for x in xs if x]
+
+
+@router.post("/move", response_model=MoveOut)
+def move_medicines(body: MoveIn, m: Membership = Depends(family_membership), user: User = Depends(current_user),
+                   db: Session = Depends(get_db)):
+    """Перенос лекарств в другую аптечку семьи (R17). Из замороженной аптечки переносить можно, в замороженную нельзя."""
+    dst = db.get(Family, body.to_family_id)
+    if dst is None:
+        raise HTTPException(404, "Аптечка не найдена в вашей семье")
+    out = cabinet_ops.move_medicines(db, user, m.family, dst, body.medicine_ids)
+    db.commit()
+    return out
 
 
 @router.post("", response_model=MedicineDetail, status_code=201)

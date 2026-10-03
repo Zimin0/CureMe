@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import get_settings
-from .models import AppSetting, Intake, Medicine, MedicineCategory, Membership, Package, UserMark
+from .models import AppSetting, Family, Intake, Medicine, MedicineCategory, Membership, Package, UserMark
 from .schemas import CategoryOut, IntakeOut, MedicineDetail, MedicineOut, PackageOut, StockOut
 from .seed import DEFAULT_INDICATION_HINTS
 
@@ -133,6 +133,12 @@ def load_medicines(db: Session, family_id: int, ids: list[int] | None = None) ->
     if ids is not None:
         q = q.where(Medicine.id.in_(ids))
     return list(db.scalars(q))
+
+
+def load_household_medicines(db: Session, fam: Family) -> list[tuple[Family, Medicine]]:
+    """Лекарства всех активных аптечек семьи (поиск и подбор по всем аптечкам, R05). Замороженные не участвуют."""
+    cabinets = [c for c in (fam.household.cabinets if fam.household else [fam]) if c.status != "frozen"]
+    return [(c, m) for c in sorted(cabinets, key=lambda c: c.id) for m in load_medicines(db, c.id)]
 
 
 def member_names(db: Session, family_id: int) -> dict[int, str]:

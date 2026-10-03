@@ -13,7 +13,10 @@ from ..ratelimit import limiter
 from ..schemas import OverviewOut, ProductInfo, ScanIn, ScanOut, SuggestionOut, SuggestOut
 from ..search import best_match, expand_query
 from ..seed import COMMON_CONDITIONS
-from ..services import find_package_by_serial, indication_hints, load_medicines, medicine_out, member_names
+from ..plans import require_plus
+from ..services import (
+    find_package_by_serial, indication_hints, load_household_medicines, load_medicines, medicine_out, member_names,
+)
 
 router = APIRouter(prefix="/api", tags=["assist"])
 
@@ -58,13 +61,21 @@ def overview(fam: Family = Depends(get_family), user: User = Depends(current_use
 @router.get("/families/{family_id}/suggest", response_model=SuggestOut)
 def suggest(
     condition: str = Query(min_length=2, max_length=100),
+    scope: str | None = Query(default=None, pattern="^all$", description="all — по всем аптечкам семьи (Плюс)"),
     fam: Family = Depends(get_family), user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
     phrases = expand_query(condition)
-    names = member_names(db, fam.id)
+    if scope == "all":
+        require_plus(db, fam, "search_all")
+        pairs = load_household_medicines(db, fam)
+    else:
+        pairs = [(fam, m) for m in load_medicines(db, fam.id)]
+    names_by_cabinet: dict[int, dict[int, str]] = {}
     results: list[SuggestionOut] = []
-    for med in load_medicines(db, fam.id):
-        out = medicine_out(med, user.id, names)
+    for cab, med in pairs:
+        out = medicine_out(med, user.id, names_by_cabinet.setdefault(cab.id, member_names(db, cab.id)))
+        if scope == "all":
+            out.family_id, out.family_name = cab.id, cab.name
         s_ind, w_ind = best_match(phrases, med.indications)
         # каждую категорию сравниваем отдельно, чтобы фраза не «склеилась» из двух соседних
         s_cat, w_cat, cat_hit = max(
