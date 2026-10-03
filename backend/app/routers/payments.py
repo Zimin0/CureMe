@@ -33,6 +33,7 @@ def _status(db: Session, user: User) -> PayStatus:
 
 @router.get("/me", response_model=PayStatus)
 def my_payments(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    payments.sync_pending(db, user)  # уведомление ЮKassa могло не дойти: Плюс не должен ждать его вечно
     return _status(db, user)
 
 
