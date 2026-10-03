@@ -629,6 +629,7 @@ function PlansTab() {
           <span className="muted small">Пока выключено, всем доступны все функции Плюса. Включите, когда будут готовы оплата и оферта.</span>
         </span>
       </label>
+      <CompressionSwitch />
       {prices && (
         <form className="card stack" style={{ padding: 16 }} onSubmit={(e: FormEvent) => {
           e.preventDefault()
@@ -682,6 +683,35 @@ function PlansTab() {
       </section>
       {edit && <PlanSheet person={edit} onClose={() => setEdit(null)} />}
     </>
+  )
+}
+
+/** Включает письма, баннер, выбор состава и само сжатие семьи после окончания Плюса (R13, R14). Выключено: после конца Плюса никого не трогаем. */
+function CompressionSwitch() {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const setting = useQuery({ queryKey: ['admin', 'compression'], queryFn: () => api<{ enabled: boolean }>('/admin/compression') })
+  const save = useMutation({
+    mutationFn: (enabled: boolean) => api<{ enabled: boolean }>('/admin/compression', { method: 'PUT', body: { enabled } }),
+    onSuccess: s => {
+      qc.setQueryData(['admin', 'compression'], s)
+      toast(s.enabled ? 'Сжатие семей после окончания Плюса включено' : 'Сжатие выключено: семьи не трогаем, замороженные аптечки разморожены')
+    },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
+  if (!setting.data) return null
+  return (
+    <label className="check card" style={{ padding: 16 }}>
+      <input type="checkbox" checked={setting.data.enabled} disabled={save.isPending}
+        onChange={e => {
+          const on = e.target.checked
+          if (!on || confirm('Включить сжатие семей? Когда у семьи кончится Плюс и людей или аптечек больше бесплатного лимита, владельцу придут письма и появится баннер, через 5 дней лишние люди перейдут в личные семьи, а лишние аптечки заморозятся. Включайте после публикации условий в Соглашении.')) save.mutate(on)
+        }} />
+      <span>
+        <b>Сжатие семьи после окончания Плюса</b><br />
+        <span className="muted small">Выключено: после конца Плюса платные функции закрыты, а людей и аптечки никто не трогает. При выключении замороженные аптечки размораживаются.</span>
+      </span>
+    </label>
   )
 }
 

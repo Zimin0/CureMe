@@ -297,6 +297,9 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                     purge_old_invites(db)  # записи старых приглашений хранятся 30 дней после срока
                     purge_old_transfers(db)  # и записи о предложениях передать владение
                     purge_old_events(db)  # журнал семьи хранится 12 месяцев
+                    from . import compression  # здесь же: households → plans → reminders
+
+                    compression.run(db)  # окончание Плюса: письма, сжатие, заморозка (если включено в админке)
                 except Exception:  # noqa: BLE001
                     log.exception("Фоновая работа семей (места, предложения, очистка) упала")
                     db.rollback()

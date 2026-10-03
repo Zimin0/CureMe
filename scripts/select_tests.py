@@ -52,17 +52,18 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "tests": [
             "integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py",
             "integration/test_plans.py", "integration/test_trial.py", "integration/test_invites.py",
-            "integration/test_owner_transfer.py",
+            "integration/test_owner_transfer.py", "integration/test_plus_end.py",
         ],
     },
     "Семья и аптечки (состав, лимиты, тариф семьи)": {
-        "sources": ["households.py"],
+        "sources": ["households.py", "compression.py"],
         "tests": [
             "integration/test_households.py", "integration/test_households_concurrency.py",
             "migrations/test_households_migration.py", "integration/test_invites.py", "integration/test_owner_transfer.py",
             "integration/test_household_journal.py", "integration/test_families.py", "integration/test_auth.py",
             "integration/test_admin.py", "integration/test_limits.py", "integration/test_plans.py",
             "integration/test_trial.py", "integration/test_payments.py", "integration/test_access_control.py",
+            "integration/test_plus_end.py",
         ],
     },
     "Лекарства, упаковки, остатки": {
@@ -86,7 +87,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "Оплата Плюса (ЮKassa) и чеки": {
         "sources": ["payments.py", "routers/payments.py"],
-        "tests": ["integration/test_payments.py", "integration/test_plans.py", "integration/test_access_control.py"],
+        "tests": ["integration/test_payments.py", "integration/test_plans.py", "integration/test_plus_end.py", "integration/test_access_control.py"],
     },
     "Поисковая оптимизация (SEO)": {
         "sources": ["seo.py"],
@@ -123,13 +124,13 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "tests": [
             "integration/test_admin.py", "integration/test_closed_mode.py", "integration/test_access_control.py",
             "integration/test_email_verification.py", "integration/test_plans.py", "integration/test_household_check.py",
-            "integration/test_owner_transfer.py",
+            "integration/test_owner_transfer.py", "integration/test_plus_end.py",
         ],
     },
     "Напоминания: почта и Telegram": {
         "sources": ["reminders.py", "telegram.py", "routers/notifications.py"],
         "tests": ["integration/test_reminders.py", "integration/test_invites.py", "integration/test_owner_transfer.py",
-                  "integration/test_household_journal.py", "integration/test_access_control.py"],
+                  "integration/test_household_journal.py", "integration/test_plus_end.py", "integration/test_access_control.py"],
     },
     "Тарифы: Бесплатный и Плюс": {
         "sources": ["plans.py"],

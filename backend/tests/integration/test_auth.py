@@ -42,7 +42,7 @@ def test_register_with_lowercase_invite_joins_family(client):
     h, u = register(client)
     code = client.get(f"/api/families/{u['families'][0]['id']}", headers=h).json()["invite_code"]
     _, u2 = register(client, "mom@example.com", "Мама", invite=f"  {code.lower()} ")
-    assert u2["families"] == [{"id": u["families"][0]["id"], "name": "Семья Никита", "role": "member"}]
+    assert u2["families"] == [{"id": u["families"][0]["id"], "name": "Семья Никита", "role": "member", "status": "active"}]
 
 
 def test_login(client):

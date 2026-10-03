@@ -1,9 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
-import { Check, Plus } from 'lucide-react'
+import { Check, Plus, Snowflake } from 'lucide-react'
 import { useState } from 'react'
 import { api, Family } from '../api'
 import { useAuth } from '../auth'
 import { PlusBanner, usePlusSheet } from '../plan'
+import { cabinetLabel } from './PlusEnding'
 import { Sheet, useToast } from './ui'
 
 /** Переключатель аптечек в шапке страницы. Показывается, только когда аптечек больше одной. */
@@ -14,7 +15,7 @@ export function CabinetSelect() {
     <label className="cabinet-select">
       <span className="visually-hidden">Открытая аптечка</span>
       <select value={familyId ?? ''} onChange={e => setFamilyId(Number(e.target.value))}>
-        {me.families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+        {me.families.map(f => <option key={f.id} value={f.id}>{cabinetLabel(f)}</option>)}
       </select>
     </label>
   )
@@ -33,6 +34,12 @@ export function Cabinets() {
     onSuccess: async d => { await refresh(); setFamilyId(d.id); setName(null); toast(`Аптечка «${d.name}» создана`) },
     // 402 (лимит бесплатной версии) сам открывает шторку Плюса; обновляем счётчик своих аптечек.
     onError: (e: Error & { status?: number }) => { setName(null); if (e.status === 402) refresh(); else toast(e.message, 'error') },
+  })
+  // Владелец размораживает аптечку, пока есть свободное место; оплата Плюса размораживает всё сама (R14).
+  const unfreeze = useMutation({
+    mutationFn: (id: number) => api<Family>(`/families/${id}/unfreeze`, { method: 'POST' }),
+    onSuccess: async () => { await refresh(); toast('Аптечка разморожена') },
+    onError: (e: Error) => toast(e.message, 'error'),
   })
   if (!me) return null
 
@@ -57,12 +64,18 @@ export function Cabinets() {
       {/* Одна аптечка — выбирать нечего, список показываем только когда их несколько. */}
       {me.families.length > 1 && <div className="cabinets">
         {me.families.map(f => (
-          <button key={f.id} className={`cabinet ${f.id === familyId ? 'active' : ''}`} aria-pressed={f.id === familyId}
-            onClick={() => f.id !== familyId && setFamilyId(f.id)}>
-            <span className="grow ellipsis">{f.name}</span>
-            {f.role === 'owner' ? <span className="faint small">своя</span> : <span className="faint small">участник</span>}
-            {f.id === familyId && <Check size={16} />}
-          </button>
+          <div key={f.id} className="row" style={{ gap: 8 }}>
+            <button className={`cabinet grow ${f.id === familyId ? 'active' : ''}`} aria-pressed={f.id === familyId}
+              onClick={() => f.id !== familyId && setFamilyId(f.id)}>
+              <span className="grow ellipsis">{f.name}</span>
+              {f.status === 'frozen' && <span className="badge"><Snowflake size={12} />заморожена</span>}
+              {f.role === 'owner' ? <span className="faint small">своя</span> : <span className="faint small">участник</span>}
+              {f.id === familyId && <Check size={16} />}
+            </button>
+            {f.status === 'frozen' && f.role === 'owner' && (
+              <button type="button" className="btn sm" disabled={unfreeze.isPending} onClick={() => unfreeze.mutate(f.id)}>Разморозить</button>
+            )}
+          </div>
         ))}
       </div>}
 

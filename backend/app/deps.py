@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -62,5 +62,15 @@ def family_owner(m: Membership = Depends(family_membership)) -> Membership:
     return m
 
 
-def get_family(m: Membership = Depends(family_membership)) -> Family:
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def get_family(request: Request, m: Membership = Depends(family_membership)) -> Family:
+    """Аптечка для работы с лекарствами, приёмами и расписанием. Замороженная (R14) открыта только на чтение и выгрузку."""
+    if m.family.status == "frozen" and request.method not in SAFE_METHODS:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Аптечка заморожена после окончания Плюса: её можно смотреть и выгружать, но не менять. "
+            "Перенесите лекарства в активную аптечку или подключите Плюс.",
+        )
     return m.family

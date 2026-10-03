@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from .. import households
+from .. import compression, households
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner
 from ..models import Family, Membership, OwnerTransfer, User
 from ..plans import plan_out
 from ..ratelimit import client_ip, limiter
-from ..schemas import FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut
+from ..schemas import CompressIn, FamilyIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut
 
 router = APIRouter(prefix="/api", tags=["families"])
 
@@ -31,7 +31,7 @@ def family_out(fam: Family, role: str, db: Session, ensure_invite: bool = False,
     if role == "owner" and house:
         invite = households.ensure_invite(db, house, households.owner_of(house)) if ensure_invite else households.active_invite(db, house)
     return FamilyOut(
-        id=fam.id, name=fam.name, role=role,
+        id=fam.id, name=fam.name, role=role, status=fam.status,
         invite_code=invite.code if invite else None, invite_expires_at=invite.expires_at if invite else None,
         owner_transfer=transfer_out(households.pending_transfer(db, house), viewer_id),
         next_transfer_at=households.next_transfer_at(db, house) if house else None,
@@ -129,6 +129,23 @@ def withdraw_transfer(m: Membership = Depends(family_membership), user: User = D
     households.withdraw_transfer(db, user)
     db.commit()
     return family_out(m.family, m.role, db, viewer_id=user.id)
+
+
+@router.post("/families/{family_id}/compress", response_model=FamilyOut)
+def compress_family(body: CompressIn, m: Membership = Depends(family_owner), user: User = Depends(current_user),
+                    db: Session = Depends(get_db)):
+    """После окончания Плюса владелец выбирает, кто остаётся и какие аптечки остаются активными (R13). Применяется сразу."""
+    compression.choose(db, user, body.keep_user_ids, body.keep_cabinet_ids)
+    db.commit()
+    return family_out(m.family, "owner", db, viewer_id=user.id)
+
+
+@router.post("/families/{family_id}/unfreeze", response_model=FamilyOut)
+def unfreeze_family(m: Membership = Depends(family_owner), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Владелец размораживает аптечку, если есть свободное место (R14). Оплата Плюса размораживает всё сама."""
+    compression.unfreeze(db, m.family)
+    db.commit()
+    return family_out(m.family, "owner", db, viewer_id=user.id)
 
 
 @router.delete("/families/{family_id}/members/{user_id}", status_code=204)

@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from . import compression
 from .households import owner_of, stop_autorenew
 from .mailer import send_mail
 from .models import Household, Payment, User
@@ -230,6 +231,7 @@ def sync_payment(db: Session, yk_id: str) -> Payment | None:
                 log.error("Платёж %s оплачен, но семьи, которой он предназначался, уже нет: Плюс никому не выдан", yk_id)
             else:
                 extend_plus(house, pay.period, pay.paid_at)
+                compression.restore(db, house)  # Плюс снова идёт: аптечки оживают, окно выбора состава закрыто (R14)
             if user and house is not None:
                 method = data.get("payment_method") or {}
                 owner = owner_of(house)

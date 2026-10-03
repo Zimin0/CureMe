@@ -243,7 +243,7 @@ def own_families_left(db: Session, user_id: int) -> int | None:
     house = user.household if user else None
     if house is None:
         return 0
-    left = max((limit_for(db, house, "own_families") or 0) - len(house.cabinets), 0)
+    left = max((limit_for(db, house, "own_families") or 0) - len([c for c in house.cabinets if c.status == "active"]), 0)
     return left if left == 0 or billing_settings(db).enabled else None
 
 

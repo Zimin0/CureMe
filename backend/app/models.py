@@ -68,6 +68,10 @@ class Household(Base):
     plus_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Текущий Плюс только пробный: оплаченные дни при вступлении в чужую семью переносятся, пробные нет (R07, R08).
     plus_is_trial: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Окончание Плюса (R13, R14): момент T0 и последняя ступень писем (0 не было, 1 за 3 дня, 2 в день конца, 3 через 3 дня,
+    # 4 через 4 дня, 5 сжатие выполнено). Пусто и 0, пока Плюс идёт или человек его не терял. Ведёт compression.py.
+    plus_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    compress_stage: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     members: Mapped[list["User"]] = relationship(back_populates="household")

@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import households
+from .. import compression, households
 from ..db import get_db
 from ..deps import signed_in_user
 from ..email_verification import code_matches, issue_code, mark_verified, needs_verification, send_verification
@@ -26,10 +26,11 @@ def me_out(user: User, db: Session) -> MeOut:
         access_blocked=not has_access(db, user),
         email_verified=user.email_verified_at is not None,
         verification_needed=needs_verification(user),
-        families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
+        families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role, status=m.family.status) for m in fams],
         owner_transfer_waiting=transfer is not None and transfer.to_user_id == user.id,
         own_families_left=own_families_left(db, user.id),
         plus_active=plus_active(user),
+        plus_ending=compression.banner(db, user),
     )
 
 
