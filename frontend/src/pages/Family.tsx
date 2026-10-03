@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { api, ApiError, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Cabinets } from '../components/Cabinets'
+import { CompressSection } from '../components/PlusEnding'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { Reminders } from '../components/Reminders'
 import { PageLoader, Sheet, useToast } from '../components/ui'
@@ -114,6 +115,8 @@ export function Family() {
         </div>
         <ChevronRight size={18} className="muted" />
       </Link>
+
+      <CompressSection family={f} />
 
       <section className="card flush">
         <div className="row between" style={{ padding: '18px 18px 6px' }}><h2>Участники</h2><LimitCounter name="members" /></div>

@@ -2,12 +2,16 @@
 export type Role = 'owner' | 'member'
 export type StockStatus = 'ok' | 'low' | 'out' | 'expiring' | 'expired'
 
-export interface FamilyBrief { id: number; name: string; role: Role }
-export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[]; owner_transfer_waiting?: boolean; own_families_left?: number | null; plus_active?: boolean }
+/** active — аптечка работает; frozen — после окончания Плюса: смотреть и выгружать можно, менять нельзя (R14). */
+export type CabinetStatus = 'active' | 'frozen'
+export interface FamilyBrief { id: number; name: string; role: Role; status?: CabinetStatus }
+/** Плюс семьи заканчивается (ending) или закончился и идёт срок выбора состава (ended, R13). date: конец Плюса или последний день выбора. */
+export interface PlusEnding { state: 'ending' | 'ended'; date: string; is_owner: boolean; people_limit: number }
+export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[]; owner_transfer_waiting?: boolean; own_families_left?: number | null; plus_active?: boolean; plus_ending?: PlusEnding | null }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 /** Незавершённая передача владения (R23). offer: владелец предлагает участнику; request: участник просит «Хочу оплачивать». */
 export interface OwnerTransfer { kind: 'offer' | 'request'; from_user_id: number | null; from_name: string; to_user_id: number | null; to_name: string; expires_at: string; can_answer: boolean; can_withdraw: boolean }
-export interface Family { id: number; name: string; invite_code: string | null; invite_expires_at?: string | null; role: Role; members: Member[]; owner_transfer?: OwnerTransfer | null; next_transfer_at?: string | null }
+export interface Family { id: number; name: string; status?: CabinetStatus; invite_code: string | null; invite_expires_at?: string | null; role: Role; members: Member[]; owner_transfer?: OwnerTransfer | null; next_transfer_at?: string | null }
 /** Публичные сведения о приглашении. full — в бесплатной семье уже предел участников, вступить нельзя. */
 export interface InviteInfo { family_name: string; owner_name: string; full: boolean }
 export interface Category { id: number; name: string; icon: string; color: string; medicine_count: number }

@@ -149,8 +149,11 @@ describe('админка: закрытый режим', () => {
     }
     let billing: Record<string, unknown> | undefined
     let plan: { plan: string; plus_until: string | null } | undefined
+    let compression: Record<string, unknown> | undefined
     server.use(
       stats,
+      http.get('/api/admin/compression', () => HttpResponse.json({ enabled: false })),
+      http.put('/api/admin/compression', async ({ request }) => { compression = await request.json() as Record<string, unknown>; return HttpResponse.json(compression) }),
       http.get('/api/admin/billing', () => HttpResponse.json({ enabled: false, price_month: null, price_year: 990, trial_days: 5 })),
       http.put('/api/admin/billing', async ({ request }) => { billing = await request.json() as Record<string, unknown>; return HttpResponse.json(billing) }),
       http.get('/api/admin/users', () => HttpResponse.json([person])),
@@ -163,6 +166,11 @@ describe('админка: закрытый режим', () => {
     window.confirm = () => true
     await user.click(await screen.findByRole('checkbox', { name: /Платная версия включена/ }))
     await waitFor(() => expect(billing).toEqual({ enabled: true, price_month: null, price_year: 990, trial_days: 5 }))  // цена не стирается
+
+    // сжатие семьи после окончания Плюса: по умолчанию выключено, включает админ
+    expect(await screen.findByRole('checkbox', { name: /Сжатие семьи после окончания Плюса/ })).not.toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /Сжатие семьи после окончания Плюса/ }))
+    await waitFor(() => expect(compression).toEqual({ enabled: true }))
 
     // стоимость подписки
     expect(screen.getByLabelText('В год, ₽')).toHaveValue(990)

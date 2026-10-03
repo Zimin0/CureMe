@@ -151,3 +151,24 @@ def test_r06_t7_migration_links_existing_payments_to_the_payers_family(alembic):
     assert rows(engine, "SELECT id, household_id FROM payments ORDER BY id") == [(1, 1), (2, 1), (3, 2), (4, None)]
     command.downgrade(cfg, "c7e9a1b3d5f7")  # откат возможен: колонка исчезает, платежи на месте
     assert rows(engine, "SELECT id FROM payments ORDER BY id") == [(1,), (2,), (3,), (4,)]
+
+
+def test_r14_migration_remembers_families_of_four(alembic):  # noqa: F811
+    """Семьям, где сейчас четверо и больше, ставится «было четверо» (после Плюса им остаются четверо); меньшим нет."""
+    cfg, engine = alembic
+    command.upgrade(cfg, "d8f0b2c4e6a8")  # последняя миграция до окончания Плюса
+    with engine.begin() as conn:
+        for hid in (1, 2, 3):
+            conn.execute(text("INSERT INTO households (id, plan, plus_is_trial, created_at) VALUES (:i, 'free', :f, '2026-10-03')"), {"i": hid, "f": False})
+        uid = 0
+        for hid, count in ((1, 4), (2, 3), (3, 5)):
+            for n in range(count):
+                uid += 1
+                conn.execute(text(
+                    "INSERT INTO users (id, email, name, password_hash, is_admin, token_version, created_at, household_id, household_role) "
+                    f"VALUES ({uid}, 'u{uid}@example.com', 'U{uid}', 'x', :admin, 0, '2026-01-01', {hid}, '{'owner' if n == 0 else 'member'}')"), {"admin": False})
+        sync_sequences(conn)
+    command.upgrade(cfg, "head")
+    assert [(r[0], bool(r[1]), r[2]) for r in rows(engine, "SELECT id, kept_four, compress_stage FROM households ORDER BY id")] == [(1, True, 0), (2, False, 0), (3, True, 0)]
+    command.downgrade(cfg, "d8f0b2c4e6a8")
+    assert len(rows(engine, "SELECT id FROM households")) == 3
