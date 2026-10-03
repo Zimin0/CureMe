@@ -116,10 +116,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "tests": ["integration/test_reports.py", "integration/test_access_control.py"],
     },
     "Администрирование": {
-        "sources": ["routers/admin.py"],
+        "sources": ["routers/admin.py", "household_check.py"],
         "tests": [
             "integration/test_admin.py", "integration/test_closed_mode.py", "integration/test_access_control.py",
-            "integration/test_email_verification.py", "integration/test_plans.py",
+            "integration/test_email_verification.py", "integration/test_plans.py", "integration/test_household_check.py",
         ],
     },
     "Напоминания: почта и Telegram": {

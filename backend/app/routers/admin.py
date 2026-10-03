@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import households
+from .. import household_check, households
 from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
@@ -77,6 +77,12 @@ def stats(db: Session = Depends(get_db)):
 
 
 # --- пользователи ---
+@router.get("/household-check")
+def household_check_report(db: Session = Depends(get_db)):
+    """Только чтение: можно ли без потерь склеить текущие аптечки в семьи (docs/household-model, PR 3)."""
+    return household_check.analyze(db)
+
+
 @router.get("/users", response_model=list[AdminUserOut])
 def list_users(db: Session = Depends(get_db)):
     users = db.scalars(

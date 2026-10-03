@@ -170,6 +170,43 @@ function UserSheet({ user, isMe, onClose }: { user: AdminUser; isMe: boolean; on
 }
 
 // ---------- семьи ----------
+type HouseholdCheck = {
+  users: number; families: number; would_create_households: number; safe: boolean
+  conflicts: { users: string[]; families: string[]; missing: string[] }[]
+  multi_owner_families: { family: string; owners: string[] }[]
+  families_without_owner: string[]; users_without_family: string[]; families_without_people: string[]
+  over_free_limits: { users: string[]; families: string[] }[]
+}
+
+/** Только чтение: можно ли склеить аптечки в семьи без лишнего доступа (docs/household-model). */
+function HouseholdCheckCard() {
+  const [run, setRun] = useState(false)
+  const rep = useQuery({ queryKey: ['admin', 'household-check'], queryFn: () => api<HouseholdCheck>('/admin/household-check'), enabled: run })
+  const d = rep.data
+  return (
+    <section className="card stack" aria-label="Проверка перед переходом на семьи и аптечки">
+      <h3>Проверка перед переходом на «семья + аптечки»</h3>
+      <p className="muted small">Показывает, где склеивание аптечек в семьи дало бы кому-то лишний доступ. Ничего не меняет.</p>
+      {!run && <button className="btn" onClick={() => setRun(true)}>Проверить данные</button>}
+      {rep.isLoading && <p className="muted small">Проверяем…</p>}
+      {d && (
+        <div className="stack small">
+          <p role="status" className={`badge ${d.safe ? 'ok' : 'out'}`} style={{ whiteSpace: 'normal' }}>
+            {d.safe ? 'Конфликтов нет, склеивание безопасно' : 'Есть конфликты, миграцию пока нельзя'}
+          </p>
+          <p>Людей {d.users}, аптечек {d.families}, будет семей: {d.would_create_households}.</p>
+          {d.conflicts.map((c, i) => <p key={i}><b>Конфликт:</b> {c.families.join(', ')}: {c.missing.join('; ')}</p>)}
+          {d.families_without_owner.length > 0 && <p><b>Без владельца:</b> {d.families_without_owner.join(', ')}</p>}
+          {d.multi_owner_families.length > 0 && <p>Несколько владельцев (останется самый давний): {d.multi_owner_families.map(f => `${f.family} (${f.owners.join(', ')})`).join('; ')}</p>}
+          {d.over_free_limits.length > 0 && <p>Выше новых бесплатных лимитов: {d.over_free_limits.map(h => h.families.join(', ')).join('; ')}</p>}
+          {d.users_without_family.length > 0 && <p>Без аптечки: {d.users_without_family.join(', ')}</p>}
+          {d.families_without_people.length > 0 && <p>Аптечки без людей: {d.families_without_people.join(', ')}</p>}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function FamiliesTab() {
   const fams = useQuery({ queryKey: ['admin', 'families'], queryFn: () => api<AdminFamily[]>('/admin/families') })
   const [openId, setOpenId] = useState<number | null>(null)
@@ -179,6 +216,7 @@ function FamiliesTab() {
 
   return (
     <>
+      <HouseholdCheckCard />
       <section className="card flush">
         {fams.data.map(f => (
           <button key={f.id} className="list-row admin-row" onClick={() => setOpenId(f.id)}>
