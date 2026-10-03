@@ -79,7 +79,7 @@ LIMIT_FEATURE = {"members": "no_limits", "medicines": "no_limits", "own_families
                  "history_days": "full_history"}
 
 BILLING = "billing"  # ключ в app_settings
-DEFAULT_TRIAL_DAYS = 5  # пробный Плюс при первом подтверждении почты; меняется в админке «Тарифы»
+DEFAULT_TRIAL_DAYS = 5  # пробный Плюс при первом подтверждении почты; меняется в админке «Капсулка Плюс»
 PLUS_HEADER = "X-Plus-Feature"  # в ответе 402: какую функцию Плюса открыть в шторке
 
 

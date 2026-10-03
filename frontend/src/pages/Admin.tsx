@@ -16,7 +16,7 @@ const TABS = [
   { id: 'access', label: 'Доступ' },
   { id: 'telegram', label: 'Telegram' },
   { id: 'debug', label: 'Отладка' },
-  { id: 'plans', label: 'Тарифы' },
+  { id: 'plans', label: 'Капсулка Плюс' },
 ] as const
 type Tab = typeof TABS[number]['id']
 
