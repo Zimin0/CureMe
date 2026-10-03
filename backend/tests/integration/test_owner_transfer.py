@@ -309,3 +309,61 @@ def test_r23_t12_family_dissolving_removes_its_offers(client, owner, session_fac
     with session_factory() as db:
         assert db.scalars(select(OwnerTransfer)).all() == []
         assert db.scalars(select(Household)).all() == []
+
+
+def test_r23_t13_support_change_is_journaled_mailed_and_stops_autorenew(client, owner, session_factory, monkeypatch):
+    """Исключительный случай: администрация меняет владельца без согласия. Запись «кто и когда», письмо всем, автопродление выключено."""
+    sent = []
+    monkeypatch.setattr(mailer, "deliver", lambda msg: sent.append(msg))
+    f, (h, u), (hm, mom), (hd, dad) = trio(client, owner)  # Никита первый аккаунт, поэтому администратор
+    with session_factory() as db:
+        old = db.get(User, u["id"])
+        old.auto_renew, old.pay_method_id, old.renew_period = True, "pm-1", "month"
+        db.commit()
+    started = offer(client, h, f, mom["id"])  # обычная процедура уже начата
+    assert started.status_code == 201
+    sent.clear()
+    r = client.patch(f"/api/admin/families/{f}/members/{dad['id']}", headers=h, json={"role": "owner"})
+    assert r.status_code == 200
+    assert owner_name(client, h, f) == "Папа"
+    assert view(client, h, f)["owner_transfer"] is None  # начатая процедура отменена
+    with session_factory() as db:
+        old = db.get(User, u["id"])
+        assert (old.auto_renew, old.pay_method_id) == (False, None)  # автопродление выключено, как при обычной передаче (R21)
+        e = [e for e in db.scalars(select(HouseholdEvent).where(HouseholdEvent.kind == "owner"))][-1]
+        assert (e.user_id, e.actor_id) == (dad["id"], u["id"])  # кому и какой администратор
+        assert e.detail == f"прежний владелец: {u['id']}; {households.SUPPORT_OWNER_CHANGE}" and e.created_at is not None
+    assert sorted(m["To"] for m in sent) == ["dad@example.com", "mom@example.com", "nikita@example.com"]  # письмо всем людям семьи
+    body = sent[0].get_content()
+    assert "Папа" in body and "Никита" in body and "http" not in body  # без ссылок: почтовый сервис их отклоняет
+    # кулдаун обычной процедуры после смены поддержкой тоже действует, а сама поддержка им не ограничена
+    assert offer(client, hd, f, mom["id"]).status_code == 409
+    again = client.patch(f"/api/admin/families/{f}/members/{mom['id']}", headers=h, json={"role": "owner"})
+    assert again.status_code == 200 and owner_name(client, h, f) == "Мама"
+    check_household_invariants(session_factory)
+
+
+def test_r23_t13_no_email_when_the_owner_does_not_change(client, owner, monkeypatch):
+    sent = []
+    monkeypatch.setattr(mailer, "deliver", lambda msg: sent.append(msg))
+    f, (h, u), _, _ = trio(client, owner)
+    sent.clear()
+    r = client.patch(f"/api/admin/families/{f}/members/{u['id']}", headers=h, json={"role": "owner"})  # он и так владелец
+    assert r.status_code == 200 and sent == []
+
+
+def test_r23_t13_deleting_an_owner_account_by_support_mails_the_family(client, owner, session_factory, monkeypatch):
+    sent = []
+    monkeypatch.setattr(mailer, "deliver", lambda msg: sent.append(msg))
+    h, u, f = owner
+    hm, mom = register(client, "mom@example.com", "Мама", invite=invite_of(client, h, f))
+    hs, stranger = register(client, "stranger@example.com", "Чужой")  # владелец собственной семьи
+    hm_owner = client.post("/api/families/join", headers=hs, json={"code": invite_of(client, h, f)})
+    assert hm_owner.status_code == 200  # Чужой вступил в семью Никиты
+    hand_over(client, h, f, mom["id"], hm)  # Мама владелец
+    sent.clear()
+    r = client.delete(f"/api/admin/users/{mom['id']}", headers=h)  # админ удалил владельца: владение у самого давнего участника
+    assert r.status_code == 204
+    assert owner_name(client, h, f) == "Никита"
+    assert sorted(m["To"] for m in sent) == ["nikita@example.com", "stranger@example.com"]  # удалённому письма нет
+    check_household_invariants(session_factory)

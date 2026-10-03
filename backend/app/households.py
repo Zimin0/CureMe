@@ -388,7 +388,7 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
     return keep
 
 
-def make_owner(db: Session, house: Household, new_owner: User, actor: User | None = None) -> None:
+def make_owner(db: Session, house: Household, new_owner: User, actor: User | None = None, reason: str = "") -> None:
     """Владелец один (R02): новый владелец назначается, прежний становится участником, его автопродление выключается.
 
     Это сама смена роли. Пользователи доходят до неё только через предложение и согласие (offer_owner, request_owner,
@@ -404,8 +404,39 @@ def make_owner(db: Session, house: Household, new_owner: User, actor: User | Non
         stop_autorenew(old)
     new_owner.household_role = "owner"
     _close_pending(db, house, "cancelled", None, now=utcnow())
-    record(db, house, "owner", user=new_owner, actor=actor, detail=f"прежний владелец: {old.id if old else 'нет'}")  # номер, не имя
+    record(db, house, "owner", user=new_owner, actor=actor, detail=f"прежний владелец: {old.id if old else 'нет'}" + (f"; {reason}" if reason else ""))  # номер, не имя
     sync_access(db, house)
+
+
+SUPPORT_OWNER_CHANGE = "по решению администрации"
+
+
+def send_support_owner_change(recipients: list[tuple[str, str]], new_owner: str, old_owner: str) -> None:
+    """Письмо всем людям семьи: администрация сменила владельца без обычной процедуры (R23, исключительный случай).
+
+    Без ссылок: почтовый сервис отклоняет письма со ссылкой на сайт. Вызывается в фоне после ответа администратору.
+    """
+    from .mailer import send_mail  # здесь, чтобы не зациклить импорты
+
+    for email, name in recipients:
+        send_mail(
+            email, "Капсулка: администрация сменила владельца семьи",
+            f"Здравствуйте, {name}!\n\n"
+            f"Администрация Капсулки сменила владельца вашей семьи по обращению одного из её членов: теперь владелец {new_owner}, "
+            f"прежний владелец {old_owner} стал участником. Автопродление Плюса у прежнего владельца отключено, оплаченный срок "
+            "остался у семьи.\n\nЕсли вы не знали об этом обращении или не согласны, ответьте на это письмо.\n\n— Капсулка, домашняя аптечка",
+        )
+
+
+def support_owner_change(house: Household | None, before: tuple[int, str] | None) -> tuple[list[tuple[str, str]], str, str] | None:
+    """Если после действия администратора владелец семьи сменился, возвращает (кому писать, новый владелец, прежний), иначе None.
+
+    before: (номер, имя) прежнего владельца, снятые до действия: сам человек мог быть удалён.
+    """
+    after = owner_of(house)
+    if house is None or after is None or before is None or after.id == before[0]:
+        return None
+    return [(u.email, u.name) for u in people(house)], after.name, before[1]
 
 
 # --- передача владения с согласием (R23) ---
@@ -623,7 +654,7 @@ def delete_account(db: Session, user: User, admin: bool = False) -> None:
     if user.household_role == "owner":
         if not admin:
             raise HTTPException(status.HTTP_409_CONFLICT, "Вы владелец семьи: сначала передайте владение другому человеку.")
-        make_owner(db, house, others[0])
+        make_owner(db, house, others[0], reason=SUPPORT_OWNER_CHANGE)
     stop_autorenew(user)
     _close_pending(db, house, "cancelled", user, now=utcnow())
     record(db, house, "leave", user=user, detail="удаление аккаунта")

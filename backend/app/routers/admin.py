@@ -24,6 +24,12 @@ from ..services import access_settings, debug_enabled, indication_hints, set_acc
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_user)])
 
 
+def _owner_snapshot(house) -> tuple[int, str] | None:
+    """(номер, имя) владельца семьи до действия администратора: если владелец сменится, нужно знать, кто был прежним."""
+    owner = households.owner_of(house)
+    return (owner.id, owner.name) if owner else None
+
+
 def _not_found(what: str) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, f"{what} не найден")
 
@@ -140,13 +146,17 @@ def update_user(user_id: int, body: AdminUserUpdate, me: User = Depends(admin_us
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: int, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+def delete_user(user_id: int, background: BackgroundTasks, me: User = Depends(admin_user), db: Session = Depends(get_db)):
     u = _get_user(db, user_id)
     if u.id == me.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя удалить свой собственный аккаунт")
+    house, before = u.household, _owner_snapshot(u.household)
     households.delete_account(db, u, admin=True)  # владельцу при других людях владение передаётся самому давнему участнику
+    notice = households.support_owner_change(house, before)
     db.delete(u)
     db.commit()
+    if notice:
+        background.add_task(households.send_support_owner_change, *notice)
     return Response(status_code=204)
 
 
@@ -183,7 +193,8 @@ def delete_family(family_id: int, me: User = Depends(admin_user), db: Session = 
 
 
 @router.post("/families/{family_id}/members", response_model=AdminFamilyOut)
-def add_member(family_id: int, body: AdminMemberIn, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+def add_member(family_id: int, body: AdminMemberIn, background: BackgroundTasks, me: User = Depends(admin_user),
+               db: Session = Depends(get_db)):
     """Вносит человека в семью этой аптечки по тем же правилам, что и приглашение (R08, лимиты R02, R03)."""
     f = _family(db, family_id)
     user = db.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
@@ -193,11 +204,15 @@ def add_member(family_id: int, body: AdminMemberIn, me: User = Depends(admin_use
         raise HTTPException(status.HTTP_409_CONFLICT, "Этот человек уже в семье")
     if f.household is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "У аптечки нет семьи")
+    before = _owner_snapshot(f.household)
     households.join(db, user, f.household, actor=me, force=True)
     if body.role == "owner":
-        households.make_owner(db, f.household, user, actor=me)
+        households.make_owner(db, f.household, user, actor=me, reason=households.SUPPORT_OWNER_CHANGE)
+    notice = households.support_owner_change(f.household, before)
     db.commit()
     db.refresh(f)
+    if notice:
+        background.add_task(households.send_support_owner_change, *notice)
     return _family_out(db, f)
 
 
@@ -209,15 +224,22 @@ def _member(f: Family, user_id: int) -> User:
 
 
 @router.patch("/families/{family_id}/members/{user_id}", response_model=AdminFamilyOut)
-def set_role(family_id: int, user_id: int, body: RoleIn, me: User = Depends(admin_user), db: Session = Depends(get_db)):
-    """Передача владения без согласия: инструмент поддержки. Владелец один, поэтому «участник» самому владельцу не ставится."""
+def set_role(family_id: int, user_id: int, body: RoleIn, background: BackgroundTasks, me: User = Depends(admin_user),
+             db: Session = Depends(get_db)):
+    """Передача владения без согласия: исключительный инструмент поддержки (R23). Владелец один, поэтому «участник» самому
+    владельцу не ставится. Журнал помнит, какой администратор и когда, всем людям семьи уходит письмо, автопродление отключается."""
     f = _family(db, family_id)
     u = _member(f, user_id)
     if body.role == "member" and u.household_role == "owner":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "В семье должен быть владелец: назначьте владельцем другого человека")
+    notice = None
     if body.role == "owner":
-        households.make_owner(db, f.household, u, actor=me)
+        before = _owner_snapshot(f.household)
+        households.make_owner(db, f.household, u, actor=me, reason=households.SUPPORT_OWNER_CHANGE)
+        notice = households.support_owner_change(f.household, before)
     db.commit()
+    if notice:
+        background.add_task(households.send_support_owner_change, *notice)
     return _family_out(db, f)
 
 
