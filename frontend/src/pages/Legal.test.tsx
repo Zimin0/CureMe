@@ -37,4 +37,9 @@ describe('согласие на передачу сведений доверен
     expect(screen.getByText('Редакция согласия: share-2026-10-02.2.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '6. Срок и отзыв' })).toBeInTheDocument()
   })
+
+  it('телефон исполнителя в разд. 13 Соглашения', async () => {
+    renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/Телефон: \+7 931 366-12-20/)).toBeInTheDocument()
+  })
 })
