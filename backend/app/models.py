@@ -145,6 +145,9 @@ class Payment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    # Семья, которой оплачен Плюс (R06): платит владелец, а срок продлевается семье, даже если владелец потом сменился.
+    # Пусто у семьи, которой уже нет: сама запись остаётся для чеков.
+    household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="SET NULL"), index=True)
     email: Mapped[str] = mapped_column(String(255))  # почта плательщика на момент оплаты: сюда уходит чек
     yk_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     period: Mapped[str] = mapped_column(String(8))  # month | year

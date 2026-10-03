@@ -130,3 +130,24 @@ def test_r27_migration_scrubs_names_from_the_journal_and_drops_orphans(alembic):
     command.upgrade(cfg, "head")
     got = {k: d for k, d in rows(engine, "SELECT kind, detail FROM household_events")}
     assert got == {"owner": "", "cabinet_add": "", "cabinet_delete": "", "join": "регистрация по приглашению", "plan": "plus 2030-01-01"}
+
+
+def test_r06_t7_migration_links_existing_payments_to_the_payers_family(alembic):  # noqa: F811
+    """Платежи, сделанные до правила «платит владелец», привязываются к семье плательщика; платёж удалённого аккаунта остаётся без семьи."""
+    cfg, engine = alembic
+    command.upgrade(cfg, "c7e9a1b3d5f7")  # последняя миграция до привязки платежей к семье
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO households (id, plan, plus_is_trial, created_at) VALUES (1, 'plus', :f, '2026-10-03')"), {"f": False})
+        conn.execute(text("INSERT INTO households (id, plan, plus_is_trial, created_at) VALUES (2, 'free', :f, '2026-10-03')"), {"f": False})
+        for uid, hid, role in ((1, 1, "owner"), (2, 1, "member"), (3, 2, "owner")):
+            conn.execute(text(
+                "INSERT INTO users (id, email, name, password_hash, is_admin, token_version, created_at, household_id, household_role) "
+                f"VALUES ({uid}, 'u{uid}@example.com', 'U{uid}', 'x', :admin, 0, '2026-01-01', {hid}, '{role}')"), {"admin": False})
+        for pid, uid in ((1, 1), (2, 2), (3, 3), (4, None)):  # у четвёртого аккаунт уже удалён
+            conn.execute(text("INSERT INTO payments (id, user_id, email, period, amount, status, created_at) "
+                              f"VALUES ({pid}, {'NULL' if uid is None else uid}, 'p{pid}@example.com', 'month', 199, 'succeeded', '2026-10-03')"))
+        sync_sequences(conn)
+    command.upgrade(cfg, "head")
+    assert rows(engine, "SELECT id, household_id FROM payments ORDER BY id") == [(1, 1), (2, 1), (3, 2), (4, None)]
+    command.downgrade(cfg, "c7e9a1b3d5f7")  # откат возможен: колонка исчезает, платежи на месте
+    assert rows(engine, "SELECT id FROM payments ORDER BY id") == [(1,), (2,), (3,), (4,)]

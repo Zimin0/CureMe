@@ -763,6 +763,9 @@ class PayStatus(BaseModel):
     enabled: bool  # оплату можно начать
     plus_active: bool
     plus_until: datetime | None = None
+    can_pay: bool = False  # этот человек может сейчас оплатить Плюс семье: платит только владелец (R06)
+    is_owner: bool = False
+    owner_name: str | None = None  # кому платить, если не он сам
     auto_renew: bool
     recurring_enabled: bool = False  # автоплатежи подключены: можно показывать галочку автопродления
     price_month: int | None = None

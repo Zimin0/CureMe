@@ -50,7 +50,7 @@ export function PayBox() {
   // Незавершённые попытки (закрыли форму) не показываем: остаётся только платёж, к которому вернулись с оплаты.
   const shownPayments = s.payments.filter(p => p.status !== 'pending' || String(p.id) === returned)
   const price = period === 'month' ? s.price_month : s.price_year
-  const canPay = s.enabled && !!price
+  const canPay = s.can_pay && !!price
 
   return (
     <section className="card stack" aria-label="Оплата">
@@ -63,6 +63,14 @@ export function PayBox() {
               : 'Оплата не прошла, деньги не списаны. Можно попробовать ещё раз.'}
         </p>
       )}
+
+      {s.enabled && !s.is_owner && (
+        <p>
+          Плюс оплачивает владелец семьи{s.owner_name ? `: ${s.owner_name}` : ''}. Хотите платить сами, попросите передать вам владение
+          на странице <Link to="/family">«Семья»</Link>.
+        </p>
+      )}
+      {s.enabled && s.is_owner && !s.can_pay && <p>У вашей семьи Плюс без ограничения срока, оплачивать его не нужно.</p>}
 
       {s.auto_renew && (
         <div className="stack">
