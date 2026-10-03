@@ -19,8 +19,8 @@ from .models import (
     utcnow,
 )
 from .plans import (
-    FREE_CABINETS_MAX, LIMIT_FEATURE, NEW_TERMS_FROM, OLD_FREE_MEMBERS, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for,
-    plus_active, plus_required,
+    FREE_CABINETS_MAX, LIMIT_FEATURE, MAX_AHEAD_MONTHS, NEW_TERMS_FROM, OLD_FREE_MEMBERS, PLUS, PLUS_MEMBERS_MAX,
+    PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required, shift_months,
 )
 from .routers.files import _drop_photo
 from .security import new_invite_code
@@ -69,6 +69,59 @@ def record(db: Session, house: Household | None, kind: str, user: User | None = 
     """Запись в журнал семьи. В detail пишут только номера и служебные пометки, без имён и названий (R27)."""
     db.add(HouseholdEvent(household_id=house.id if house else None, kind=kind,
                           user_id=user.id if user else None, actor_id=actor.id if actor else None, detail=detail))
+
+
+# --- кулдаун и счётчик смен состава (R11) ---
+SWITCH_COOLDOWN_DAYS = 30
+CHANGES_PER_30D_FREE = 2
+CHANGES_PER_30D_PLUS = 4
+REGISTRATION = "регистрация по приглашению"  # такое вступление в кулдаун и счётчик не входит
+
+
+def _msk(moment: datetime) -> str:
+    return moment.astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y")
+
+
+def next_change_at(user: User, now: datetime | None = None) -> datetime | None:
+    """С какого момента человек снова может сменить семью; None, если можно уже сейчас (R11)."""
+    if user.household_changed_at is None or SWITCH_COOLDOWN_DAYS <= 0:
+        return None
+    until = _aware(user.household_changed_at) + timedelta(days=SWITCH_COOLDOWN_DAYS)
+    return until if until > (now or datetime.now(timezone.utc)) else None
+
+
+def ensure_can_switch(user: User, now: datetime) -> None:
+    until = next_change_at(user, now)
+    if until is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Сменить семью можно раз в {SWITCH_COOLDOWN_DAYS} дней: следующий раз с {_msk(until)} (по московскому времени). "
+            "Если нужно срочно, напишите нам.",
+        )
+
+
+def changes_in_window(db: Session, house: Household, now: datetime) -> int:
+    """Смены состава семьи за 30 дней: вступления, выходы, исключения. Регистрация по приглашению и сжатие не считаются."""
+    since = now - timedelta(days=30)
+    rows = db.scalars(select(HouseholdEvent).where(
+        HouseholdEvent.household_id == house.id, HouseholdEvent.kind.in_(["join", "leave", "kick"]),
+        HouseholdEvent.created_at >= since))
+    return sum(1 for e in rows if not (e.kind == "join" and e.detail == REGISTRATION))
+
+
+def ensure_family_changes_left(db: Session, house: Household, now: datetime) -> None:
+    limit = CHANGES_PER_30D_PLUS if plus_active(house, now) else CHANGES_PER_30D_FREE
+    if limit > 0 and changes_in_window(db, house, now) >= limit:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"В этой семье уже было {limit} смены состава за 30 дней: больше пока нельзя. Попробуйте позже.",
+        )
+
+
+def reset_cooldown(db: Session, user: User, actor: User | None = None) -> None:
+    """Администратор снимает кулдаун вручную; в журнале остаётся запись (R11-T6)."""
+    user.household_changed_at = None
+    record(db, user.household, "cooldown_reset", user=user, actor=actor)
 
 
 def drop_household(db: Session, house: Household) -> None:
@@ -280,7 +333,7 @@ def remember_four(house: Household, now: datetime | None = None) -> None:
 def attach(db: Session, user: User, house: Household) -> None:
     """Новый аккаунт, пришедший по приглашению, становится участником семьи (R01: личная семья ему не создаётся)."""
     user.household, user.household_role, user.household_joined_at = house, "member", utcnow()
-    record(db, house, "join", user=user, detail="регистрация по приглашению")
+    record(db, house, "join", user=user, detail=REGISTRATION)
     remember_four(house)
     sync_access(db, house)
 
@@ -308,13 +361,44 @@ def stop_autorenew(user: User) -> None:
     user.renew_notified_for = user.renew_notified_at = None
 
 
-def join(db: Session, user: User, target: Household, actor: User | None = None, force: bool = False) -> None:
+def _carry_plus(db: Session, user: User, mine: Household, target: Household, carry: bool, now: datetime) -> None:
+    """Оплаченные дни личной семьи переезжают в целевую семью, автопродление карты выключается (R08 «а»)."""
+    if not carry:
+        until = f" до {_msk(_aware(mine.plus_until))}" if mine.plus_until is not None else ""
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"У вашей семьи оплачен Плюс{until}. Вступить можно, только перенеся оставшиеся оплаченные дни в эту семью "
+            "(ваше автопродление выключится, дальше платит владелец). Или не вступайте и пригласите людей этой семьи к себе.",
+        )
+    if mine.plus_until is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Плюс без срока выдан администратором и не переносится. Напишите нам.")
+    if target.plan == PLUS and target.plus_until is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "У этой семьи Плюс без срока: переносить дни некуда. Напишите нам.")
+    remaining = _aware(mine.plus_until) - now
+    paid_target = plus_active(target, now) and not target.plus_is_trial
+    base = _aware(target.plus_until) if paid_target and target.plus_until is not None else now
+    new_until = base + remaining
+    if new_until > shift_months(now, MAX_AHEAD_MONTHS):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Срок Плюса семьи не может быть больше {MAX_AHEAD_MONTHS} месяцев вперёд: ваши дни не поместятся. Напишите нам.",
+        )
+    target.plan, target.plus_until, target.plus_is_trial = PLUS, new_until, False
+    stop_autorenew(user)
+    record(db, target, "plus_carry", user=user, detail=f"перенесено дней: {remaining.days}")
+
+
+def join(db: Session, user: User, target: Household, actor: User | None = None, force: bool = False,
+         carry_plus: bool = False, now: datetime | None = None) -> None:
     """Человек, который живёт один, вступает в чужую семью (R08).
 
     Бесплатный приносит свою аптечку с лекарствами, пустая растворяется. Пробный Плюс личной семьи пропадает вместе
-    с ней (R07). Если у человека оплачен Плюс, вступить нельзя: оплаченные дни пропали бы (до выбора по R08 «а/б/в»).
+    с ней (R07). Если у человека оплачен Плюс, вступить можно, только выбрав перенос оставшихся дней в семью
+    (carry_plus, R08 «а»): иначе оплаченное пропало бы. Вступать и терять оплаченное нельзя.
+    Кулдаун человека и счётчик смен семьи (R11) проверяются, если не force.
     force — администратор сервиса вносит человека сверх лимитов (по просьбе семьи); остальные проверки остаются.
     """
+    now = now or datetime.now(timezone.utc)
     mine = user.household
     if mine is target:
         return
@@ -324,11 +408,11 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
     if mine is not None:
         if len(mine.members) > 1:
             raise HTTPException(status.HTTP_409_CONFLICT, "Сначала выйдите из своей семьи: вступить в другую можно, только если живёшь один.")
-        if plus_active(mine) and not mine.plus_is_trial:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "У вашей семьи оплачен Плюс, и при вступлении он пропадёт. Напишите нам, мы поможем перенести оплаченные дни.",
-            )
+        if not force:
+            ensure_can_switch(user, now)
+            ensure_family_changes_left(db, target, now)
+        if plus_active(mine, now) and not mine.plus_is_trial:
+            _carry_plus(db, user, mine, target, carry_plus, now)
     if not force:
         ensure_room_for_person(db, target, joining=True)
     own = cabinets_of(mine) if mine is not None else []
@@ -357,6 +441,8 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
     if mine is not None:
         db.expire(mine, ["members", "cabinets"])
         drop_household(db, mine)
+    if not force:
+        user.household_changed_at = now
     record(db, target, "join", user=user, actor=actor)
     remember_four(target)
     sync_access(db, target)
@@ -377,6 +463,11 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
         raise HTTPException(status.HTTP_409_CONFLICT, "Вы живёте один: покидать нечего. Лишнюю аптечку можно удалить, а аккаунт удалить в профиле.")
     if user.household_role == "owner":
         raise HTTPException(status.HTTP_409_CONFLICT, "Владелец семьи сначала передаёт владение другому человеку.")
+    voluntary = not kicked and kind is None  # исключение и сжатие кулдаун не запускают и счётчик не упирают (R10, R14)
+    now = datetime.now(timezone.utc)
+    if voluntary:
+        ensure_can_switch(user, now)
+        ensure_family_changes_left(db, house, now)
     own = [c for c in active_cabinets(house) if c.created_by_id == user.id and c.id not in stay_ids]
     keep = own[0] if own else None
     left_ids = [c.id for c in house.cabinets if c is not keep]
@@ -399,6 +490,8 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
     _move_history(db, user, left_ids, keep)
     db.execute(delete(Schedule).where(Schedule.user_id == user.id, Schedule.family_id.in_(left_ids)))
     _close_pending(db, house, "cancelled", user, now=utcnow())  # предложения с уходящим теряют смысл
+    if voluntary:
+        user.household_changed_at = now
     record(db, house, kind or ("kick" if kicked else "leave"), user=user, actor=actor, detail=detail)
     sync_access(db, house)
     sync_access(db, new_house)

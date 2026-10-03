@@ -14,7 +14,6 @@
   на странице «Оплаты и чеки», письмо с ссылкой уходит покупателю.
 Пока в .env нет CUREME_YOOKASSA_SHOP_ID и CUREME_YOOKASSA_SECRET_KEY, всё выключено.
 """
-import calendar
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -29,7 +28,8 @@ from . import compression
 from .households import owner_of, stop_autorenew
 from .mailer import send_mail
 from .models import Household, Payment, User
-from .plans import PLUS, billing_settings, plus_active
+from .plans import MAX_AHEAD_MONTHS, PLUS, billing_settings, plus_active
+from .plans import shift_months as _shift_months
 
 log = logging.getLogger("cureme.payments")
 API = "https://api.yookassa.ru/v3"
@@ -37,7 +37,6 @@ PERIOD_DAYS = {"month": 30, "year": 365}
 PERIOD_TITLE = {"month": "1 месяц", "year": "1 год"}
 NOTICE_DAYS = 3  # за сколько дней предупреждаем о списании
 RETRY_HOURS = 2  # письмо должно уйти не позже чем за 3 дня минус эта погрешность
-MAX_AHEAD_MONTHS = 13  # Плюс семьи нельзя оплатить дальше чем на столько месяцев вперёд (R06)
 
 
 class PaymentError(Exception):
@@ -97,15 +96,6 @@ def _amount(rub: int) -> dict:
 
 def _description(user: User, period: str) -> str:
     return f"Подписка Капсулка Плюс на {PERIOD_TITLE[period]}, аккаунт {user.email}"[:128]
-
-
-def _shift_months(moment: datetime, months: int) -> datetime:
-    """Сдвиг на целые календарные месяцы (назад при отрицательном числе); 31-е в коротком месяце становится его последним днём."""
-    index = moment.year * 12 + moment.month - 1 + months
-    year, month = divmod(index, 12)
-    month += 1
-    day = min(moment.day, calendar.monthrange(year, month)[1])
-    return moment.replace(year=year, month=month, day=day)
 
 
 def _msk_date(moment: datetime) -> str:

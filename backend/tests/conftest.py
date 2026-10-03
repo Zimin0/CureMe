@@ -53,6 +53,14 @@ def new_terms_in_force(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_switch_limits_by_default(monkeypatch):
+    """Кулдаун смены семьи и счётчик смен за 30 дней (R11) в обычных сценариях выключены; их проверяет test_switch_rules.py."""
+    monkeypatch.setattr("app.households.SWITCH_COOLDOWN_DAYS", 0)
+    monkeypatch.setattr("app.households.CHANGES_PER_30D_FREE", 0)
+    monkeypatch.setattr("app.households.CHANGES_PER_30D_PLUS", 0)
+
+
+@pytest.fixture(autouse=True)
 def no_trial_by_default(monkeypatch):
     """Новые аккаунты в тестах бесплатные: пробный Плюс включает только test_trial.py (фикстура trial_on)."""
     monkeypatch.setattr("app.plans.DEFAULT_TRIAL_DAYS", 0)

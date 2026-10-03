@@ -199,6 +199,17 @@ def delete_family(family_id: int, me: User = Depends(admin_user), db: Session = 
     return Response(status_code=204)
 
 
+@router.post("/users/{user_id}/reset-cooldown", status_code=204)
+def reset_cooldown(user_id: int, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    """Снимает кулдаун смены семьи (R11-T6): человек может сменить семью сразу. В журнале семьи остаётся запись."""
+    user = db.get(User, user_id)
+    if not user:
+        raise _not_found("Аккаунт")
+    households.reset_cooldown(db, user, actor=me)
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.post("/families/{family_id}/members", response_model=AdminFamilyOut)
 def add_member(family_id: int, body: AdminMemberIn, background: BackgroundTasks, me: User = Depends(admin_user),
                db: Session = Depends(get_db)):

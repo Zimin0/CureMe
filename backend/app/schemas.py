@@ -85,6 +85,7 @@ class MeOut(UserOut):
     plus_ending: PlusEndingOut | None = None
     # Сколько ещё своих аптечек можно создать: None — без ограничений (Плюс или платная версия выключена).
     own_families_left: int | None = None
+    next_change_at: datetime | None = None  # до этого момента сменить семью нельзя (кулдаун, R11)
     plus_active: bool = False  # у аккаунта оплачен Плюс (нужно, чтобы отличить «лимит бесплатной» от «потолка Плюса»)
     # Только после смены своего пароля: старый токен уже не действует, вот новый.
     access_token: str | None = None
@@ -193,6 +194,7 @@ class RoleIn(BaseModel):  # используется админкой (инст�
 
 class JoinIn(BaseModel):
     code: str = Field(min_length=1, max_length=32)
+    carry_plus: bool = False  # у человека оплачен Плюс: перенести оставшиеся дни в семью (R08 «а»)
 
 
 class InviteInfo(BaseModel):

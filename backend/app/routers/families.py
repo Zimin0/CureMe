@@ -195,7 +195,7 @@ def join(body: JoinIn, request: Request, user: User = Depends(current_user), db:
     house = inv.household
     if user.household is house:  # свой код владельца или повторный переход: ничего не сгорает
         return family_out(households.cabinets_of(house)[0], user.household_role, db, viewer_id=user.id)
-    households.join(db, user, house, actor=user)  # отказ (нет места, чужая семья) откатывает всё: код не сгорает (R04-T5)
+    households.join(db, user, house, actor=user, carry_plus=body.carry_plus)  # отказ (нет места, чужая семья) откатывает всё: код не сгорает (R04-T5)
     households.use_invite(inv, user)
     db.commit()
     fam = households.cabinets_of(user.household)[0]
