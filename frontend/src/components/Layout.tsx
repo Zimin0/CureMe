@@ -1,6 +1,7 @@
-import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Stethoscope, Users } from 'lucide-react'
+import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Sparkles, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { usePlan } from '../plan'
 
 // short — подпись в нижней панели на телефоне, если полная не помещается.
 const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?: boolean }[] = [
@@ -15,6 +16,8 @@ const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?
 
 export function Layout() {
   const { me, familyId, setFamilyId, signOut } = useAuth()
+  const { plan } = usePlan()
+  const showUpsell = !!plan && plan.billing_enabled && !plan.plus_active
   return (
     <div className="app">
       <aside className="sidebar">
@@ -27,6 +30,9 @@ export function Layout() {
           <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
         )}
         <div className="spacer" />
+        {showUpsell && (
+          <NavLink to="/plus" className="btn primary side-plus"><Sparkles size={18} />Подключить Плюс</NavLink>
+        )}
         {me && me.families.length > 1 && (
           <label className="family-switch small">
             <span className="muted">Аптечка семьи</span>
