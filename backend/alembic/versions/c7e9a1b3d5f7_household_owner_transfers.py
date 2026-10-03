@@ -4,8 +4,11 @@ Revision ID: c7e9a1b3d5f7
 Revises: b4d6f8a1c3e5
 Create Date: 2026-10-03 23:00:00
 
-Только новая таблица, существующие данные не меняются. Записи о предложениях (кто, кому, чем закончилось)
-хранятся 30 дней после окончания срока ответа и удаляются фоновой задачей.
+Новая таблица; записи о предложениях (кто, кому, чем закончилось) хранятся 30 дней после окончания срока
+ответа и удаляются фоновой задачей.
+
+Заодно чистится журнал семьи (R27): в detail убираются имена людей и названия аптечек (теперь там только
+номера), удаляются записи семей, которых уже нет. Остальные данные не меняются.
 """
 from typing import Sequence, Union
 
@@ -21,6 +24,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Журнал семьи: имена и названия аптечек в detail (с версии 1.21.0) стираем, записи исчезнувших семей удаляем.
+    op.execute("UPDATE household_events SET detail = '' WHERE kind IN ('owner', 'cabinet_add', 'cabinet_delete')")
+    op.execute("DELETE FROM household_events WHERE household_id IS NULL")
     op.create_table(
         'household_owner_transfers',
         sa.Column('id', sa.Integer(), nullable=False),

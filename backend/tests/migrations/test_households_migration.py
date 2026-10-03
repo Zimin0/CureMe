@@ -114,3 +114,19 @@ def test_downgrade_returns_plus_to_the_owner(alembic):  # noqa: F811
         conn.execute(text("UPDATE households SET plan = 'plus', plus_until = '2031-01-01'"))
     command.downgrade(cfg, BEFORE)
     assert [(r[0], r[1]) for r in rows(engine, "SELECT id, plan FROM users ORDER BY id")] == [(1, "plus"), (2, "free")]
+
+
+def test_r27_migration_scrubs_names_from_the_journal_and_drops_orphans(alembic):  # noqa: F811
+    """Миграция передачи владения заодно стирает имена и названия аптечек из журнала и удаляет записи исчезнувших семей."""
+    cfg, engine = alembic
+    command.upgrade(cfg, "b4d6f8a1c3e5")  # последняя миграция до передачи владения
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO households (id, plan, plus_is_trial, created_at) VALUES (1, 'free', :f, '2026-10-03')"), {"f": False})
+        for kind, detail, hid in [("owner", "прежний владелец: Никита", 1), ("cabinet_add", "Дача Никиты", 1),
+                                  ("cabinet_delete", "Старая аптечка", 1), ("join", "регистрация по приглашению", 1),
+                                  ("plan", "plus 2030-01-01", 1), ("leave", "удаление аккаунта", None)]:
+            conn.execute(text("INSERT INTO household_events (household_id, kind, detail, created_at) VALUES (:h, :k, :d, '2026-10-03')"),
+                         {"h": hid, "k": kind, "d": detail})
+    command.upgrade(cfg, "head")
+    got = {k: d for k, d in rows(engine, "SELECT kind, detail FROM household_events")}
+    assert got == {"owner": "", "cabinet_add": "", "cabinet_delete": "", "join": "регистрация по приглашению", "plan": "plus 2030-01-01"}

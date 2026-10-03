@@ -55,10 +55,30 @@ def _is_empty(db: Session, fam: Family) -> bool:
     return db.scalar(select(Medicine.id).where(Medicine.family_id == fam.id).limit(1)) is None
 
 
+EVENT_KEEP = timedelta(days=365)  # журнал семьи хранится 12 месяцев (R27)
+
+
 def record(db: Session, house: Household | None, kind: str, user: User | None = None,
            actor: User | None = None, detail: str = "") -> None:
+    """Запись в журнал семьи. В detail пишут только номера и служебные пометки, без имён и названий (R27)."""
     db.add(HouseholdEvent(household_id=house.id if house else None, kind=kind,
                           user_id=user.id if user else None, actor_id=actor.id if actor else None, detail=detail))
+
+
+def drop_household(db: Session, house: Household) -> None:
+    """Удаляет семью вместе с её журналом: запись о семье, которой нет, хранить незачем (R27)."""
+    db.flush()
+    db.execute(delete(HouseholdEvent).where(HouseholdEvent.household_id == house.id))
+    db.delete(house)
+
+
+def purge_old_events(db: Session, now: datetime | None = None) -> int:
+    """Удаляет записи журнала старше 12 месяцев (R27). Для споров по тарифу и счётчиков за 30 дней этого достаточно."""
+    now = now or datetime.now(timezone.utc)
+    removed = db.execute(delete(HouseholdEvent).where(HouseholdEvent.created_at < now - EVENT_KEEP)).rowcount or 0
+    if removed:
+        db.commit()
+    return removed
 
 
 # --- доступ ---
@@ -257,7 +277,7 @@ def create_cabinet(db: Session, user: User, name: str) -> Family:
     lock(db, house)
     ensure_room_for_cabinets(db, house)
     fam = add_cabinet(db, house, name, user)
-    record(db, house, "cabinet_add", user=user, detail=name)
+    record(db, house, "cabinet_add", user=user, detail=f"аптечка №{fam.id}")  # номер, не название: в нём бывает имя человека
     return fam
 
 
@@ -323,7 +343,7 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
     db.flush()
     if mine is not None:
         db.expire(mine, ["members", "cabinets"])
-        db.delete(mine)
+        drop_household(db, mine)
     record(db, target, "join", user=user, actor=actor)
     sync_access(db, target)
 
@@ -384,7 +404,7 @@ def make_owner(db: Session, house: Household, new_owner: User, actor: User | Non
         stop_autorenew(old)
     new_owner.household_role = "owner"
     _close_pending(db, house, "cancelled", None, now=utcnow())
-    record(db, house, "owner", user=new_owner, actor=actor, detail=f"прежний владелец: {old.name if old else 'нет'}")
+    record(db, house, "owner", user=new_owner, actor=actor, detail=f"прежний владелец: {old.id if old else 'нет'}")  # номер, не имя
     sync_access(db, house)
 
 
@@ -576,7 +596,7 @@ def delete_cabinet(db: Session, fam: Family, actor: User | None = None, force: b
         if not force and len(house.cabinets) <= 1:
             raise HTTPException(status.HTTP_409_CONFLICT, "Это последняя аптечка семьи: удалить её нельзя. Создайте другую или выгрузите данные.")
     drop_cabinet_files(db, fam)
-    record(db, house, "cabinet_delete", actor=actor, detail=fam.name)
+    record(db, house, "cabinet_delete", actor=actor, detail=f"аптечка №{fam.id}")
     db.delete(fam)
     db.flush()
     if house is not None:
@@ -597,7 +617,7 @@ def delete_account(db: Session, user: User, admin: bool = False) -> None:
     if not others:
         for fam in list(house.cabinets):
             drop_cabinet_files(db, fam)
-        db.delete(house)
+        drop_household(db, house)
         db.flush()
         return
     if user.household_role == "owner":
