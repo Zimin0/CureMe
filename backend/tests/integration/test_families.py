@@ -67,7 +67,7 @@ def test_roles(client):
     assert client.patch(f"{url}/{u1['id']}", headers=h1, json={"role": "member"}).status_code == 400
     assert client.patch(f"{url}/{u2['id']}", headers=h1, json={"role": "admin"}).status_code == 422
     assert client.patch(f"{url}/99999", headers=h1, json={"role": "owner"}).status_code == 404
-    # назначаем второго владельца — теперь первого понизить можно
+    # назначаем второго владельца: владелец один (R02), прежний становится участником
     assert client.patch(f"{url}/{u2['id']}", headers=h1, json={"role": "owner"}).status_code == 200
     r = client.patch(f"{url}/{u1['id']}", headers=h2, json={"role": "member"})
     assert r.status_code == 200
@@ -79,23 +79,16 @@ def test_roles(client):
 def test_member_can_leave(client):
     (h1, _), (h2, u2), f = two_members(client)
     assert client.delete(f"/api/families/{f}/members/{u2['id']}", headers=h2).status_code == 204
-    assert client.get("/api/auth/me", headers=h2).json()["families"] == []
+    # ушедший получает свою семью с пустой аптечкой (подробнее: test_households.py, R09)
+    mine = client.get("/api/auth/me", headers=h2).json()["families"]
+    assert len(mine) == 1 and mine[0]["id"] != f and mine[0]["role"] == "owner"
     assert len(client.get(f"/api/families/{f}", headers=h1).json()["members"]) == 1
 
 
 def test_only_owner_cannot_leave_while_others_stay(client):
     (h1, u1), _, f = two_members(client)
     r = client.delete(f"/api/families/{f}/members/{u1['id']}", headers=h1)
-    assert r.status_code == 400 and "владельца" in r.json()["detail"]
-
-
-def test_last_member_leaving_deletes_family(client, owner):
-    h, u, f = owner
-    code = invite_code(client, h, f)
-    client.post(f"/api/families/{f}/medicines", headers=h, json={"name": "Нурофен", "packages": [{"quantity": 1}]})
-    assert client.delete(f"/api/families/{f}/members/{u['id']}", headers=h).status_code == 204
-    assert client.get(f"/api/invites/{code}").status_code == 404
-    assert client.get(f"/api/families/{f}", headers=h).status_code == 404
+    assert r.status_code == 409 and "передаёт владение" in r.json()["detail"]
 
 
 def test_remove_unknown_member(client, owner):
@@ -127,7 +120,7 @@ def test_free_plan_allows_one_own_cabinet(client, owner):
     assert client.get("/api/auth/me", headers=h).json()["own_families_left"] == 0
     r = client.post("/api/families", headers=h, json={"name": "Дача"})
     assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "cabinets"
-    assert "одну свою аптечку" in r.json()["detail"]
+    assert "столько же, сколько людей" in r.json()["detail"]
     assert len(client.get("/api/auth/me", headers=h).json()["families"]) == 1
 
 
@@ -135,7 +128,7 @@ def test_plus_in_own_family_unlocks_more_cabinets(client, owner):
     h, _, first = owner
     enable_billing(client, h)
     grant_plus(client, h, first)
-    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] == 4  # потолок Плюса 5, одна уже есть
+    assert client.get("/api/auth/me", headers=h).json()["own_families_left"] == 7  # потолок Плюса 8, одна уже есть
     assert client.post("/api/families", headers=h, json={"name": "Дача"}).status_code == 201
     assert client.post("/api/families", headers=h, json={"name": "Машина"}).status_code == 201
 

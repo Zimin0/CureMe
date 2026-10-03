@@ -101,8 +101,20 @@ def fid(user) -> int:
     return user["families"][0]["id"]
 
 
+def check_household_invariants(session_factory):
+    """Инварианты семей (R01–R03, R20-T3): у каждого человека одна семья, у семьи один владелец, лимиты, доступ = люди × аптечки.
+
+    Вызывается в конце сценариев; сессия закрывается сразу, иначе на Postgres транзакция повисла бы на сносе схемы.
+    """
+    from app.households import invariant_problems
+
+    with session_factory() as db:
+        problems = invariant_problems(db)
+    assert problems == [], problems
+
+
 def grant_plus(client, h, family_id, plan="plus", until=None):
-    """Админ (h) включает Плюс аккаунту главного владельца аптечки. Возвращает ответ API."""
+    """Админ (h) включает Плюс семье, которой принадлежит аптечка (через её владельца). Возвращает ответ API."""
     fam = next(x for x in client.get("/api/admin/families", headers=h).json() if x["id"] == family_id)
     r = client.put(f"/api/admin/users/{fam['owner_id']}/plan", headers=h, json={"plan": plan, "plus_until": until})
     assert r.status_code == 200, r.text

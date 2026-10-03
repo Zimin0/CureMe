@@ -190,7 +190,8 @@ def test_module_names():
 
 def test_relative_imports_are_resolved():
     rev = st.importers()
-    assert "app.routers.families" in rev["app.routers.auth"]   # from .auth import create_family
+    assert "app.routers.families" in rev["app.households"]      # from .. import households
+    assert "app.routers.auth" in rev["app.households"]
     assert "app.routers.medicines" in rev["app.codes"]          # from ..codes import parse_code
     assert "app.main" in rev["app.routers.admin"]               # from .routers import admin, ...
 

@@ -11,7 +11,7 @@ export interface InviteInfo { family_name: string; members: number; full: boolea
 export interface Category { id: number; name: string; icon: string; color: string; medicine_count: number }
 
 export interface AdminStats { users: number; admins: number; families: number; medicines: number; categories: number }
-export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[]; plan: PlanName; plus_until: string | null; plus_active: boolean; auto_renew?: boolean; plus_from_others?: string[] }
+export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[]; plan: PlanName; plus_until: string | null; plus_active: boolean; auto_renew?: boolean; household_id?: number | null; is_owner?: boolean }
 export interface AdminFamily { id: number; name: string; invite_code: string; created_at: string; medicine_count: number; members: Member[]; plan: PlanName; plus_until: string | null; plus_active: boolean; owner_id?: number | null; owner_name?: string | null }
 
 // --- тарифы: backend/app/plans.py ---
@@ -27,7 +27,7 @@ export interface Plan {
   billing_enabled: boolean   // платная версия включена администратором
   price_month?: number | null  // стоимость Плюса для аккаунта, ₽ (настраивает админ); null — не показывать
   price_year?: number | null
-  owner_name?: string | null  // чей Плюс: главный владелец семьи
+  owner_name?: string | null  // чей Плюс: владелец семьи
   has_plus: boolean          // семье доступно всё из Плюса
   limits: Record<LimitName, number | null>  // null — без ограничений
   free_limits: Record<LimitName, number>

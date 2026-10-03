@@ -132,6 +132,7 @@ class MemberOut(BaseModel):
     name: str
     email: str
     role: str
+    is_owner: bool = False  # владелец семьи: приглашает и платит (R02)
     joined_at: datetime
 
 
@@ -213,8 +214,17 @@ class AdminUserOut(BaseModel):
     plus_until: datetime | None = None
     plus_active: bool = False  # Плюс аккаунта оплачен и не истёк
     auto_renew: bool = False  # включено автопродление (способ оплаты сохранён в ЮKassa)
-    # Аптечки, где у человека есть Плюс не от его тарифа, а от главного владельца аптечки.
-    plus_from_others: list[str] = []
+    household_id: int | None = None
+    is_owner: bool = False  # владелец своей семьи: платит и приглашает
+
+
+class HouseholdEventOut(BaseModel):
+    id: int
+    kind: str
+    user_id: int | None = None
+    actor_id: int | None = None
+    detail: str = ""
+    created_at: datetime
 
 
 class AdminUserUpdate(BaseModel):
@@ -233,12 +243,15 @@ class AdminFamilyOut(BaseModel):
     created_at: datetime
     medicine_count: int
     members: list[MemberOut]
-    # Тариф главного владельца аптечки (только для чтения: менять нужно у аккаунта).
+    # Тариф семьи, которой принадлежит аптечка (только для чтения: менять нужно у человека семьи).
     plan: str = "free"
     plus_until: datetime | None = None
     plus_active: bool = False  # Плюс оплачен и не истёк
     owner_id: int | None = None
     owner_name: str | None = None
+    household_id: int | None = None
+    household_people: int = 0
+    household_cabinets: int = 0
 
 
 # --- тарифы (plans.py) ---

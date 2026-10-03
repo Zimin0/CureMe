@@ -112,7 +112,7 @@ def test_plus_moves_from_family_to_main_owner(alembic):
         conn.execute(text(
             "INSERT INTO memberships (family_id, user_id, role, joined_at) VALUES "
             "(1, 1, 'owner', '2026-01-01'), (1, 2, 'owner', '2026-02-01'),"  # главный владелец — 1, не 2
-            "(2, 1, 'owner', '2026-01-01'), (3, 3, 'owner', '2026-01-01')"
+            "(2, 1, 'owner', '2026-01-01'), (2, 2, 'member', '2026-02-01'), (3, 3, 'owner', '2026-01-01')"
         ))
     command.upgrade(cfg, "head")
     with engine.connect() as conn:

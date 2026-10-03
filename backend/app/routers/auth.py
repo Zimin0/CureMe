@@ -2,29 +2,19 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import households
 from ..db import get_db
 from ..deps import signed_in_user
 from ..email_verification import code_matches, issue_code, mark_verified, needs_verification, send_verification
 from ..legal import CONSENT_VERSION
-from ..limits import ensure_can_add_member
-from ..models import Family, Membership, User, utcnow
+from ..models import Family, User, utcnow
 from ..plans import billing_settings, grant_trial, own_families_left, plus_active
 from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
-from ..security import burn_password_check, create_token, hash_password, new_invite_code, verify_password
-from ..seed import ensure_default_categories
+from ..security import burn_password_check, create_token, hash_password, verify_password
 from ..services import access_settings, debug_enabled, has_access, telegram_active
-from .admin import _leave
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-def create_family(db: Session, name: str, owner: User) -> Family:
-    fam = Family(name=name, invite_code=new_invite_code())
-    fam.memberships.append(Membership(user=owner, role="owner"))
-    db.add(fam)
-    ensure_default_categories(db)
-    return fam
 
 
 def me_out(user: User, db: Session) -> MeOut:
@@ -52,21 +42,24 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     email = body.email.lower()
     if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть")
-    family = None
+    house = None
     if body.invite_code:
         family = db.scalar(select(Family).where(Family.invite_code == body.invite_code.strip().upper()))
-        if not family:
+        if not family or not family.household:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден")
-        ensure_can_add_member(db, family, joining=True)
+        house = family.household
+        households.lock(db, house)
+        households.ensure_room_for_person(db, house, joining=True)
 
     first = db.scalar(select(User.id).limit(1)) is None  # первый аккаунт — администратор
     user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password), is_admin=first,
                 consent_at=utcnow(), consent_version=CONSENT_VERSION)
     db.add(user)
-    if family:
-        db.add(Membership(family=family, user=user, role="member"))
+    db.flush()
+    if house:
+        households.attach(db, user, house)
     else:
-        create_family(db, f"Семья {user.name}", user)
+        households.create_personal(db, user)
     code = issue_code(user) if needs_verification(user) else None
     if code is None:
         grant_trial(db, user)  # почту не проверяем (нет SMTP): подарок сразу; иначе его даёт подтверждение почты
@@ -126,17 +119,14 @@ def give_consent(body: ConsentIn, user: User = Depends(signed_in_user), db: Sess
 def delete_me(body: DeleteAccountIn, user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
     """Удаление аккаунта — это и отзыв согласия (152-ФЗ, ст. 9 и 21): данные стираются сразу.
 
-    Из каждой семьи человек выходит как при «Покинуть семью»: семья без участников удаляется
-    вместе с аптечкой и фото, а общие лекарства остальных участников остаются.
+    Аптечки, которые создал человек, остаются семье, а общие лекарства других участников остаются. Если он
+    последний, семья удаляется целиком вместе с аптечками и фото. Владелец при других людях сначала передаёт владение.
     """
     # С украденным токеном нельзя подбирать пароль, чтобы стереть чужой аккаунт.
     limiter.hit(f"delete-me:{user.id}", limit=5, window=900)
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный пароль")
-    for m in list(user.memberships):
-        _leave(db, m)
-    db.flush()
-    db.expire(user, ["memberships"])
+    households.delete_account(db, user)
     db.delete(user)
     db.commit()
     return Response(status_code=204)

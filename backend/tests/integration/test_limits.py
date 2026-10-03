@@ -1,9 +1,9 @@
-"""Лимиты бесплатной версии: до 4 участников и 60 лекарств, в Плюсе без ограничений."""
+"""Лимиты бесплатной версии: до 3 человек в семье и 60 лекарств в аптечке; в Плюсе до 5 человек и лекарства без лимита (R02, R26)."""
 
 import pytest
 
 from app.models import Medicine
-from app.plans import FREE_LIMITS, PLUS_HEADER
+from app.plans import FREE_LIMITS, PLUS_HEADER, PLUS_MEMBERS_MAX
 from tests.conftest import grant_plus, register
 
 FREE_MAX_MEMBERS = FREE_LIMITS["members"]
@@ -58,7 +58,7 @@ def test_usage_is_shown_in_family(client, owner):
     }
 
 
-def test_medicine_limit_blocks_only_adding(client, db, owner):
+def test_r26_t1_medicine_limit_blocks_only_adding(client, db, owner):
     h, _, f = owner
     fill_medicines(db, f, FREE_MAX_MEDICINES - 1)
     assert add(client, h, f, "Шестидесятое").status_code == 201
@@ -145,13 +145,13 @@ def test_admin_is_not_limited(client, owner):
     assert usage(client, h, f)["members"] == FREE_MAX_MEMBERS + 1
 
 
-def test_plus_has_no_limits(client, db, owner, plus):
+def test_r26_t2_plus_has_no_medicine_limit_but_people_cap(client, db, owner, plus):
     h, _, f = owner
     fill_medicines(db, f, FREE_MAX_MEDICINES)
     assert add(client, h, f).status_code == 201
     fill_members(client, h, f, FREE_MAX_MEMBERS + 1)
     assert usage(client, h, f) == {
-        "members": FREE_MAX_MEMBERS + 1, "max_members": None, "medicines": FREE_MAX_MEDICINES + 1, "max_medicines": None,
+        "members": FREE_MAX_MEMBERS + 1, "max_members": PLUS_MEMBERS_MAX, "medicines": FREE_MAX_MEDICINES + 1, "max_medicines": None,
     }
     assert client.get(f"/api/invites/{invite_code(client, h, f)}").json()["full"] is False
 

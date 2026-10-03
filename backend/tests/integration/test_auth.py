@@ -148,8 +148,11 @@ def test_delete_account_keeps_shared_family_for_others(client):
     h, u = register(client)
     fam = u["families"][0]["id"]
     code = client.get(f"/api/families/{fam}", headers=h).json()["invite_code"]
-    h2, _ = register(client, "mom@example.com", "Мама", invite=code)
+    h2, mom = register(client, "mom@example.com", "Мама", invite=code)
     client.post(f"/api/families/{fam}/medicines", json={"name": "Нурофен"}, headers=h)
+    # владелец при других людях сначала передаёт владение (R22-T3), потом удаляет аккаунт
+    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 409
+    assert client.patch(f"/api/families/{fam}/members/{mom['id']}", headers=h, json={"role": "owner"}).status_code == 200
     assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
     left = client.get(f"/api/families/{fam}", headers=h2).json()
     assert [m["name"] for m in left["members"]] == ["Мама"] and left["members"][0]["role"] == "owner"
