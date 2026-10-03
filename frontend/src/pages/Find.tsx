@@ -3,25 +3,35 @@ import { Info, Search } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, SuggestResult } from '../api'
-import { useFamilyPath } from '../auth'
+import { useAuth, useFamilyPath } from '../auth'
 import { Empty, MedIcon, Spinner } from '../components/ui'
 import { fmtQty, subtitle } from '../format'
 import { MEDICAL_NOTE } from '../legal'
+import { useRequirePlus } from '../plan'
 
 export function Find() {
   const fam = useFamilyPath()
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const [input, setInput] = useState(q)
+  const { me, familyId, setFamilyId } = useAuth()
+  const requirePlus = useRequirePlus()
+  const several = (me?.families.length ?? 0) > 1
+  const all = several && params.get('scope') === 'all'
 
   const conditions = useQuery({ queryKey: ['conditions'], queryFn: () => api<string[]>('/conditions'), staleTime: Infinity })
   const res = useQuery({
-    queryKey: ['suggest', fam(''), q],
-    queryFn: () => api<SuggestResult>(fam(`/suggest?condition=${encodeURIComponent(q)}`)),
+    queryKey: ['suggest', fam(''), q, all],
+    queryFn: () => api<SuggestResult>(fam(`/suggest?condition=${encodeURIComponent(q)}${all ? '&scope=all' : ''}`)),
     enabled: q.trim().length >= 2,
   })
 
-  const go = (v: string) => { setInput(v); setParams(v ? { q: v } : {}, { replace: true }) }
+  const go = (v: string) => { setInput(v); setParams(v ? { q: v, ...(all ? { scope: 'all' } : {}) } : {}, { replace: true }) }
+  const setScope = (on: boolean) => {
+    const next = new URLSearchParams(params)
+    on ? next.set('scope', 'all') : next.delete('scope')
+    setParams(next, { replace: true })
+  }
   const submit = (e: FormEvent) => { e.preventDefault(); go(input.trim()) }
 
   return (
@@ -42,6 +52,13 @@ export function Find() {
         </label>
         <button className="btn primary" style={{ height: 50 }}>Найти</button>
       </form>
+
+      {several && (
+        <div className="chips">
+          <button className={`chip ${!all ? 'active' : ''}`} aria-pressed={!all} onClick={() => setScope(false)}>Эта аптечка</button>
+          <button className={`chip ${all ? 'active' : ''}`} aria-pressed={all} onClick={() => requirePlus('search_all', () => setScope(true))}>Все аптечки</button>
+        </div>
+      )}
 
       <div className="chips wrap">
         {conditions.data?.map(c => (
@@ -64,12 +81,14 @@ export function Find() {
                 const m = r.medicine
                 const unavailable = m.stock.total <= 0
                 return (
-                  <Link key={m.id} to={`/medicines/${m.id}`} className="card condition-result" style={unavailable ? { opacity: .7 } : undefined}>
+                  <Link key={`${m.family_id ?? ''}-${m.id}`} to={`/medicines/${m.id}`} className="card condition-result" style={unavailable ? { opacity: .7 } : undefined}
+                    onClick={() => { if (all && m.family_id && m.family_id !== familyId) setFamilyId(m.family_id) }}>
                     <div className="row">
                       <span className="rank">{i + 1}</span>
                       <MedIcon category={m.category} size={44} photo={m.photo_url} />
                       <div className="grow">
                         <div style={{ fontWeight: 700, fontSize: 16 }}>{m.name}</div>
+                        {all && m.family_name && <span className="badge accent">{m.family_name}</span>}
                         <div className="small muted ellipsis">{subtitle(m) || m.category?.name}</div>
                       </div>
                       <div className="qty">{fmtQty(m.stock.total)}<small>{m.unit}</small></div>

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Copy, Download, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchText } from '../api'
+import { fetchFile, fetchText } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Empty, Spinner, useToast } from '../components/ui'
 import { plural } from '../format'
@@ -23,6 +23,18 @@ export function Export() {
   // Латиница в имени: часть браузеров молча заменяет кириллическое имя blob-файла на «download».
   const filename = `kapsulka-lekarstva-${new Date().toLocaleDateString('sv-SE')}.txt`
   const file = () => new File([text ?? ''], filename, { type: 'text/plain;charset=utf-8' })
+
+  const [busy, setBusy] = useState<'csv' | 'json' | null>(null)
+  const dump = async (fmt: 'csv' | 'json') => {
+    setBusy(fmt)
+    try {
+      saveFile(await fetchFile(fam(`/export.${fmt}`), `kapsulka-lekarstva.${fmt}`))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const download = () => saveFile(file())
   const canShareFile = canShare(file())
@@ -65,6 +77,17 @@ export function Export() {
               </div>
             </>
           )}
+      </section>
+
+      <section className="card stack" aria-label="Выгрузка данных">
+        <div>
+          <h2>Выгрузка данных</h2>
+          <p className="small muted">Все лекарства аптечки со всеми упаковками: таблицей для Excel или файлом .json, в нём ещё и ваши приёмы. Работает и для замороженной аптечки.</p>
+        </div>
+        <div className="row wrap">
+          <button className="btn grow" disabled={busy !== null} onClick={() => dump('csv')}><Download size={18} />Таблица .csv</button>
+          <button className="btn grow" disabled={busy !== null} onClick={() => dump('json')}><Download size={18} />Все данные .json</button>
+        </div>
       </section>
     </div>
   )
