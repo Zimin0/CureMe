@@ -147,6 +147,7 @@ body.has-debug-bar .sidebar { padding-top: 34px; }
 .side-link:hover { background: var(--surface-2); color: var(--text); }
 .side-link.active { background: var(--primary-soft); color: var(--primary-strong); }
 .sidebar .spacer { flex: 1; }
+.side-plus { margin: 0 6px 8px; text-decoration: none; }
 .family-switch { padding: 12px; border-radius: 14px; background: var(--surface-2); }
 .family-switch { min-width: 0; }
 .family-switch select { display: block; width: 100%; max-width: 100%; min-width: 0; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
