@@ -41,6 +41,10 @@ def configured() -> bool:
     return get_settings().yookassa_enabled
 
 
+def recurring_enabled() -> bool:
+    return configured() and get_settings().yookassa_recurring
+
+
 def price_for(db: Session, period: str) -> int | None:
     b = billing_settings(db)
     return b.price_month if period == "month" else b.price_year

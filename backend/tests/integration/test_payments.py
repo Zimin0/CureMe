@@ -18,6 +18,7 @@ def yk(monkeypatch):
     s = get_settings()
     monkeypatch.setattr(s, "yookassa_shop_id", "1480957")
     monkeypatch.setattr(s, "yookassa_secret_key", "test-secret")
+    monkeypatch.setattr(s, "yookassa_recurring", True)
 
     class Fake:
         def __init__(self):
@@ -367,3 +368,13 @@ def test_non_json_error_body(client, shop, monkeypatch):
     monkeypatch.setattr(payments.httpx, "request", lambda m, u, **kw: httpx.Response(500, text="oops", request=httpx.Request(m, u)))
     r = client.post("/api/payments", headers=h, json={"period": "month", "agree": True})
     assert r.status_code == 502 and "500" in r.json()["detail"]
+
+
+def test_autorenew_hidden_and_refused_until_shop_has_autopayments(client, shop, yk, monkeypatch):
+    h, _ = shop
+    assert client.get("/api/payments/me", headers=h).json()["recurring_enabled"] is True
+    monkeypatch.setattr(get_settings(), "yookassa_recurring", False)  # ЮKassa ещё не подключила автоплатежи
+    assert client.get("/api/payments/me", headers=h).json()["recurring_enabled"] is False
+    assert pay(client, h, auto_renew=True).status_code == 409
+    assert yk.calls == []  # до ЮKassa не дошли: не ловим 403
+    assert pay(client, h, auto_renew=False).status_code == 201

@@ -19,13 +19,22 @@ export const usePayStatus = (poll = false) => useQuery({
   refetchInterval: poll ? 2500 : false,
 })
 
+/** Если браузер заблокировал скрипт политикой безопасности (старая версия сайта в кеше), подсказываем обновить страницу. */
 function loadWidget(): Promise<void> {
   if (window.YooMoneyCheckoutWidget) return Promise.resolve()
   return new Promise((resolve, reject) => {
+    let blocked = false
+    const onViolation = (e: Event) => { if (String((e as SecurityPolicyViolationEvent).blockedURI).includes('yookassa')) blocked = true }
+    document.addEventListener('securitypolicyviolation', onViolation)
     const s = document.createElement('script')
     s.src = WIDGET_SRC
-    s.onload = () => resolve()
-    s.onerror = () => reject(new Error('Не удалось загрузить форму оплаты ЮKassa. Проверьте интернет и повторите.'))
+    s.onload = () => { document.removeEventListener('securitypolicyviolation', onViolation); resolve() }
+    s.onerror = () => {
+      document.removeEventListener('securitypolicyviolation', onViolation)
+      reject(new Error(blocked
+        ? 'Браузер заблокировал форму оплаты: обновите страницу (Ctrl+F5, на телефоне закройте и откройте сайт заново) и повторите.'
+        : 'Не удалось загрузить форму оплаты ЮKassa. Проверьте интернет и повторите.'))
+    }
     document.head.appendChild(s)
   })
 }
@@ -48,7 +57,7 @@ export function PayBox() {
   const widget = useRef<Widget | null>(null)
 
   const start = useMutation({
-    mutationFn: () => api<{ payment_id: number; confirmation_token: string }>('/payments', { method: 'POST', body: { period, auto_renew: renew, agree } }),
+    mutationFn: () => api<{ payment_id: number; confirmation_token: string }>('/payments', { method: 'POST', body: { period, auto_renew: renew && !!status.data?.recurring_enabled, agree } }),
     onSuccess: r => setToken({ value: r.confirmation_token, id: r.payment_id }),
     onError: (e: Error) => toast(e.message, 'error'),
   })
@@ -81,8 +90,10 @@ export function PayBox() {
     }
   }, [paid?.status]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!s) return null
-  if (!s.enabled && !s.auto_renew && s.payments.length === 0) return null
+  if (!s.enabled && !s.auto_renew && s.payments.length === 0) return null  // nothing to show
 
+  // Незавершённые попытки (закрыли форму) не показываем: остаётся только платёж, к которому вернулись с оплаты.
+  const shownPayments = s.payments.filter(p => p.status !== 'pending' || String(p.id) === returned)
   const price = period === 'month' ? s.price_month : s.price_year
   const canPay = s.enabled && !!price
 
@@ -120,20 +131,22 @@ export function PayBox() {
             <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} />
             <span>Я согласен(на) с <Link to="/offer" target="_blank">публичной офертой</Link>, <Link to="/terms" target="_blank">Пользовательским соглашением</Link> и <Link to="/privacy" target="_blank">Политикой обработки персональных данных</Link></span>
           </label>
-          <label className="check">
-            <input type="checkbox" checked={renew} onChange={e => setRenew(e.target.checked)} />
-            <span>Сохранить способ оплаты и автоматически продлевать подписку. За три дня до списания пришлём письмо, отключить можно в любой момент.</span>
-          </label>
+          {s.recurring_enabled && (
+            <label className="check">
+              <input type="checkbox" checked={renew} onChange={e => setRenew(e.target.checked)} />
+              <span>Сохранить способ оплаты и автоматически продлевать подписку. За три дня до списания пришлём письмо, отключить можно в любой момент.</span>
+            </label>
+          )}
           <p className="muted small">Данные банковской карты вводятся в платёжной форме ЮKassa и на наш сервер не передаются.</p>
           <button className="btn primary" disabled={!agree || start.isPending}>Оплатить {price ? rub(price) : ''}</button>
         </form>
       )}
       {token && <div id="yk-widget" />}
 
-      {s.payments.length > 0 && (
+      {shownPayments.length > 0 && (
         <div className="stack">
           <h3>Ваши оплаты</h3>
-          {s.payments.map(p => (
+          {shownPayments.map(p => (
             <div key={p.id} className="row between small">
               <span>{fmtDate(p.paid_at ?? p.created_at)}, {rub(p.amount)} за {PERIOD[p.period]}{p.recurring ? ' (автопродление)' : ''}</span>
               <span>{STATUS[p.status]}{p.receipt_url && <> · <a href={p.receipt_url} target="_blank" rel="noreferrer noopener">чек</a></>}</span>

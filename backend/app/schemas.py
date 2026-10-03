@@ -732,6 +732,7 @@ class PayStatus(BaseModel):
     plus_active: bool
     plus_until: datetime | None = None
     auto_renew: bool
+    recurring_enabled: bool = False  # автоплатежи подключены: можно показывать галочку автопродления
     price_month: int | None = None
     price_year: int | None = None
     payments: list[PaymentBrief] = []
