@@ -13,6 +13,7 @@
     since = history_since(db, family)                           # None или граница «последних 30 дней»
 или зависимостью: dependencies=[Depends(plus_feature("reminders"))].
 """
+import calendar
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -41,6 +42,7 @@ FREE_LIMITS: dict[str, int] = {
 # больше нового предела, не затрагиваются: никого не исключаем, только не принимаем новых.
 NEW_TERMS_FROM = datetime(2026, 10, 12, 21, 0, tzinfo=timezone.utc)  # 13 октября 2026 г., 00:00 по Москве
 OLD_FREE_MEMBERS = 4
+MAX_AHEAD_MONTHS = 13  # Плюс семьи нельзя оплатить или перенести дальше чем на столько месяцев вперёд (R06, R08)
 FREE_CABINETS_MAX = 3  # потолок аптечек бесплатной семьи, как бы ни менялся предел людей (R03)
 # Потолки Плюса (R02, R03): защита от того, что одна подписка держит десятки людей и аптечек.
 PLUS_MEMBERS_MAX = 5
@@ -137,6 +139,15 @@ def grant_trial(db: Session, user: User) -> bool:
 
 def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)  # SQLite отдаёт время без пояса
+
+
+def shift_months(moment: datetime, months: int) -> datetime:
+    """Сдвиг на целые календарные месяцы (назад при отрицательном числе); 31-е в коротком месяце становится его последним днём."""
+    index = moment.year * 12 + moment.month - 1 + months
+    year, month = divmod(index, 12)
+    month += 1
+    day = min(moment.day, calendar.monthrange(year, month)[1])
+    return moment.replace(year=year, month=month, day=day)
 
 
 def plus_active(who: "User | Household | None", now: datetime | None = None) -> bool:

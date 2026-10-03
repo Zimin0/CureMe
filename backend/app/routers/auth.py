@@ -29,6 +29,7 @@ def me_out(user: User, db: Session) -> MeOut:
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role, status=m.family.status) for m in fams],
         owner_transfer_waiting=transfer is not None and transfer.to_user_id == user.id,
         own_families_left=own_families_left(db, user.id),
+        next_change_at=households.next_change_at(user),
         plus_active=plus_active(user),
         plus_ending=compression.banner(db, user),
     )

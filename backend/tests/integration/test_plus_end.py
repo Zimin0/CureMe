@@ -232,6 +232,8 @@ def test_r14_t1_t2_without_a_choice_the_oldest_stay_after_five_days(client, big,
     assert [m["name"] for m in client.get(f"/api/families/{f}", headers=h).json()["members"]] == ["Никита", "Вторая", "Третий"]
     # Четвёртый ничего не создавал: пустая аптечка. Пятая создала «П1» и забрала её с лекарством.
     p4, p5 = me(client, big["p4"][0])["families"], me(client, big["p5"][0])["families"]
+    with session_factory() as db:  # сжатие кулдаун не запускает (R11-T4)
+        assert db.get(User, big["p4"][1]["id"]).household_changed_at is None
     assert [(x["name"], x["role"]) for x in p4] == [("Семья Четвёртый", "owner")]
     assert [(x["name"], x["role"]) for x in p5] == [("П1", "owner")]
     assert [m["name"] for m in client.get(f"/api/families/{p5[0]['id']}/medicines", headers=big["p5"][0]).json()] == ["Лекарство П1"]

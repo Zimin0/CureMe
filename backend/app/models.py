@@ -52,6 +52,8 @@ class User(Base):
     household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="SET NULL"), index=True)
     household_role: Mapped[str] = mapped_column(String(16), default="member", server_default="member")
     household_joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Когда человек сам сменил семью (вступил или вышел): от этого момента считается кулдаун (R11). Пусто: не менял.
+    household_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     household: Mapped["Household | None"] = relationship(back_populates="members")
