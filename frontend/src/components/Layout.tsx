@@ -1,5 +1,5 @@
 import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Sparkles, Stethoscope, Users } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { usePlan } from '../plan'
 import { TermsNotice } from './TermsNotice'
@@ -53,6 +53,11 @@ export function Layout() {
 
       <main className="main">
         <TermsNotice />
+        {me?.owner_transfer_waiting && (
+          <div className="alert info" role="status" style={{ marginBottom: 14 }}>
+            <div className="grow">Вам нужно ответить на предложение о владении семьёй. <Link to="/family">Открыть «Семья»</Link></div>
+          </div>
+        )}
         <Outlet />
       </main>
 

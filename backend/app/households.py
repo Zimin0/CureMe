@@ -15,7 +15,8 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from .models import (
-    Family, Household, HouseholdEvent, HouseholdInvite, Intake, Medicine, Membership, Schedule, User, utcnow,
+    Family, Household, HouseholdEvent, HouseholdInvite, Intake, Medicine, Membership, OwnerTransfer, Schedule, User,
+    utcnow,
 )
 from .plans import (
     FREE_CABINETS_MAX, LIMIT_FEATURE, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required,
@@ -54,10 +55,30 @@ def _is_empty(db: Session, fam: Family) -> bool:
     return db.scalar(select(Medicine.id).where(Medicine.family_id == fam.id).limit(1)) is None
 
 
+EVENT_KEEP = timedelta(days=365)  # журнал семьи хранится 12 месяцев (R27)
+
+
 def record(db: Session, house: Household | None, kind: str, user: User | None = None,
            actor: User | None = None, detail: str = "") -> None:
+    """Запись в журнал семьи. В detail пишут только номера и служебные пометки, без имён и названий (R27)."""
     db.add(HouseholdEvent(household_id=house.id if house else None, kind=kind,
                           user_id=user.id if user else None, actor_id=actor.id if actor else None, detail=detail))
+
+
+def drop_household(db: Session, house: Household) -> None:
+    """Удаляет семью вместе с её журналом: запись о семье, которой нет, хранить незачем (R27)."""
+    db.flush()
+    db.execute(delete(HouseholdEvent).where(HouseholdEvent.household_id == house.id))
+    db.delete(house)
+
+
+def purge_old_events(db: Session, now: datetime | None = None) -> int:
+    """Удаляет записи журнала старше 12 месяцев (R27). Для споров по тарифу и счётчиков за 30 дней этого достаточно."""
+    now = now or datetime.now(timezone.utc)
+    removed = db.execute(delete(HouseholdEvent).where(HouseholdEvent.created_at < now - EVENT_KEEP)).rowcount or 0
+    if removed:
+        db.commit()
+    return removed
 
 
 # --- доступ ---
@@ -256,7 +277,7 @@ def create_cabinet(db: Session, user: User, name: str) -> Family:
     lock(db, house)
     ensure_room_for_cabinets(db, house)
     fam = add_cabinet(db, house, name, user)
-    record(db, house, "cabinet_add", user=user, detail=name)
+    record(db, house, "cabinet_add", user=user, detail=f"аптечка №{fam.id}")  # номер, не название: в нём бывает имя человека
     return fam
 
 
@@ -322,7 +343,7 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
     db.flush()
     if mine is not None:
         db.expire(mine, ["members", "cabinets"])
-        db.delete(mine)
+        drop_household(db, mine)
     record(db, target, "join", user=user, actor=actor)
     sync_access(db, target)
 
@@ -360,14 +381,20 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
         keep = add_cabinet(db, new_house, f"Семья {user.name}", user)
     _move_history(db, user, left_ids, keep)
     db.execute(delete(Schedule).where(Schedule.user_id == user.id, Schedule.family_id.in_(left_ids)))
+    _close_pending(db, house, "cancelled", user, now=utcnow())  # предложения с уходящим теряют смысл
     record(db, house, "kick" if kicked else "leave", user=user, actor=actor, detail=detail)
     sync_access(db, house)
     sync_access(db, new_house)
     return keep
 
 
-def make_owner(db: Session, house: Household, new_owner: User, actor: User | None = None) -> None:
-    """Владелец один (R02): новый владелец назначается, прежний становится участником, его автопродление выключается."""
+def make_owner(db: Session, house: Household, new_owner: User, actor: User | None = None, reason: str = "") -> None:
+    """Владелец один (R02): новый владелец назначается, прежний становится участником, его автопродление выключается.
+
+    Это сама смена роли. Пользователи доходят до неё только через предложение и согласие (offer_owner, request_owner,
+    answer_transfer); напрямую её вызывают администратор (инструмент поддержки) и удаление аккаунта. Незавершённые
+    предложения после смены владельца теряют смысл и отменяются.
+    """
     lock(db, house)
     old = owner_of(house)
     if old is new_owner:
@@ -376,8 +403,214 @@ def make_owner(db: Session, house: Household, new_owner: User, actor: User | Non
         old.household_role = "member"
         stop_autorenew(old)
     new_owner.household_role = "owner"
-    record(db, house, "owner", user=new_owner, actor=actor, detail=f"прежний владелец: {old.name if old else 'нет'}")
+    _close_pending(db, house, "cancelled", None, now=utcnow())
+    record(db, house, "owner", user=new_owner, actor=actor, detail=f"прежний владелец: {old.id if old else 'нет'}" + (f"; {reason}" if reason else ""))  # номер, не имя
     sync_access(db, house)
+
+
+SUPPORT_OWNER_CHANGE = "по решению администрации"
+
+
+def send_support_owner_change(recipients: list[tuple[str, str]], new_owner: str, old_owner: str) -> None:
+    """Письмо всем людям семьи: администрация сменила владельца без обычной процедуры (R23, исключительный случай).
+
+    Без ссылок: почтовый сервис отклоняет письма со ссылкой на сайт. Вызывается в фоне после ответа администратору.
+    """
+    from .mailer import send_mail  # здесь, чтобы не зациклить импорты
+
+    for email, name in recipients:
+        send_mail(
+            email, "Капсулка: администрация сменила владельца семьи",
+            f"Здравствуйте, {name}!\n\n"
+            f"Администрация Капсулки сменила владельца вашей семьи по обращению одного из её членов: теперь владелец {new_owner}, "
+            f"прежний владелец {old_owner} стал участником. Автопродление Плюса у прежнего владельца отключено, оплаченный срок "
+            "остался у семьи.\n\nЕсли вы не знали об этом обращении или не согласны, ответьте на это письмо.\n\n— Капсулка, домашняя аптечка",
+        )
+
+
+def support_owner_change(house: Household | None, before: tuple[int, str] | None) -> tuple[list[tuple[str, str]], str, str] | None:
+    """Если после действия администратора владелец семьи сменился, возвращает (кому писать, новый владелец, прежний), иначе None.
+
+    before: (номер, имя) прежнего владельца, снятые до действия: сам человек мог быть удалён.
+    """
+    after = owner_of(house)
+    if house is None or after is None or before is None or after.id == before[0]:
+        return None
+    return [(u.email, u.name) for u in people(house)], after.name, before[1]
+
+
+# --- передача владения с согласием (R23) ---
+OWNER_TRANSFER_REPLY = timedelta(hours=24)  # owner_transfer_reply_hours: сколько ждём ответа
+OWNER_TRANSFER_COOLDOWN = timedelta(days=7)  # owner_transfer_cooldown_days: чаще раза в неделю владение не передают
+OWNER_TRANSFER_KEEP = timedelta(days=30)  # записи о предложениях удаляются через 30 дней после срока ответа
+
+
+def _transfers(db: Session, house: Household) -> list[OwnerTransfer]:
+    db.flush()  # populate_existing перечитывает строки из базы: несохранённые правки статуса иначе пропали бы
+    return list(db.scalars(select(OwnerTransfer).where(
+        OwnerTransfer.household_id == house.id, OwnerTransfer.status == "pending",
+    ).order_by(OwnerTransfer.id).execution_options(populate_existing=True)))
+
+
+def _close_pending(db: Session, house: Household, status_: str, only_user: User | None, now: datetime,
+                   kind: str | None = None) -> int:
+    """Закрывает ожидающие предложения семьи (все или те, где участвует only_user). В журнал пишет тех, что закрыла."""
+    closed = 0
+    for t in _transfers(db, house):
+        if only_user is not None and only_user.id not in (t.from_user_id, t.to_user_id):
+            continue
+        t.status, t.resolved_at = status_, now
+        record(db, house, kind or f"owner_{status_}", user=t.to_user if t.kind == "offer" else t.from_user,
+               detail=f"{'предложение владельца' if t.kind == 'offer' else 'просьба участника'} закрыто: {status_}")
+        closed += 1
+    return closed
+
+
+def _expire_house(db: Session, house: Household, now: datetime) -> None:
+    """Предложения, на которые не ответили за сутки, отменяются (R23-T2)."""
+    for t in _transfers(db, house):
+        if _aware(t.expires_at) <= now:
+            t.status, t.resolved_at = "expired", _aware(t.expires_at)
+            record(db, house, "owner_expired", user=t.to_user if t.kind == "offer" else t.from_user,
+                   detail=f"{'предложение владельца' if t.kind == 'offer' else 'просьба участника'} без ответа за 24 часа")
+
+
+def pending_transfer(db: Session, house: Household | None, now: datetime | None = None) -> OwnerTransfer | None:
+    """Действующее предложение семьи или None. Просроченное не показываем (оно закроется фоновой задачей)."""
+    if house is None:
+        return None
+    now = now or datetime.now(timezone.utc)
+    return next((t for t in _transfers(db, house) if _aware(t.expires_at) > now), None)
+
+
+def next_transfer_at(db: Session, house: Household) -> datetime | None:
+    """Когда можно передать владение снова: через 7 дней после прошлой смены владельца (в том числе по решению поддержки)."""
+    last = db.scalar(select(HouseholdEvent.created_at).where(
+        HouseholdEvent.household_id == house.id, HouseholdEvent.kind == "owner",
+    ).order_by(HouseholdEvent.created_at.desc()).limit(1))
+    return _aware(last) + OWNER_TRANSFER_COOLDOWN if last else None
+
+
+def _check_transfer_allowed(db: Session, house: Household, now: datetime, pair: tuple[User, User]) -> None:
+    """Общие условия предложения и принятия: отдыхает кулдаун, у обоих подтверждена почта (владелец получает письма об оплате)."""
+    from .email_verification import needs_verification  # здесь, чтобы не зациклить импорты
+
+    again = next_transfer_at(db, house)
+    if again and again > now:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"Владение недавно менялось. Следующая передача возможна с {again.astimezone(timezone(timedelta(hours=3))):%d.%m.%Y %H:%M} по Москве.")
+    for u in pair:
+        if needs_verification(u):
+            raise HTTPException(status.HTTP_409_CONFLICT, f"{u.name} ещё не подтвердил(а) почту: стать владельцем семьи можно только с подтверждённой почтой.")
+
+
+def offer_owner(db: Session, owner: User, target_id: int, now: datetime | None = None) -> OwnerTransfer:
+    """Владелец предлагает участнику стать владельцем (R23). Принудительно передать нельзя: решает участник."""
+    house = owner.household
+    now = now or datetime.now(timezone.utc)
+    lock(db, house)
+    _expire_house(db, house, now)
+    if owner.household_role != "owner":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Передать владение может только владелец семьи.")
+    target = next((u for u in house.members if u.id == target_id), None)
+    if target is None or target is owner:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Участник не найден")
+    if pending_transfer(db, house, now) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Передача владения уже предложена: дождитесь ответа или отмените её.")
+    _check_transfer_allowed(db, house, now, (owner, target))
+    t = OwnerTransfer(household_id=house.id, kind="offer", from_user_id=owner.id, to_user_id=target.id,
+                      created_at=now, expires_at=now + OWNER_TRANSFER_REPLY)
+    db.add(t)
+    record(db, house, "owner_offer", user=target, actor=owner, detail="владелец предложил стать владельцем семьи")
+    db.flush()
+    return t
+
+
+def request_owner(db: Session, member: User, now: datetime | None = None) -> OwnerTransfer:
+    """Участник просит «Хочу оплачивать»: владелец подтверждает или отклоняет (R23)."""
+    house = member.household
+    now = now or datetime.now(timezone.utc)
+    lock(db, house)
+    _expire_house(db, house, now)
+    owner = owner_of(house)
+    if member.household_role == "owner" or owner is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Вы и так владелец семьи.")
+    if pending_transfer(db, house, now) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Передача владения уже предложена: дождитесь ответа или отмените её.")
+    _check_transfer_allowed(db, house, now, (owner, member))
+    t = OwnerTransfer(household_id=house.id, kind="request", from_user_id=member.id, to_user_id=owner.id,
+                      created_at=now, expires_at=now + OWNER_TRANSFER_REPLY)
+    db.add(t)
+    record(db, house, "owner_request", user=member, actor=member, detail="участник попросил стать владельцем и оплачивать")
+    db.flush()
+    return t
+
+
+def answer_transfer(db: Session, user: User, accept: bool, now: datetime | None = None) -> bool:
+    """Ответ того, кому адресовано предложение. Принять: владелец сменился. Отказаться: ничего не меняется.
+
+    Возвращает True, если владение передано.
+    """
+    house = user.household
+    now = now or datetime.now(timezone.utc)
+    lock(db, house)
+    _expire_house(db, house, now)
+    t = pending_transfer(db, house, now)
+    if t is None or t.to_user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Предложение не найдено или срок ответа истёк.")
+    if not accept:
+        t.status, t.resolved_at = "declined", now
+        record(db, house, "owner_declined", user=user, actor=user, detail="отказ от передачи владения")
+        return False
+    new_owner = t.to_user if t.kind == "offer" else t.from_user
+    old_owner = owner_of(house)
+    if new_owner is None or new_owner.household_id != house.id or old_owner is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Предложение не найдено или срок ответа истёк.")
+    _check_transfer_allowed(db, house, now, (old_owner, new_owner))
+    t.status, t.resolved_at = "accepted", now
+    make_owner(db, house, new_owner, actor=user)
+    return True
+
+
+def withdraw_transfer(db: Session, user: User, now: datetime | None = None) -> None:
+    """Тот, кто предложил (или попросил), забирает своё предложение обратно."""
+    house = user.household
+    now = now or datetime.now(timezone.utc)
+    lock(db, house)
+    _expire_house(db, house, now)
+    t = pending_transfer(db, house, now)
+    if t is None or t.from_user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Предложение не найдено или срок ответа истёк.")
+    t.status, t.resolved_at = "cancelled", now
+    record(db, house, "owner_cancelled", user=user, actor=user, detail="предложение забрано")
+
+
+def expire_owner_transfers(db: Session, now: datetime | None = None) -> int:
+    """Фоновая задача: закрывает предложения без ответа за сутки (R23-T2)."""
+    now = now or datetime.now(timezone.utc)
+    ids = {t.household_id for t in db.scalars(select(OwnerTransfer).where(
+        OwnerTransfer.status == "pending", OwnerTransfer.expires_at <= now))}
+    closed = 0
+    for house in db.scalars(select(Household).where(Household.id.in_(ids))) if ids else []:
+        lock(db, house)
+        before = len(_transfers(db, house))
+        _expire_house(db, house, now)
+        closed += before - len(_transfers(db, house))
+    if closed:
+        db.commit()
+    return closed
+
+
+def purge_old_transfers(db: Session, now: datetime | None = None) -> int:
+    """Удаляет записи о предложениях, срок которых истёк больше 30 дней назад: в них идентификаторы людей семьи.
+
+    Кто и когда стал владельцем, остаётся в журнале семьи.
+    """
+    now = now or datetime.now(timezone.utc)
+    removed = db.execute(delete(OwnerTransfer).where(OwnerTransfer.expires_at < now - OWNER_TRANSFER_KEEP)).rowcount or 0
+    if removed:
+        db.commit()
+    return removed
 
 
 # --- аптечки и аккаунты ---
@@ -394,7 +627,7 @@ def delete_cabinet(db: Session, fam: Family, actor: User | None = None, force: b
         if not force and len(house.cabinets) <= 1:
             raise HTTPException(status.HTTP_409_CONFLICT, "Это последняя аптечка семьи: удалить её нельзя. Создайте другую или выгрузите данные.")
     drop_cabinet_files(db, fam)
-    record(db, house, "cabinet_delete", actor=actor, detail=fam.name)
+    record(db, house, "cabinet_delete", actor=actor, detail=f"аптечка №{fam.id}")
     db.delete(fam)
     db.flush()
     if house is not None:
@@ -415,14 +648,15 @@ def delete_account(db: Session, user: User, admin: bool = False) -> None:
     if not others:
         for fam in list(house.cabinets):
             drop_cabinet_files(db, fam)
-        db.delete(house)
+        drop_household(db, house)
         db.flush()
         return
     if user.household_role == "owner":
         if not admin:
             raise HTTPException(status.HTTP_409_CONFLICT, "Вы владелец семьи: сначала передайте владение другому человеку.")
-        make_owner(db, house, others[0])
+        make_owner(db, house, others[0], reason=SUPPORT_OWNER_CHANGE)
     stop_autorenew(user)
+    _close_pending(db, house, "cancelled", user, now=utcnow())
     record(db, house, "leave", user=user, detail="удаление аккаунта")
     user.household = None
     sync_access(db, house)
@@ -443,6 +677,12 @@ def invariant_problems(db: Session) -> list[str]:
         owners = [u for u in members if u.household_role == "owner"]
         if len(owners) != 1:
             problems.append(f"R02: у семьи {house.id} владельцев {len(owners)}")
+        pending = _transfers(db, house)
+        if len(pending) > 1:
+            problems.append(f"R23: у семьи {house.id} незавершённых передач владения {len(pending)}")
+        for t in pending:
+            if {t.from_user_id, t.to_user_id} - {u.id for u in members}:
+                problems.append(f"R23: в передаче {t.id} участвует человек не из семьи {house.id}")
         limit = limit_for(db, house, "members")
         if limit is not None and len(members) > limit:
             problems.append(f"R02: в семье {house.id} людей {len(members)} при лимите {limit}")

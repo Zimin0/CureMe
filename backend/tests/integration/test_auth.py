@@ -3,7 +3,7 @@
 import pytest
 
 from app.security import create_token
-from tests.conftest import register
+from tests.conftest import hand_over, register
 
 
 def test_register_returns_token_and_creates_own_family(client):
@@ -152,7 +152,7 @@ def test_delete_account_keeps_shared_family_for_others(client):
     client.post(f"/api/families/{fam}/medicines", json={"name": "Нурофен"}, headers=h)
     # владелец при других людях сначала передаёт владение (R22-T3), потом удаляет аккаунт
     assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 409
-    assert client.patch(f"/api/families/{fam}/members/{mom['id']}", headers=h, json={"role": "owner"}).status_code == 200
+    hand_over(client, h, fam, mom["id"], h2)
     assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
     left = client.get(f"/api/families/{fam}", headers=h2).json()
     assert [m["name"] for m in left["members"]] == ["Мама"] and left["members"][0]["role"] == "owner"

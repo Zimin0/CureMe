@@ -16,7 +16,8 @@ FAMILY_ENDPOINTS = [
     ("GET", "/api/families/{f}", None),
     ("PATCH", "/api/families/{f}", {"name": "X"}),
     ("POST", "/api/families/{f}/invite", None),
-    ("PATCH", "/api/families/{f}/members/{u}", {"role": "owner"}),
+    ("POST", "/api/families/{f}/owner-transfer", {"user_id": 0}),
+    ("POST", "/api/families/{f}/owner-request", None),
     ("DELETE", "/api/families/{f}/members/{u}", None),
     ("GET", "/api/families/{f}/categories", None),
     ("GET", "/api/families/{f}/medicines", None),
@@ -83,7 +84,7 @@ def test_stranger_gets_404(client, world, method, path, body):
 
 
 OWNER_ONLY = {"PATCH /api/families/{f}", "POST /api/families/{f}/invite",
-              "PATCH /api/families/{f}/members/{u}"}
+              "POST /api/families/{f}/owner-transfer"}
 # Комментарий к приёму меняет только тот, кто принимал (в world это владелец).
 AUTHOR_ONLY = {"PATCH /api/families/{f}/intakes/{i}"}
 

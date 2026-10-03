@@ -73,6 +73,7 @@ class Household(Base):
     members: Mapped[list["User"]] = relationship(back_populates="household")
     cabinets: Mapped[list["Family"]] = relationship(back_populates="household", cascade="all, delete-orphan")
     invites: Mapped[list["HouseholdInvite"]] = relationship(back_populates="household", cascade="all, delete-orphan")
+    transfers: Mapped[list["OwnerTransfer"]] = relationship(back_populates="household", cascade="all, delete-orphan")
 
 
 class HouseholdInvite(Base):
@@ -96,6 +97,30 @@ class HouseholdInvite(Base):
     household: Mapped["Household"] = relationship(back_populates="invites")
 
 
+class OwnerTransfer(Base):
+    """Передача владения семьёй (R23) только с согласием принимающего.
+
+    kind = offer: владелец предлагает участнику стать владельцем, отвечает участник (to_user).
+    kind = request: участник просит «Хочу оплачивать», отвечает владелец (to_user). Без ответа за сутки запись истекает.
+    """
+
+    __tablename__ = "household_owner_transfers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    household_id: Mapped[int] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # offer | request
+    from_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))  # кто начал
+    to_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)  # кто отвечает
+    status: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")  # pending | accepted | declined | cancelled | expired
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    household: Mapped["Household"] = relationship(back_populates="transfers")
+    from_user: Mapped["User | None"] = relationship(foreign_keys=[from_user_id])
+    to_user: Mapped["User | None"] = relationship(foreign_keys=[to_user_id])
+
+
 class HouseholdEvent(Base):
     """Журнал семьи: вступления, выходы, передача владения, выдача Плюса админом (R16, R23).
 
@@ -106,7 +131,7 @@ class HouseholdEvent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="SET NULL"), index=True)
-    kind: Mapped[str] = mapped_column(String(32))  # join | leave | kick | owner | plan | cabinet_add | cabinet_delete
+    kind: Mapped[str] = mapped_column(String(32))  # join | leave | kick | owner | owner_offer | owner_request | owner_declined | owner_cancelled | owner_expired | plan | cabinet_add | cabinet_delete
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))   # о ком запись
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))  # кто сделал
     detail: Mapped[str] = mapped_column(Text, default="", server_default="")

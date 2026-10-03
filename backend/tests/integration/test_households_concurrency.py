@@ -98,3 +98,51 @@ def test_r20_crossed_joins_do_not_deadlock(client, session_factory):
     ]))
     assert codes[0] == 200 and codes[1] in (200, 404, 409)  # главное: не 500 от взаимной блокировки
     check_household_invariants(session_factory)
+
+
+def three_people(client):
+    h, u = register(client)
+    f = fid(u)
+    hm, mom = register(client, "mom@example.com", "Мама", invite=invite_of(client, h, f))
+    hd, dad = register(client, "dad@example.com", "Папа", invite=invite_of(client, h, f))
+    return f, h, hm, mom, hd, dad
+
+
+def owners(client, h, f):
+    return [m["name"] for m in client.get(f"/api/families/{f}", headers=h).json()["members"] if m["role"] == "owner"]
+
+
+def test_r23_t11_two_offers_at_once_leave_one_pending(client, session_factory):
+    """Владелец нажал «Передать» дважды для разных людей: создаётся одно предложение, второе получает 409 (R23, R20)."""
+    f, h, hm, mom, hd, dad = three_people(client)
+    offer = lambda uid: (lambda c: c.post(f"/api/families/{f}/owner-transfer", headers=h, json={"user_id": uid}))  # noqa: E731
+    assert race([offer(mom["id"]), offer(dad["id"])]) == [201, 409]
+    assert owners(client, h, f) == ["Никита"]
+    check_household_invariants(session_factory)
+
+
+def test_r23_t11_double_accept_transfers_once(client, session_factory):
+    from sqlalchemy import select
+
+    from app.models import HouseholdEvent
+
+    f, h, hm, mom, hd, dad = three_people(client)
+    assert client.post(f"/api/families/{f}/owner-transfer", headers=h, json={"user_id": mom["id"]}).status_code == 201
+    accept = lambda c: c.post(f"/api/families/{f}/owner-transfer/accept", headers=hm)  # noqa: E731
+    assert race([accept, accept]) == [200, 404]
+    assert owners(client, h, f) == ["Мама"]
+    with session_factory() as db:
+        assert len(db.scalars(select(HouseholdEvent).where(HouseholdEvent.kind == "owner")).all()) == 1
+    check_household_invariants(session_factory)
+
+
+def test_r23_t11_accept_and_withdraw_at_once_give_one_outcome(client, session_factory):
+    """Принять и забрать одновременно: выигрывает один, владелец остаётся согласованным (R23, R20)."""
+    f, h, hm, mom, hd, dad = three_people(client)
+    assert client.post(f"/api/families/{f}/owner-transfer", headers=h, json={"user_id": mom["id"]}).status_code == 201
+    accept = lambda c: c.post(f"/api/families/{f}/owner-transfer/accept", headers=hm)  # noqa: E731
+    withdraw = lambda c: c.delete(f"/api/families/{f}/owner-transfer", headers=h)  # noqa: E731
+    codes = race([accept, withdraw])
+    assert codes == [200, 404] or codes == [200, 200], codes  # забрать до принятия: принять уже нельзя; иначе принято
+    assert owners(client, h, f) in (["Мама"], ["Никита"])
+    check_household_invariants(session_factory)

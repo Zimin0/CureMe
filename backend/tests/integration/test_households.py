@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 
 from app.models import Family, Household, HouseholdEvent, Intake, Medicine, Schedule, User
 from app.plans import PLUS_HEADER
-from tests.conftest import check_household_invariants, fid, grant_plus, register
+from tests.conftest import age_owner_events, check_household_invariants, fid, grant_plus, hand_over, register
 
 
 # --- помощники ---
@@ -133,12 +133,13 @@ def test_r02_t3_family_always_has_one_owner(client, session_factory):
     hc, c = join_family(client, h, f, "Вера", "c@example.com")
     owners = lambda: [m["name"] for m in client.get(f"/api/families/{f}", headers=h).json()["members"] if m["role"] == "owner"]  # noqa: E731
     assert owners() == ["Никита"]
-    assert client.patch(f"/api/families/{f}/members/{b['id']}", headers=h, json={"role": "owner"}).status_code == 200
+    hand_over(client, h, f, b["id"], hb)
     assert owners() == ["Боря"]  # прежний владелец стал участником
     check_household_invariants(session_factory)
     assert client.delete(f"/api/families/{f}/members/{c['id']}", headers=hb).status_code == 204  # владелец исключил
     assert owners() == ["Боря"]
-    assert client.patch(f"/api/families/{f}/members/{a['id']}", headers=hb, json={"role": "owner"}).status_code == 200
+    age_owner_events(session_factory)  # прошла неделя после прошлой передачи
+    hand_over(client, hb, f, a["id"], h)
     assert delete_account(client, hb).status_code == 204  # Боря уже участник и просто уходит
     assert owners() == ["Никита"]
     check_household_invariants(session_factory)

@@ -71,6 +71,7 @@ class MeOut(UserOut):
     email_verified: bool = False
     verification_needed: bool = False  # почта не подтверждена, а проверка включена — показать экран «Проверьте почту»
     families: list[FamilyBrief]
+    owner_transfer_waiting: bool = False  # кому-то из семьи нужен ответ этого человека по передаче владения (R23)
     # Сколько ещё своих аптечек можно создать: None — без ограничений (Плюс или платная версия выключена).
     own_families_left: int | None = None
     plus_active: bool = False  # у аккаунта оплачен Плюс (нужно, чтобы отличить «лимит бесплатной» от «потолка Плюса»)
@@ -136,6 +137,18 @@ class MemberOut(BaseModel):
     joined_at: datetime
 
 
+class OwnerTransferOut(BaseModel):
+    """Незавершённая передача владения (R23): кто кому предложил и до когда ждём ответа."""
+    kind: str  # offer: владелец предлагает; request: участник просит «Хочу оплачивать»
+    from_user_id: int | None = None
+    from_name: str = ""
+    to_user_id: int | None = None
+    to_name: str = ""
+    expires_at: datetime
+    can_answer: bool = False  # смотрящий может принять или отказаться
+    can_withdraw: bool = False  # смотрящий может забрать своё предложение
+
+
 class FamilyOut(BaseModel):
     id: int
     name: str
@@ -143,9 +156,15 @@ class FamilyOut(BaseModel):
     invite_expires_at: datetime | None = None
     role: str
     members: list[MemberOut]
+    owner_transfer: OwnerTransferOut | None = None
+    next_transfer_at: datetime | None = None  # пока не наступило, владение передать нельзя (кулдаун 7 дней, R23)
 
 
-class RoleIn(BaseModel):
+class OwnerOfferIn(BaseModel):
+    user_id: int
+
+
+class RoleIn(BaseModel):  # используется админкой (инструмент поддержки)
     role: str = Field(pattern="^(owner|member)$")
 
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Share2, Shield, Sparkles, Trash2 } from 'lucide-react'
+import { Check, ChevronRight, Copy, Crown, LogOut, Pencil, RefreshCw, Share2, Shield, Sparkles, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, Family as FamilyT } from '../api'
@@ -31,9 +31,22 @@ export function Family() {
   const onError = (e: Error) => { if (!(e instanceof ApiError && e.status === 402)) toast(e.message, 'error') }
   const membersFull = useLimitReached('members')
 
-  const setRole = useMutation({
-    mutationFn: ({ uid, role }: { uid: number; role: string }) => api<FamilyT>(fam(`/members/${uid}`), { method: 'PATCH', body: { role } }),
-    onSuccess: d => onFam(d, 'Роль изменена'), onError,
+  // Передача владения только с согласием принимающего (R23): предложить, попросить, принять, отказаться, забрать.
+  const offer = useMutation({
+    mutationFn: (uid: number) => api<FamilyT>(fam('/owner-transfer'), { method: 'POST', body: { user_id: uid } }),
+    onSuccess: d => onFam(d, 'Предложение отправлено, ждём ответа'), onError,
+  })
+  const askToPay = useMutation({
+    mutationFn: () => api<FamilyT>(fam('/owner-request'), { method: 'POST' }),
+    onSuccess: d => onFam(d, 'Просьба отправлена владельцу'), onError,
+  })
+  const answer = useMutation({
+    mutationFn: (accept: boolean) => api<FamilyT>(fam(`/owner-transfer/${accept ? 'accept' : 'decline'}`), { method: 'POST' }),
+    onSuccess: async (d, accept) => { onFam(d, accept ? 'Готово, владелец семьи сменился' : 'Вы отказались'); await refresh(); qc.invalidateQueries({ queryKey: ['plan'] }) }, onError,
+  })
+  const withdraw = useMutation({
+    mutationFn: () => api<FamilyT>(fam('/owner-transfer'), { method: 'DELETE' }),
+    onSuccess: async d => { onFam(d, 'Предложение отменено'); await refresh() }, onError,
   })
   const removeMember = useMutation({
     mutationFn: (uid: number) => api(fam(`/members/${uid}`), { method: 'DELETE' }),
@@ -50,6 +63,8 @@ export function Family() {
   })
   if (isLoading || !f) return <PageLoader />
   const owner = f.role === 'owner'
+  const transfer = f.owner_transfer ?? null
+  const cooldownUntil = f.next_transfer_at && new Date(f.next_transfer_at) > new Date() ? f.next_transfer_at : null
   const link = `${location.origin}/join/${f.invite_code ?? ''}`
 
   const copyLink = async () => {
@@ -66,6 +81,30 @@ export function Family() {
         </div>
         {owner && <button className="btn ghost" onClick={() => setRename(f.name)}><Pencil size={16} />Переименовать</button>}
       </div>
+
+      {transfer && (
+        <section className="alert info stack" role="status" aria-label="Передача владения">
+          <div>
+            {transfer.can_answer && transfer.kind === 'offer' && <>{transfer.from_name} предлагает вам стать владельцем семьи: владелец приглашает людей и оплачивает Плюс. Если согласитесь, у прежнего владельца отключится автопродление, а оплаченный срок Плюса останется семье до конца.</>}
+            {transfer.can_answer && transfer.kind === 'request' && <>{transfer.from_name} хочет стать владельцем семьи и оплачивать Плюс. Если согласитесь, вы станете участником, у вас отключится автопродление, а оплаченный срок Плюса останется семье до конца.</>}
+            {transfer.can_withdraw && transfer.kind === 'offer' && <>Вы предложили {transfer.to_name} стать владельцем семьи. Пока ответа нет, владелец вы.</>}
+            {transfer.can_withdraw && transfer.kind === 'request' && <>Вы попросили владельца ({transfer.to_name}) передать вам владение семьёй. Пока ответа нет.</>}
+            {!transfer.can_answer && !transfer.can_withdraw && (transfer.kind === 'offer'
+              ? <>{transfer.from_name} предлагает {transfer.to_name} стать владельцем семьи.</>
+              : <>{transfer.from_name} просит владельца ({transfer.to_name}) передать ему владение семьёй.</>)}
+            {' '}Ответить можно до {fmtDateTime(transfer.expires_at)}.
+          </div>
+          <div className="row wrap" style={{ gap: 8 }}>
+            {transfer.can_answer && (
+              <>
+                <button className="btn primary" onClick={() => answer.mutate(true)} disabled={answer.isPending}><Check size={16} />{transfer.kind === 'offer' ? 'Принять' : 'Подтвердить'}</button>
+                <button className="btn ghost" onClick={() => answer.mutate(false)} disabled={answer.isPending}><X size={16} />{transfer.kind === 'offer' ? 'Отказаться' : 'Отклонить'}</button>
+              </>
+            )}
+            {transfer.can_withdraw && <button className="btn ghost" onClick={() => withdraw.mutate()} disabled={withdraw.isPending}>{transfer.kind === 'offer' ? 'Отменить предложение' : 'Забрать просьбу'}</button>}
+          </div>
+        </section>
+      )}
 
       <Link to="/plus" className="card list-row plus-link" style={{ textDecoration: 'none', color: 'inherit' }}>
         <Sparkles size={22} style={{ color: 'var(--plus)', flex: 'none' }} />
@@ -88,13 +127,20 @@ export function Family() {
             {m.role === 'owner' && <span className="badge accent"><Crown size={12} />Владелец</span>}
             {owner && m.user_id !== me?.id && (
               <>
-                <button className="icon-btn" title="Передать владение"
-                  onClick={() => confirm(`Передать владение: ${m.name}? Вы станете участником, автопродление Плюса отключится.`) && setRole.mutate({ uid: m.user_id, role: 'owner' })}><Crown size={16} /></button>
+                <button className="icon-btn" title={cooldownUntil ? `Владение менялось недавно: передать можно с ${fmtDateTime(cooldownUntil)}` : transfer ? 'Уже есть неотвеченное предложение' : 'Предложить владение'}
+                  disabled={!!transfer || !!cooldownUntil}
+                  onClick={() => confirm(`Предложить ${m.name} стать владельцем семьи? Станет, только если ${m.name} согласится в течение 24 часов. Тогда вы станете участником, а автопродление Плюса у вас отключится.`) && offer.mutate(m.user_id)}><Crown size={16} /></button>
                 <button className="icon-btn" title="Убрать из семьи" onClick={() => confirm(`Убрать ${m.name} из семьи?`) && removeMember.mutate(m.user_id)}><Trash2 size={16} /></button>
               </>
             )}
           </div>
         ))}
+        {!owner && !transfer && (
+          <div style={{ padding: '10px 18px 16px' }}>
+            <button className="btn ghost" disabled={!!cooldownUntil} title={cooldownUntil ? `Владение менялось недавно: можно с ${fmtDateTime(cooldownUntil)}` : undefined}
+              onClick={() => confirm('Попросить владельца передать вам владение семьёй? Станете владельцем, только если он согласится в течение 24 часов. Вы будете оплачивать Плюс, а у него автопродление отключится.') && askToPay.mutate()}><Crown size={16} />Хочу оплачивать</button>
+          </div>
+        )}
       </section>
 
       <section className="card stack">
