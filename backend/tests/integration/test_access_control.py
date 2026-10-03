@@ -127,6 +127,7 @@ def test_account_endpoints_require_login(client):
 # Первый зарегистрированный аккаунт — администратор (в world это владелец).
 ADMIN_ENDPOINTS = [
     ("GET", "/api/admin/stats", None),
+    ("GET", "/api/admin/payments", None),
     ("GET", "/api/admin/users", None),
     ("PATCH", "/api/admin/users/{u}", {"name": "X"}),
     ("DELETE", "/api/admin/users/{u}", None),

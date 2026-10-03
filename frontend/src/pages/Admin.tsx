@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Crown, House, Lightbulb, Pill, Plus, Search, Shield, Sparkles, Tags, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, Crown, House, Lightbulb, Pill, Plus, Search, Shield, Sparkles, Tags, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AdminFamily, AdminStats, AdminUser, api, Category, PlanName } from '../api'
 import { useAuth } from '../auth'
 import { CategoryDraft, CategoryEditor } from '../components/CategoryEditor'
@@ -53,6 +53,11 @@ export function Admin() {
         <div className="stat"><span className="label"><Pill size={15} />Лекарств</span><span className="value">{s?.medicines ?? '…'}</span></div>
         <div className="stat"><span className="label"><Tags size={15} />Категорий</span><span className="value">{s?.categories ?? '…'}</span></div>
       </div>
+
+      <Link to="/admin/payments" className="card row between" style={{ padding: 14 }}>
+        <span><b>Оплаты и чеки</b><br /><span className="muted small">Список оплат ЮKassa и чеки самозанятого для покупателей</span></span>
+        <ArrowRight size={18} />
+      </Link>
 
       <div className="segmented wrap" role="tablist">
         {TABS.map(t => (
