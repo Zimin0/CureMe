@@ -31,6 +31,12 @@ describe('юридические страницы', () => {
     expect(screen.getByText(/Замороженная аптечка хранится без ограничения срока/, { exact: false })).toBeInTheDocument()
   })
 
+  it('Соглашение п. 6.8 и 6.13: перенос оплаченных дней и смена семьи', async () => {
+    renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/вправе по своему выбору перенести оставшиеся оплаченные дни/)).toBeInTheDocument()
+    expect(screen.getByText(/6\.13\. Пользователь может сменить семью не чаще одного раза в тридцать дней/)).toBeInTheDocument()
+  })
+
   it('Политика п. 5.10: перенос данных между семьями без передачи третьим лицам', async () => {
     renderApp('/privacy')
     expect(await screen.findByText(/5\.10\. Перенос данных между семьями\./)).toBeInTheDocument()
