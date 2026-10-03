@@ -29,6 +29,11 @@ function PaymentRow({ p }: { p: AdminPayment }) {
     onSuccess: () => { setUrl(''); done(); toast('Чек сброшен') },
     onError: (e: Error) => toast(e.message, 'error'),
   })
+  const recheck = useMutation({
+    mutationFn: () => api<AdminPayment>(`/admin/payments/${p.id}/sync`, { method: 'POST' }),
+    onSuccess: r => { done(); toast(r.status === 'succeeded' ? 'Платёж оплачен, Плюс выдан' : `В ЮKassa статус: ${STATUS[r.status]}`) },
+    onError: (e: Error) => toast(e.message, 'error'),
+  })
   const payable = p.status === 'succeeded' || p.status === 'refunded'
 
   return (
@@ -40,6 +45,12 @@ function PaymentRow({ p }: { p: AdminPayment }) {
         </div>
         <span className={`badge ${p.status === 'succeeded' ? 'ok' : p.status === 'pending' ? 'info' : 'out'}`}>{STATUS[p.status]}</span>
       </div>
+      {p.status === 'pending' && (
+        <div className="row small" style={{ gap: 8 }}>
+          <span className="muted grow">Если человек оплатил, а Плюс не включился, проверьте платёж в ЮKassa.</span>
+          <button type="button" className="btn ghost" onClick={() => recheck.mutate()} disabled={recheck.isPending}>Проверить в ЮKassa</button>
+        </div>
+      )}
       {payable && (
         <>
           <div className="row small" style={{ gap: 8 }}>

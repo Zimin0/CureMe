@@ -732,6 +732,7 @@ class PayStatus(BaseModel):
     plus_active: bool
     plus_until: datetime | None = None
     auto_renew: bool
+    can_pay: bool = True  # человек главный владелец хотя бы одной аптечки: иначе Плюс, который он купит, нигде не заработает
     recurring_enabled: bool = False  # автоплатежи подключены: можно показывать галочку автопродления
     price_month: int | None = None
     price_year: int | None = None

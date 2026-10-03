@@ -66,6 +66,26 @@ describe('оплата Плюса на странице /plus', () => {
     await waitFor(() => expect(sent).toEqual({ period: 'month', auto_renew: false, agree: true }))
   })
 
+  it('если Плюс оплачен лично, а аптечка чужая, объясняет почему ограничения остались', async () => {
+    server.use(billing, payStatus({ plus_active: true, plus_until: '2026-11-03T10:00:00Z' }))
+    renderApp('/plus')
+    expect(await screen.findByText(/У вас оплачен Плюс до .*он работает на ваших собственных аптечках/)).toBeInTheDocument()
+  })
+
+  it('цена «для сведения» не показывается, когда оплата уже доступна', async () => {
+    server.use(billing, payStatus())
+    renderApp('/plus')
+    await screen.findByRole('button', { name: /Оплатить 199/ })
+    expect(screen.queryByText(/цена указана для сведения/)).not.toBeInTheDocument()
+  })
+
+  it('участнику чужой аптечки вместо формы оплаты объясняет, кто покупает Плюс', async () => {
+    server.use(billing, payStatus({ can_pay: false }))
+    renderApp('/plus')
+    expect(await screen.findByText(/Плюс покупает главный владелец аптечки/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Оплатить/ })).not.toBeInTheDocument()
+  })
+
   it('незавершённые попытки оплаты в списке не показываются', async () => {
     const mk = (id: number, status: 'pending' | 'succeeded') => ({ id, period: 'month', amount: 199, status, recurring: false, created_at: '2026-10-03T10:00:00Z', paid_at: status === 'succeeded' ? '2026-10-03T10:01:00Z' : null, receipt_url: null } as const)
     server.use(billing, payStatus({ payments: [mk(3, 'pending'), mk(2, 'pending'), mk(1, 'succeeded')] }))
@@ -128,6 +148,18 @@ describe('админ-страница «Оплаты и чеки»', () => {
     await user.type(screen.getByLabelText('Ссылка на чек, оплата 11'), 'https://lknpd.nalog.ru/x/print')
     await user.click(send)
     await waitFor(() => expect(body).toEqual({ url: 'https://lknpd.nalog.ru/x/print', send_email: true }))
+  })
+
+  it('для ожидающей оплаты есть кнопка «Проверить в ЮKassa»', async () => {
+    let called = false
+    server.use(
+      http.get('/api/admin/payments', () => HttpResponse.json([{ ...PAYMENT, status: 'pending', paid_at: null }])),
+      http.post('/api/admin/payments/11/sync', () => { called = true; return HttpResponse.json(PAYMENT) }),
+    )
+    const { user } = renderApp('/admin/payments', { me: ADMIN })
+    await user.click(await screen.findByRole('tab', { name: /Все оплаты/ }))
+    await user.click(await screen.findByRole('button', { name: 'Проверить в ЮKassa' }))
+    await waitFor(() => expect(called).toBe(true))
   })
 
   it('вкладка «Все оплаты» показывает и оформленные', async () => {

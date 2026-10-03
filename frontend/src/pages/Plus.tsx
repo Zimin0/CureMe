@@ -6,6 +6,7 @@ import { PayBox, usePayStatus } from '../components/PayBox'
 import { PayTerms } from '../components/PayTerms'
 import { SellerInfo } from '../components/SellerInfo'
 import { PageLoader } from '../components/ui'
+import { fmtDate } from '../format'
 import { limitWord, planLabel, PRICE_NOTE, priceText, usePlan } from '../plan'
 
 // Что сравниваем на странице: лимит бесплатной версии → «без ограничений» в Плюсе.
@@ -41,8 +42,13 @@ export function Plus() {
         {priceText(plan) && (
           <>
             <p>Стоимость Плюса: <b>{priceText(plan)}</b>.</p>
-            <p className="muted small">{PRICE_NOTE}</p>
+            {!pay.data?.enabled && <p className="muted small">{PRICE_NOTE}</p>}
           </>
+        )}
+        {pay.data?.plus_active && !plan.plus_active && (
+          <p role="status" className="badge info" style={{ whiteSpace: 'normal' }}>
+            У вас оплачен Плюс{pay.data.plus_until ? ` до ${fmtDate(pay.data.plus_until)}` : ''}, он работает на ваших собственных аптечках. Эта аптечка работает по тарифу её главного владельца{plan.owner_name ? ` (${plan.owner_name})` : ''}, поэтому здесь остаются ограничения бесплатной версии. Чтобы Плюс заработал здесь, он должен быть у главного владельца аптечки.
+          </p>
         )}
         {!plan.billing_enabled && <p className="muted small">Платная версия пока не включена, поэтому все функции Плюса доступны бесплатно.</p>}
         {plan.billing_enabled && !plan.plus_active && !pay.data?.enabled && (

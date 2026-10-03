@@ -170,6 +170,29 @@ def sync_payment(db: Session, yk_id: str) -> Payment | None:
     return pay
 
 
+def sync_pending(db: Session, user: User, max_age: timedelta = timedelta(hours=3), limit: int = 3) -> None:
+    """Запасной путь, если уведомление ЮKassa не дошло: спрашиваем у ЮKassa свежие неоплаченные платежи человека.
+
+    Вызывается, когда человек открывает /plus (в том числе после возврата с оплаты). Ошибки ЮKassa глотаем:
+    страница откроется, а платёж подхватится при следующем запросе.
+    """
+    if not configured():
+        return
+    since = datetime.now(timezone.utc) - max_age
+    rows = db.scalars(select(Payment).where(
+        Payment.user_id == user.id, Payment.status == "pending", Payment.yk_id.is_not(None),
+    ).order_by(Payment.id.desc()).limit(limit))
+    for pay in list(rows):
+        created = pay.created_at if pay.created_at.tzinfo else pay.created_at.replace(tzinfo=timezone.utc)
+        if created < since:
+            break
+        try:
+            sync_payment(db, pay.yk_id)
+        except PaymentError:
+            return
+    db.refresh(user)
+
+
 def _site() -> str:
     return (get_settings().public_url or "https://kapsulka.ru").rstrip("/")
 

@@ -320,7 +320,7 @@ export type PaymentBrief = {
   recurring: boolean; created_at: string; paid_at: string | null; receipt_url: string | null
 }
 export type PayStatus = {
-  enabled: boolean; plus_active: boolean; plus_until: string | null; auto_renew: boolean; recurring_enabled?: boolean
+  enabled: boolean; plus_active: boolean; plus_until: string | null; auto_renew: boolean; recurring_enabled?: boolean; can_pay?: boolean
   price_month: number | null; price_year: number | null; payments: PaymentBrief[]
 }
 export type AdminPayment = PaymentBrief & {
