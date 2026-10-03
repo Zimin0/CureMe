@@ -126,6 +126,10 @@ function UserSheet({ user, isMe, onClose }: { user: AdminUser; isMe: boolean; on
     }),
     onSuccess: () => { refresh(); toast(password ? 'Сохранено, пароль изменён' : 'Сохранено'); onClose() }, onError,
   })
+  const resetCooldown = useMutation({
+    mutationFn: () => api(`/admin/users/${user.id}/reset-cooldown`, { method: 'POST' }),
+    onSuccess: () => toast(`${user.name} может сменить семью сразу`), onError,
+  })
   const remove = useMutation({
     mutationFn: () => api(`/admin/users/${user.id}`, { method: 'DELETE' }),
     onSuccess: () => { refresh(); toast(`Аккаунт ${user.name} удалён`); onClose() }, onError,
@@ -158,6 +162,10 @@ function UserSheet({ user, isMe, onClose }: { user: AdminUser; isMe: boolean; on
           </div>
         )}
         <button className="btn primary block" disabled={save.isPending}>Сохранить</button>
+        <button type="button" className="btn block" disabled={resetCooldown.isPending}
+          onClick={() => confirm(`Снять ограничение «семью можно менять раз в 30 дней» для ${user.name}? В журнале семьи останется запись.`) && resetCooldown.mutate()}>
+          Снять кулдаун смены семьи
+        </button>
         {!isMe && (
           <button type="button" className="btn danger block" disabled={remove.isPending}
             onClick={() => confirm(`Удалить аккаунт ${user.name}? Семьи, где он был один, удалятся вместе с аптечкой.`) && remove.mutate()}>

@@ -7,7 +7,9 @@ export type CabinetStatus = 'active' | 'frozen'
 export interface FamilyBrief { id: number; name: string; role: Role; status?: CabinetStatus }
 /** Плюс семьи заканчивается (ending) или закончился и идёт срок выбора состава (ended, R13). date: конец Плюса или последний день выбора. */
 export interface PlusEnding { state: 'ending' | 'ended'; date: string; is_owner: boolean; people_limit: number }
-export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[]; owner_transfer_waiting?: boolean; own_families_left?: number | null; plus_active?: boolean; plus_ending?: PlusEnding | null }
+export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[]; owner_transfer_waiting?: boolean; own_families_left?: number | null; plus_active?: boolean; plus_ending?: PlusEnding | null; next_change_at?: string | null }
+/** Ответ переноса лекарств между аптечками и разделения аптечки (R17, R18). */
+export interface MoveResult { moved: number; merged: number; to_family_id: number }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
 /** Незавершённая передача владения (R23). offer: владелец предлагает участнику; request: участник просит «Хочу оплачивать». */
 export interface OwnerTransfer { kind: 'offer' | 'request'; from_user_id: number | null; from_name: string; to_user_id: number | null; to_name: string; expires_at: string; can_answer: boolean; can_withdraw: boolean }

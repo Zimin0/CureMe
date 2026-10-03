@@ -11,6 +11,7 @@ import { Reminders } from '../components/Reminders'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { copyText } from '../clipboard'
 import { avatarColor, fmtDateTime } from '../format'
+import { CooldownNote } from '../join'
 import { useLimitReached } from '../limits'
 import { LimitCounter, planLabel, usePlan } from '../plan'
 import { versionLabel } from '../version'
@@ -187,6 +188,7 @@ export function Family() {
         <h2>Аккаунт</h2>
         <div className="row wrap">
           {me?.is_admin && <Link to="/admin" className="btn"><Shield size={16} />Панель администратора</Link>}
+          {!owner && <CooldownNote />}
           {!owner && <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»? У вас будет своя семья и одна из созданных вами аптечек.`) && removeMember.mutate(me!.id)}>Покинуть семью</button>}
           <button className="btn danger" onClick={signOut}><LogOut size={16} />Выйти из аккаунта</button>
           <DeleteAccountButton />

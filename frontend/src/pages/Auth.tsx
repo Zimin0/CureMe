@@ -2,7 +2,8 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { MailCheck } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, Family, InviteInfo, Me } from '../api'
+import { api, InviteInfo, Me } from '../api'
+import { CooldownNote, JoinError, useJoinFamily } from '../join'
 import { useAuth } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, useToast } from '../components/ui'
@@ -154,10 +155,7 @@ export function Join() {
     queryFn: () => api<InviteInfo>(`/invites/${code}`),
     retry: false,
   })
-  const join = useMutation({
-    mutationFn: () => api<Family>('/families/join', { body: { code } }),
-    onSuccess: async f => { await refresh(); setFamilyId(f.id); toast(`Вы в семье «${f.name}»`); nav('/') },
-  })
+  const join = useJoinFamily(code, async f => { await refresh(); setFamilyId(f.id); toast(`Вы в семье «${f.name}»`); nav('/') })
   if (info.isLoading) return <PageLoader />
   if (info.isError) {
     return <AuthShell title="Приглашение не найдено" sub="Приглашение одноразовое и действует 24 часа, прежние многоразовые ссылки больше не работают. Попросите владельца семьи создать новую."><Link className="btn primary block" to="/">На главную</Link></AuthShell>
@@ -174,8 +172,9 @@ export function Join() {
     <AuthShell title={`Приглашение в «${fam.family_name}»`} sub={`${fam.owner_name ? `${fam.owner_name} зовёт вас в общую аптечку` : 'Вас зовут в общую аптечку'}. Вы получите доступ ко всем аптечкам семьи.`}>
       {me ? (
         <>
-          {join.error && <div className="alert error">{join.error.message}</div>}
-          <button className="btn primary block" onClick={() => join.mutate()} disabled={join.isPending}>Вступить как {me.name}</button>
+          <CooldownNote />
+          <JoinError j={join} />
+          <button className="btn primary block" onClick={join.join} disabled={join.pending}>Вступить как {me.name}</button>
         </>
       ) : (
         <>
