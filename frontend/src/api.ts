@@ -11,7 +11,7 @@ export interface InviteInfo { family_name: string; members: number; full: boolea
 export interface Category { id: number; name: string; icon: string; color: string; medicine_count: number }
 
 export interface AdminStats { users: number; admins: number; families: number; medicines: number; categories: number }
-export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[]; plan: PlanName; plus_until: string | null; plus_active: boolean }
+export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[]; plan: PlanName; plus_until: string | null; plus_active: boolean; auto_renew?: boolean; plus_from_others?: string[] }
 export interface AdminFamily { id: number; name: string; invite_code: string; created_at: string; medicine_count: number; members: Member[]; plan: PlanName; plus_until: string | null; plus_active: boolean; owner_id?: number | null; owner_name?: string | null }
 
 // --- тарифы: backend/app/plans.py ---
@@ -312,4 +312,17 @@ export async function fetchText(path: string): Promise<string> {
   const res = await fetch(`/api${path}`, { headers: authHeaders() })
   if (!res.ok) return failure(res)
   return res.text()
+}
+
+// --- оплата Плюса (ЮKassa) ---
+export type PaymentBrief = {
+  id: number; period: 'month' | 'year'; amount: number; status: 'pending' | 'succeeded' | 'canceled' | 'refunded'
+  recurring: boolean; created_at: string; paid_at: string | null; receipt_url: string | null
+}
+export type PayStatus = {
+  enabled: boolean; plus_active: boolean; plus_until: string | null; auto_renew: boolean; recurring_enabled?: boolean
+  price_month: number | null; price_year: number | null; payments: PaymentBrief[]
+}
+export type AdminPayment = PaymentBrief & {
+  email: string; user_id: number | null; user_name: string | null; receipt_sent_at: string | null
 }

@@ -41,7 +41,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     "Аккаунты и вход": {
         "sources": ["routers/auth.py", "security.py", "legal.py", "ratelimit.py", "email_verification.py", "mailer.py"],
         "tests": [
-            "unit/test_security.py", "unit/test_mailer.py", "integration/test_auth.py",
+            "unit/test_security.py", "unit/test_mailer.py", "unit/test_mail_addresses.py", "integration/test_auth.py",
             "integration/test_security_hardening.py", "integration/test_closed_mode.py",
             "integration/test_access_control.py", "integration/test_email_verification.py",
         ],
@@ -71,6 +71,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     "Уведомления по расписанию и доверенный человек": {
         "sources": ["schedule_notify.py", "routers/schedule_notify.py"],
         "tests": ["integration/test_schedule_notify.py", "integration/test_reminders.py", "integration/test_access_control.py"],
+    },
+    "Оплата Плюса (ЮKassa) и чеки": {
+        "sources": ["payments.py", "routers/payments.py"],
+        "tests": ["integration/test_payments.py", "integration/test_plans.py", "integration/test_access_control.py"],
     },
     "Поисковая оптимизация (SEO)": {
         "sources": ["seo.py"],

@@ -1,14 +1,17 @@
 """Панель администратора: все аккаунты, все семьи и общий список категорий."""
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
-from ..models import Category, Family, Medicine, MedicineCategory, Membership, User
+from ..mailer import send_mail
+from ..models import Category, Family, Medicine, MedicineCategory, Membership, Payment, User
 from ..schemas import (
-    AccessSettings, AdminPlanIn, BillingSettings, DebugSettings, TelegramSettings,
+    AccessSettings, AdminPaymentOut, AdminPlanIn, ReceiptIn, BillingSettings, DebugSettings, TelegramSettings,
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
     CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
 )
@@ -38,8 +41,19 @@ def _user_out(u: User) -> AdminUserOut:
         id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, email_verified=u.email_verified_at is not None,
         created_at=u.created_at,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
-        plan=u.plan, plus_until=u.plus_until, plus_active=plus_active(u),
+        plan=u.plan, plus_until=u.plus_until, plus_active=plus_active(u), auto_renew=u.auto_renew,
+        plus_from_others=_plus_from_others(u),
     )
+
+
+def _plus_from_others(u: User) -> list[str]:
+    """Аптечки, где человек не главный владелец, но Плюс есть: он идёт от тарифа главного владельца, а не от тарифа человека."""
+    out = []
+    for m in sorted(u.memberships, key=lambda m: m.joined_at):
+        owner = family_owner_user(m.family)
+        if owner and owner.id != u.id and plus_active(owner):
+            out.append(f"{m.family.name} (Плюс у {owner.name})")
+    return out
 
 
 def _family_out(db: Session, f: Family) -> AdminFamilyOut:
@@ -95,10 +109,13 @@ def list_users(db: Session = Depends(get_db)):
 @router.put("/users/{user_id}/plan", response_model=AdminUserOut)
 def set_user_plan(user_id: int, body: AdminPlanIn, db: Session = Depends(get_db)):
     """Ручное включение Плюса аккаунту (оплаты пока нет). Плюс действует на все аптечки, где он главный владелец.
-    Бесплатный тариф сбрасывает и срок."""
+    Бесплатный тариф сбрасывает срок и автопродление: сохранённый способ оплаты забываем, иначе человек остался бы
+    с включённым автопродлением и кнопкой «Отключить» у тарифа, которого у него уже нет."""
     u = _get_user(db, user_id)
     u.plan = body.plan
     u.plus_until = body.plus_until if body.plan == "plus" else None
+    if body.plan != "plus":
+        u.auto_renew, u.pay_method_id, u.renew_period, u.renew_notified_for, u.renew_notified_at = False, None, None, None, None
     db.commit()
     return _user_out(u)
 
@@ -327,3 +344,56 @@ def get_billing(db: Session = Depends(get_db)):
 @router.put("/billing", response_model=BillingSettings)
 def put_billing(body: BillingSettings, db: Session = Depends(get_db)):
     return set_billing_settings(db, body)
+
+
+# --- оплаты и чеки самозанятого ---
+PERIOD_NAME = {"month": "1 месяц", "year": "1 год"}
+
+
+def _payment_out(db: Session, p: Payment) -> AdminPaymentOut:
+    user = db.get(User, p.user_id) if p.user_id else None
+    out = AdminPaymentOut.model_validate(p, from_attributes=True)
+    out.user_name = user.name if user else None
+    return out
+
+
+@router.get("/payments", response_model=list[AdminPaymentOut])
+def list_payments(db: Session = Depends(get_db)):
+    """Все оплаты, новые сверху. Успешные без отправленного чека — те, по которым нужно оформить чек."""
+    return [_payment_out(db, p) for p in db.scalars(select(Payment).order_by(Payment.id.desc()).limit(500))]
+
+
+def _payment(db: Session, pid: int) -> Payment:
+    p = db.get(Payment, pid)
+    if not p:
+        raise _not_found("Оплата")
+    return p
+
+
+@router.put("/payments/{payment_id}/receipt", response_model=AdminPaymentOut)
+def set_receipt(payment_id: int, body: ReceiptIn, tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Сохраняет ссылку на чек из «Мой налог» и отправляет её покупателю на почту."""
+    p = _payment(db, payment_id)
+    if p.status not in ("succeeded", "refunded"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Чек оформляют только по оплаченным платежам")
+    p.receipt_url = body.url
+    if body.send_email:
+        p.receipt_sent_at = datetime.now(timezone.utc)
+        paid = (p.paid_at or p.created_at).strftime("%d.%m.%Y")
+        tasks.add_task(
+            send_mail, p.email, "Капсулка: чек по вашей оплате",
+            f"Здравствуйте!\n\nЧек по оплате от {paid} ({p.amount} ₽, подписка Капсулка Плюс на {PERIOD_NAME[p.period]}):\n"
+            f"{body.url}\n\nЧек оформлен самозанятым в приложении «Мой налог». Если у вас вопросы, ответьте на это письмо.\n\nКапсулка",
+        )
+    db.commit()
+    return _payment_out(db, p)
+
+
+@router.delete("/payments/{payment_id}/receipt", response_model=AdminPaymentOut)
+def clear_receipt(payment_id: int, db: Session = Depends(get_db)):
+    """Сбрасывает ссылку и отметку об отправке (например, чек аннулирован и оформлен заново)."""
+    p = _payment(db, payment_id)
+    p.receipt_url = None
+    p.receipt_sent_at = None
+    db.commit()
+    return _payment_out(db, p)

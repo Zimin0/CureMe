@@ -39,9 +39,37 @@ class User(Base):
     # чтобы утёкшая копия базы не давала подтверждать чужие почты.
     email_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     email_token_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Автопродление Плюса: человек сам включил галочку при оплате. Данные карты у нас не хранятся,
+    # только идентификатор сохранённого способа оплаты ЮKassa (pay_method_id).
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    pay_method_id: Mapped[str | None] = mapped_column(String(100))
+    renew_period: Mapped[str | None] = mapped_column(String(8))  # month | year
+    # Для какого окончания Плюса (plus_until) и когда отправлено письмо «через 3 дня спишем».
+    renew_notified_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    renew_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class Payment(Base):
+    """Оплата Плюса через ЮKassa. Записи не удаляются вместе с аккаунтом: они нужны для чеков и учёта доходов."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    email: Mapped[str] = mapped_column(String(255))  # почта плательщика на момент оплаты: сюда уходит чек
+    yk_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    period: Mapped[str] = mapped_column(String(8))  # month | year
+    amount: Mapped[int] = mapped_column(Integer)  # рублей
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | succeeded | canceled | refunded
+    recurring: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")  # автопродление
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Чек самозанятого из «Мой налог»: ссылка, которую админ вставил, и когда она ушла покупателю.
+    receipt_url: Mapped[str | None] = mapped_column(String(500))
+    receipt_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Family(Base):

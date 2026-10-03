@@ -35,4 +35,8 @@ export const server = setupServer(
   http.get('/api/auth/access', () => HttpResponse.json({ closed: false })),
   // по умолчанию платная версия выключена и всё доступно; тесты Плюса подменяют ответ (planFixture из utils)
   http.get('/api/families/:id/plan', () => HttpResponse.json(PLAN_OPEN)),
+  // оплата выключена; тесты оплаты подменяют ответ
+  http.get('/api/payments/me', () => HttpResponse.json({
+    enabled: false, plus_active: false, plus_until: null, auto_renew: false, price_month: null, price_year: null, payments: [],
+  })),
 )

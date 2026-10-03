@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from . import reminders, seo
 from .config import get_settings
 from .db import SessionLocal
-from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications, reports, schedule, schedule_notify
+from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications, payments, reports, schedule, schedule_notify
 from .version import app_version
 
 settings = get_settings()
@@ -38,12 +38,14 @@ app.add_middleware(
 # Content Security Policy: браузер выполняет только наши скрипты, так что даже если в название
 # лекарства подсунут <script>, он не запустится и не утащит токен входа.
 # wasm-unsafe-eval и blob: нужны сканеру штрихкодов (zxing-wasm) и распознаванию срока (tesseract).
+# yookassa.ru и yoomoney.ru: запас от времён встроенного виджета ЮKassa (сейчас оплата идёт переходом на страницу ЮKassa).
 CSP = "; ".join([
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' blob:",
+    "script-src 'self' 'wasm-unsafe-eval' blob: https://yookassa.ru",
     "worker-src 'self' blob:",
-    "connect-src 'self' data: blob:",
-    "img-src 'self' data: blob:",
+    "connect-src 'self' data: blob: https://yookassa.ru https://*.yookassa.ru https://yoomoney.ru https://*.yoomoney.ru",
+    "img-src 'self' data: blob: https://yookassa.ru https://*.yookassa.ru https://yoomoney.ru https://*.yoomoney.ru",
+    "frame-src https://yookassa.ru https://*.yookassa.ru https://yoomoney.ru https://*.yoomoney.ru https:",
     "media-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
@@ -73,7 +75,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for r in (auth, families, categories, medicines, intakes, assist, files, reports, admin, notifications, schedule, schedule_notify):
+for r in (auth, families, categories, medicines, intakes, assist, files, reports, admin, notifications, payments, schedule, schedule_notify):
     app.include_router(r.router)
 app.include_router(schedule_notify.public)
 

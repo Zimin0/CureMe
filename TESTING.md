@@ -113,6 +113,7 @@ python3 -m pytest scripts -q     # тесты самого выбора (нуж�
 - `test_search.py` — нормализация, «стемминг», синонимы («болит голова» → «мигрень»), порог совпадения.
 - `test_security.py` — bcrypt, JWT: истёкший, чужой ключ, другой алгоритм, атака `alg=none`.
 - `test_services.py` — статус лекарства (ok/low/out/expiring/expired) на границах и списание по FEFO.
+- `test_mail_addresses.py` — письмо подтверждения и обычные письма для разных ящиков (Gmail, Яндекс, mail.ru, адреса с «+», заглавными буквами, кириллицей), заголовки `Date` и `Message-ID`, в письме с кодом нет ссылок (Яндекс отклонял их как спам). SMTP подменён. «Живой» тест `test_live_delivery_to_real_mailboxes` пропускается, пока не задана `CUREME_LIVE_MAIL_TO`: `CUREME_SMTP_HOST=... CUREME_SMTP_USER=... CUREME_SMTP_PASSWORD=... CUREME_MAIL_FROM=... CUREME_LIVE_MAIL_TO=ящик1@gmail.com,ящик2@mail.ru pytest tests/unit/test_mail_addresses.py -k live` отправляет настоящие письма с кодом и падает, если SMTP-сервер отклонил хоть одно (запускать на сервере или локально). Раз в сутки то же делает workflow `.github/workflows/mail-check.yml`: шлёт настоящее письмо на тестовый ящик и падает, если SMTP отклонил его. Ему нужны секреты репозитория `MAIL_SMTP_USER`, `MAIL_SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_LIVE_TO` (необязательно `MAIL_SMTP_HOST`); пока их нет, проверка пропускается.
 - `test_websearch.py` — разбор заголовков аптек, голосование, переход на запасной поисковик.
 
 **Бэкенд, интеграция**

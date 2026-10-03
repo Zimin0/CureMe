@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     # Сколько минут действует код подтверждения из письма.
     email_code_ttl_minutes: int = 30
 
+    # ЮKassa (оплата Плюса): идентификатор магазина и секретный ключ из личного кабинета.
+    # Пока хотя бы одно поле пусто, оплата выключена.
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    # Автоплатежи (сохранение способа оплаты) подключаются в ЮKassa отдельно, по заявке менеджеру.
+    # Пока не подключены, галочки автопродления на сайте нет: без них ЮKassa отвечает 403.
+    yookassa_recurring: bool = False
+
     # Напоминания «скоро закончится» и «истекает срок» (reminders.py).
     # Фоновые задачи внутри приложения: ежедневная рассылка и приём сообщений Telegram-бота.
     background_jobs: bool = True
@@ -59,6 +67,10 @@ class Settings(BaseSettings):
     telegram_bot_username: str = ""
     # Сколько минут действует ссылка привязки Telegram.
     telegram_link_ttl_minutes: int = 60
+
+    @property
+    def yookassa_enabled(self) -> bool:
+        return bool(self.yookassa_shop_id and self.yookassa_secret_key)
 
     @property
     def telegram_enabled(self) -> bool:

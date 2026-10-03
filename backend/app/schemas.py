@@ -212,6 +212,9 @@ class AdminUserOut(BaseModel):
     plan: str = "free"
     plus_until: datetime | None = None
     plus_active: bool = False  # Плюс аккаунта оплачен и не истёк
+    auto_renew: bool = False  # включено автопродление (способ оплаты сохранён в ЮKassa)
+    # Аптечки, где у человека есть Плюс не от его тарифа, а от главного владельца аптечки.
+    plus_from_others: list[str] = []
 
 
 class AdminUserUpdate(BaseModel):
@@ -693,3 +696,55 @@ class TrustedPublicOut(BaseModel):
 
     user_name: str
     status: str
+
+
+# --- оплата (payments.py) ---
+class PayIn(BaseModel):
+    period: str = Field(pattern="^(month|year)$")
+    auto_renew: bool = False
+    agree: bool  # согласие с офертой, условиями и политикой: без него оплата не создаётся
+
+    @model_validator(mode="after")
+    def _agreed(self):
+        if not self.agree:
+            raise ValueError("Нужно согласиться с офертой")
+        return self
+
+
+class PayStarted(BaseModel):
+    payment_id: int
+    confirmation_url: str  # страница оплаты ЮKassa
+
+
+class PaymentBrief(BaseModel):
+    id: int
+    period: str
+    amount: int
+    status: str
+    recurring: bool
+    created_at: datetime
+    paid_at: datetime | None = None
+    receipt_url: str | None = None
+
+
+class PayStatus(BaseModel):
+    enabled: bool  # оплату можно начать
+    plus_active: bool
+    plus_until: datetime | None = None
+    auto_renew: bool
+    recurring_enabled: bool = False  # автоплатежи подключены: можно показывать галочку автопродления
+    price_month: int | None = None
+    price_year: int | None = None
+    payments: list[PaymentBrief] = []
+
+
+class AdminPaymentOut(PaymentBrief):
+    email: str
+    user_id: int | None = None
+    user_name: str | None = None
+    receipt_sent_at: datetime | None = None
+
+
+class ReceiptIn(BaseModel):
+    url: str = Field(min_length=10, max_length=500, pattern=r"^https://\S+$")
+    send_email: bool = True
