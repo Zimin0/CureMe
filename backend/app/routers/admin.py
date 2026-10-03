@@ -1,11 +1,12 @@
 """Панель администратора: все аккаунты, все семьи и общий список категорий."""
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import household_check, households
+from .. import compression, household_check, households
 from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
@@ -14,13 +15,14 @@ from ..models import Category, Family, HouseholdEvent, Medicine, MedicineCategor
 from ..schemas import (
     AccessSettings, AdminPaymentOut, AdminPlanIn, ReceiptIn, BillingSettings, DebugSettings, TelegramSettings,
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
-    CategoryOut, FamilyBrief, FamilyIn, HouseholdEventOut, IndicationHintsIn, MemberOut, RoleIn,
+    CategoryOut, CompressionSettingsIO, FamilyBrief, FamilyIn, HouseholdEventOut, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
 from ..plans import PLUS, billing_settings, plus_active, set_billing_settings
 from ..security import hash_password
 from ..services import access_settings, debug_enabled, indication_hints, set_access_settings, set_debug_enabled, set_indication_hints, set_telegram_switch, telegram_switch_on
 
+log = logging.getLogger("cureme.admin")
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_user)])
 
 
@@ -106,9 +108,14 @@ def set_user_plan(user_id: int, body: AdminPlanIn, me: User = Depends(admin_user
     house = u.household
     if house is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "У человека нет семьи: тариф выдавать некому")
+    had_plus = plus_active(house)
     house.plan = body.plan
     house.plus_until = body.plus_until if body.plan == PLUS else None
     house.plus_is_trial = False
+    if body.plan == PLUS:
+        compression.restore(db, house)  # Плюс выдан: замороженные аптечки оживают, окно выбора закрыто
+    elif had_plus and compression.enabled(db):
+        compression.mark_ended(house, datetime.now(timezone.utc))  # снят вручную: окно выбора (R13) начинается сейчас
     if body.plan != PLUS:
         # Карта привязана к человеку, но платит он за семью: сбрасываем у всех её людей, а не только у выбранного.
         for member in house.members:
@@ -368,6 +375,19 @@ def put_debug(body: DebugSettings, db: Session = Depends(get_db)):
 @router.get("/billing", response_model=BillingSettings)
 def get_billing(db: Session = Depends(get_db)):
     return billing_settings(db)
+
+
+@router.get("/compression", response_model=CompressionSettingsIO)
+def get_compression(db: Session = Depends(get_db)):
+    """Включено ли сжатие семей после окончания Плюса (R13, R14). По умолчанию выключено до публикации текста Соглашения."""
+    return CompressionSettingsIO(enabled=compression.enabled(db))
+
+
+@router.put("/compression", response_model=CompressionSettingsIO)
+def put_compression(body: CompressionSettingsIO, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    compression.set_enabled(db, body.enabled)
+    log.info("Сжатие семей после окончания Плюса: %s (администратор %s)", "включено" if body.enabled else "выключено", me.id)
+    return body
 
 
 @router.put("/billing", response_model=BillingSettings)

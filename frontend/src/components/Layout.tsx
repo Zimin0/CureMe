@@ -2,6 +2,7 @@ import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shie
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { usePlan } from '../plan'
+import { cabinetLabel, FrozenNotice, PlusEndingBanner } from './PlusEnding'
 import { TermsNotice } from './TermsNotice'
 
 // short — подпись в нижней панели на телефоне, если полная не помещается.
@@ -38,7 +39,7 @@ export function Layout() {
           <label className="family-switch small">
             <span className="muted">Аптечка семьи</span>
             <select value={familyId ?? ''} title={me.families.find(f => f.id === familyId)?.name} onChange={e => setFamilyId(Number(e.target.value))}>
-              {me.families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              {me.families.map(f => <option key={f.id} value={f.id}>{cabinetLabel(f)}</option>)}
             </select>
           </label>
         )}
@@ -58,6 +59,8 @@ export function Layout() {
             <div className="grow">Вам нужно ответить на предложение о владении семьёй. <Link to="/family">Открыть «Семья»</Link></div>
           </div>
         )}
+        <PlusEndingBanner />
+        <FrozenNotice />
         <Outlet />
       </main>
 

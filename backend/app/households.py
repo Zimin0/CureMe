@@ -19,7 +19,8 @@ from .models import (
     utcnow,
 )
 from .plans import (
-    FREE_CABINETS_MAX, LIMIT_FEATURE, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required,
+    FREE_CABINETS_MAX, LIMIT_FEATURE, NEW_TERMS_FROM, OLD_FREE_MEMBERS, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for,
+    plus_active, plus_required,
 )
 from .routers.files import _drop_photo
 from .security import new_invite_code
@@ -49,6 +50,11 @@ def owner_of(house: Household | None) -> User | None:
 
 def cabinets_of(house: Household) -> list[Family]:
     return sorted(house.cabinets, key=lambda f: (_aware(f.created_at), f.id))
+
+
+def active_cabinets(house: Household) -> list[Family]:
+    """Аптечки семьи без замороженных (R14): только они считаются в лимит и принимают записи."""
+    return [c for c in cabinets_of(house) if c.status == "active"]
 
 
 def _is_empty(db: Session, fam: Family) -> bool:
@@ -234,7 +240,7 @@ def members_full(db: Session, house: Household) -> bool:
 def ensure_room_for_cabinets(db: Session, house: Household, adding: int = 1, people: int | None = None) -> None:
     """Аптечек не станет больше, чем разрешено семье (R03). Уже созданные сверх лимита не трогаем."""
     limit = limit_for(db, house, "own_families", people)
-    if limit is None or len(house.cabinets) + adding <= limit:
+    if limit is None or len(active_cabinets(house)) + adding <= limit:
         return
     if limit >= PLUS_OWN_FAMILIES_MAX:
         raise HTTPException(
@@ -265,10 +271,17 @@ def create_personal(db: Session, user: User) -> Family:
     return add_cabinet(db, house, f"Семья {user.name}", user)
 
 
+def remember_four(house: Household, now: datetime | None = None) -> None:
+    """В семье стало четверо и больше до 13.10.2026: после окончания Плюса ей остаются четверо, не трое (Соглашение п. 6.12)."""
+    if len(house.members) >= OLD_FREE_MEMBERS and (now or datetime.now(timezone.utc)) < NEW_TERMS_FROM:
+        house.kept_four = True
+
+
 def attach(db: Session, user: User, house: Household) -> None:
     """Новый аккаунт, пришедший по приглашению, становится участником семьи (R01: личная семья ему не создаётся)."""
     user.household, user.household_role, user.household_joined_at = house, "member", utcnow()
     record(db, house, "join", user=user, detail="регистрация по приглашению")
+    remember_four(house)
     sync_access(db, house)
 
 
@@ -328,7 +341,7 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
         ensure_room_for_cabinets(db, target, adding=len(bring), people=len(target.members) + 1)
 
     dissolved = [c for c in own if c not in bring]
-    target_first = cabinets_of(target)[0] if target.cabinets else None
+    target_first = next(iter(active_cabinets(target) or cabinets_of(target)), None)
     for fam in bring:
         fam.household = target
     user.household, user.household_role, user.household_joined_at = target, "member", utcnow()
@@ -345,14 +358,18 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
         db.expire(mine, ["members", "cabinets"])
         drop_household(db, mine)
     record(db, target, "join", user=user, actor=actor)
+    remember_four(target)
     sync_access(db, target)
 
 
-def leave(db: Session, user: User, actor: User | None = None, kicked: bool = False, detail: str = "") -> Family:
+def leave(db: Session, user: User, actor: User | None = None, kicked: bool = False, detail: str = "",
+          stay_ids: frozenset[int] = frozenset(), kind: str | None = None) -> Family:
     """Человек уходит из семьи (R09) или его исключает владелец (R10): новая личная семья и одна аптечка, созданная им.
 
     Остальные его аптечки остаются семье. Приёмы человека переезжают с ним, расписание по оставшимся аптечкам
     удаляется (лекарства там ему больше недоступны). Возвращает аптечку, с которой он ушёл.
+    stay_ids — аптечки, которые владелец оставил активными при выборе состава после Плюса (R13): их уходящий не забирает.
+    kind — запись в журнале, если это не обычный выход или исключение (сжатие, R14).
     """
     house = user.household
     lock(db, house)
@@ -360,7 +377,7 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
         raise HTTPException(status.HTTP_409_CONFLICT, "Вы живёте один: покидать нечего. Лишнюю аптечку можно удалить, а аккаунт удалить в профиле.")
     if user.household_role == "owner":
         raise HTTPException(status.HTTP_409_CONFLICT, "Владелец семьи сначала передаёт владение другому человеку.")
-    own = [c for c in cabinets_of(house) if c.created_by_id == user.id and c.status == "active"]
+    own = [c for c in active_cabinets(house) if c.created_by_id == user.id and c.id not in stay_ids]
     keep = own[0] if own else None
     left_ids = [c.id for c in house.cabinets if c is not keep]
 
@@ -370,7 +387,7 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
     db.flush()
     if keep is not None:
         # Приёмы тех, кто остаётся, не уезжают вместе с аптечкой: переносим их в аптечку прежней семьи.
-        stay_home = next((c for c in cabinets_of(house) if c is not keep), None)
+        stay_home = next((c for c in (active_cabinets(house) + cabinets_of(house)) if c is not keep), None)
         if stay_home is None:
             stay_home = add_cabinet(db, house, f"Семья {owner_of(house).name}", owner_of(house))
         for other in house.members:
@@ -382,7 +399,7 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
     _move_history(db, user, left_ids, keep)
     db.execute(delete(Schedule).where(Schedule.user_id == user.id, Schedule.family_id.in_(left_ids)))
     _close_pending(db, house, "cancelled", user, now=utcnow())  # предложения с уходящим теряют смысл
-    record(db, house, "kick" if kicked else "leave", user=user, actor=actor, detail=detail)
+    record(db, house, kind or ("kick" if kicked else "leave"), user=user, actor=actor, detail=detail)
     sync_access(db, house)
     sync_access(db, new_house)
     return keep
@@ -684,11 +701,14 @@ def invariant_problems(db: Session) -> list[str]:
             if {t.from_user_id, t.to_user_id} - {u.id for u in members}:
                 problems.append(f"R23: в передаче {t.id} участвует человек не из семьи {house.id}")
         limit = limit_for(db, house, "members")
+        if limit is not None and house.kept_four:
+            limit = max(limit, OLD_FREE_MEMBERS)  # семья, где было четверо до 13.10.2026, остаётся на четырёх (Соглашение п. 6.12)
         if limit is not None and len(members) > limit:
             problems.append(f"R02: в семье {house.id} людей {len(members)} при лимите {limit}")
         limit = limit_for(db, house, "own_families")
-        if limit is not None and len(house.cabinets) > limit:
-            problems.append(f"R03: в семье {house.id} аптечек {len(house.cabinets)} при лимите {limit}")
+        active = len(active_cabinets(house))
+        if limit is not None and active > limit:
+            problems.append(f"R03: в семье {house.id} активных аптечек {active} при лимите {limit}")
         for fam in house.cabinets:
             for u in members:
                 expected[(fam.id, u.id)] = u.household_role

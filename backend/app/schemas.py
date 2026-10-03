@@ -62,6 +62,16 @@ class FamilyBrief(BaseModel):
     id: int
     name: str
     role: str
+    status: str = "active"  # active | frozen: замороженная аптечка открыта только на чтение и выгрузку (R14)
+
+
+class PlusEndingOut(BaseModel):
+    """Баннер вверху приложения: Плюс семьи заканчивается или закончился, идёт срок выбора состава (R13)."""
+
+    state: str  # ending | ended
+    date: datetime  # конец Плюса или последний день выбора
+    is_owner: bool
+    people_limit: int
 
 
 class MeOut(UserOut):
@@ -72,6 +82,7 @@ class MeOut(UserOut):
     verification_needed: bool = False  # почта не подтверждена, а проверка включена — показать экран «Проверьте почту»
     families: list[FamilyBrief]
     owner_transfer_waiting: bool = False  # кому-то из семьи нужен ответ этого человека по передаче владения (R23)
+    plus_ending: PlusEndingOut | None = None
     # Сколько ещё своих аптечек можно создать: None — без ограничений (Плюс или платная версия выключена).
     own_families_left: int | None = None
     plus_active: bool = False  # у аккаунта оплачен Плюс (нужно, чтобы отличить «лимит бесплатной» от «потолка Плюса»)
@@ -158,10 +169,22 @@ class FamilyOut(BaseModel):
     members: list[MemberOut]
     owner_transfer: OwnerTransferOut | None = None
     next_transfer_at: datetime | None = None  # пока не наступило, владение передать нельзя (кулдаун 7 дней, R23)
+    status: str = "active"
 
 
 class OwnerOfferIn(BaseModel):
     user_id: int
+
+
+class CompressIn(BaseModel):
+    """Выбор владельца после окончания Плюса (R13): кто остаётся (кроме него самого) и какие аптечки остаются активными."""
+
+    keep_user_ids: list[int] = []
+    keep_cabinet_ids: list[int] = []  # пусто: самые давние
+
+
+class CompressionSettingsIO(BaseModel):
+    enabled: bool = False
 
 
 class RoleIn(BaseModel):  # используется админкой (инструмент поддержки)
