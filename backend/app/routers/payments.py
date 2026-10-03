@@ -7,7 +7,7 @@ from .. import payments
 from ..db import get_db
 from ..deps import current_user
 from ..models import Payment, User
-from ..plans import plus_active
+from ..plans import is_main_owner, plus_active
 from ..schemas import PayIn, PayStarted, PayStatus, PaymentBrief
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
@@ -18,7 +18,7 @@ def _status(db: Session, user: User) -> PayStatus:
     rows = db.scalars(select(Payment).where(Payment.user_id == user.id).order_by(Payment.id.desc()).limit(10))
     return PayStatus(
         enabled=payments.payments_enabled(db), plus_active=plus_active(user), plus_until=user.plus_until,
-        auto_renew=user.auto_renew, recurring_enabled=payments.recurring_enabled(), price_month=payments.price_for(db, "month"), price_year=payments.price_for(db, "year"),
+        auto_renew=user.auto_renew, can_pay=is_main_owner(db, user), recurring_enabled=payments.recurring_enabled(), price_month=payments.price_for(db, "month"), price_year=payments.price_for(db, "year"),
         payments=[PaymentBrief.model_validate(p, from_attributes=True) for p in rows],
     )
 
@@ -32,6 +32,8 @@ def my_payments(user: User = Depends(current_user), db: Session = Depends(get_db
 def start(body: PayIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if not payments.payments_enabled(db):
         raise HTTPException(409, "Оплата пока недоступна")
+    if not is_main_owner(db, user):
+        raise HTTPException(409, "Плюс покупает главный владелец аптечки: он действует на его аптечки, и пользуются все участники")
     if body.auto_renew and not payments.recurring_enabled():
         raise HTTPException(409, "Автопродление пока недоступно")
     try:

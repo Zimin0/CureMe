@@ -153,6 +153,17 @@ def test_admin_can_recheck_payment_in_yookassa(client, shop, yk, session_factory
     assert client.post(f"/api/admin/payments/{pid}/sync", headers=h).status_code == 502
 
 
+def test_member_of_foreign_family_cannot_buy_plus(client, shop, yk):
+    h, u = shop
+    code = next(f for f in client.get("/api/admin/families", headers=h).json() if f["id"] == u["families"][0]["id"])["invite_code"]
+    member, _ = register(client, "member2@example.com", invite=code)
+    me = client.get("/api/payments/me", headers=member).json()
+    assert me["can_pay"] is False
+    assert pay(client, member).status_code == 409
+    assert client.get("/api/payments/me", headers=h).json()["can_pay"] is True
+    assert pay(client, h).status_code == 201
+
+
 def test_second_payment_extends_from_current_end(client, shop, yk, session_factory):
     h, u = shop
     for _ in range(2):

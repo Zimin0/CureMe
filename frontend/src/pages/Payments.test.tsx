@@ -79,6 +79,13 @@ describe('оплата Плюса на странице /plus', () => {
     expect(screen.queryByText(/цена указана для сведения/)).not.toBeInTheDocument()
   })
 
+  it('участнику чужой аптечки вместо формы оплаты объясняет, кто покупает Плюс', async () => {
+    server.use(billing, payStatus({ can_pay: false }))
+    renderApp('/plus')
+    expect(await screen.findByText(/Плюс покупает главный владелец аптечки/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Оплатить/ })).not.toBeInTheDocument()
+  })
+
   it('незавершённые попытки оплаты в списке не показываются', async () => {
     const mk = (id: number, status: 'pending' | 'succeeded') => ({ id, period: 'month', amount: 199, status, recurring: false, created_at: '2026-10-03T10:00:00Z', paid_at: status === 'succeeded' ? '2026-10-03T10:01:00Z' : null, receipt_url: null } as const)
     server.use(billing, payStatus({ payments: [mk(3, 'pending'), mk(2, 'pending'), mk(1, 'succeeded')] }))

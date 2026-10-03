@@ -50,7 +50,7 @@ export function PayBox() {
   // Незавершённые попытки (закрыли форму) не показываем: остаётся только платёж, к которому вернулись с оплаты.
   const shownPayments = s.payments.filter(p => p.status !== 'pending' || String(p.id) === returned)
   const price = period === 'month' ? s.price_month : s.price_year
-  const canPay = s.enabled && !!price
+  const canPay = s.enabled && !!price && s.can_pay !== false
 
   return (
     <section className="card stack" aria-label="Оплата">
@@ -69,6 +69,10 @@ export function PayBox() {
           <p>Автопродление включено{s.plus_until ? `: следующее списание ${fmtDate(s.plus_until)}` : ''}. За три дня до списания мы напишем на почту.</p>
           <button className="btn danger" onClick={() => off.mutate()} disabled={off.isPending}>Отключить автопродление</button>
         </div>
+      )}
+
+      {s.enabled && s.can_pay === false && (
+        <p className="muted">Плюс покупает главный владелец аптечки: он действует на все его аптечки, и пользуются все участники. Попросите владельца вашей аптечки оформить Плюс здесь или создайте свою аптечку.</p>
       )}
 
       {canPay && (

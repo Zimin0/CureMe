@@ -216,6 +216,12 @@ def own_families_left(db: Session, user_id: int) -> int | None:
     return max(limit - len(owned), 0)
 
 
+def is_main_owner(db: Session, user: User) -> bool:
+    """Главный владелец хотя бы одной аптечки: только тогда купленный им Плюс где-то работает."""
+    families = db.scalars(select(Family).join(Membership).where(Membership.user_id == user.id, Membership.role == "owner"))
+    return any(family_owner_user(f) is user for f in families)
+
+
 def usage(db: Session, family: Family) -> dict[str, int]:
     count = lambda model, col: db.scalar(select(func.count()).select_from(model).where(col == family.id)) or 0  # noqa: E731
     return {"members": count(Membership, Membership.family_id), "medicines": count(Medicine, Medicine.family_id)}
