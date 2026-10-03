@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .models import Family, Household, HouseholdEvent, Intake, Medicine, Membership, Schedule, User, utcnow
 from .plans import (
-    FREE_LIMITS, LIMIT_FEATURE, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required,
+    FREE_CABINETS_MAX, LIMIT_FEATURE, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required,
 )
 from .routers.files import _drop_photo
 from .security import new_invite_code
@@ -111,7 +111,7 @@ def ensure_room_for_cabinets(db: Session, house: Household, adding: int = 1, peo
         )
     raise plus_required(
         LIMIT_FEATURE["own_families"],
-        f"В бесплатной версии аптечек столько же, сколько людей в семье (не больше {FREE_LIMITS['members']}). "
+        f"В бесплатной версии аптечек столько же, сколько людей в семье (не больше {FREE_CABINETS_MAX}). "
         "В Капсулке Плюс — до 8: дача, машина, бабушка.",
     )
 

@@ -13,6 +13,7 @@
 
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 os.environ["CUREME_REMOTE_LOOKUP"] = "false"
@@ -43,6 +44,12 @@ def pytest_collection_modifyitems(items):
         level = Path(str(item.fspath)).parent.name
         if level in LEVELS:
             item.add_marker(level)
+
+
+@pytest.fixture(autouse=True)
+def new_terms_in_force(monkeypatch):
+    """Тесты проверяют правила новой редакции (3 человека); переходный период до 13 октября — в test_plans.py."""
+    monkeypatch.setattr("app.plans.NEW_TERMS_FROM", datetime(2000, 1, 1, tzinfo=timezone.utc))
 
 
 @pytest.fixture(autouse=True)

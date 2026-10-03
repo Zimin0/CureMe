@@ -10,6 +10,8 @@ from app.db import get_db
 from app.models import Family, User
 from tests.conftest import check_household_invariants, fid, grant_plus, register
 
+REAL_NEW_TERMS_FROM = plans.NEW_TERMS_FROM  # conftest сдвигает дату в прошлое для всех тестов; настоящую читаем при импорте
+
 # Потолки Плюса действуют всегда, даже пока платная версия выключена (R02, R03); остальные лимиты снимаются.
 PLUS_LIMITS = {"members": plans.PLUS_MEMBERS_MAX, "medicines": None, "own_families": plans.PLUS_OWN_FAMILIES_MAX, "history_days": None}
 
@@ -221,3 +223,58 @@ def test_admin_sets_plus_price_and_family_sees_it(client, admin):
 def test_bad_price_is_rejected(client, admin, body):
     h, _ = admin
     assert client.put("/api/admin/billing", headers=h, json={"enabled": False, **body}).status_code == 422
+
+
+# --- переходный период новой редакции Соглашения (п. 11.2: 10 дней до вступления в силу) -----------
+
+def join_family(client, h, f, count):
+    """Добавляет в семью `count` человек по её коду; возвращает заголовки последнего."""
+    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
+    last = None
+    for i in range(count):
+        last, _ = register(client, f"member{i}@example.com", f"Человек {i}", invite=code)
+    return last
+
+
+def fifth_tries_to_join(client, h, f):
+    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
+    h5, _ = register(client, "fifth@example.com", "Пятый")
+    return client.post("/api/families/join", headers=h5, json={"code": code})
+
+
+def test_r02_transition_free_family_keeps_four_people_until_new_terms(client, admin, monkeypatch, session_factory, db):
+    """До 13 октября действует прежний предел: в бесплатной семье 4 человека, аптечек по-прежнему не больше 3."""
+    h, f = admin
+    monkeypatch.setattr(plans, "NEW_TERMS_FROM", datetime.now(timezone.utc) + timedelta(days=5))
+    enable_billing(client, h)
+    join_family(client, h, f, 3)
+    p = client.get(f"/api/families/{f}/plan", headers=h).json()
+    assert p["limits"]["members"] == p["free_limits"]["members"] == plans.OLD_FREE_MEMBERS == 4
+    assert p["usage"]["members"] == 4
+    r = fifth_tries_to_join(client, h, f)
+    assert r.status_code == 402 and r.headers[plans.PLUS_HEADER] == "no_limits"
+    assert plans.limit_for(db, None, "own_families", people=4) == plans.FREE_CABINETS_MAX == 3
+    check_household_invariants(session_factory)
+
+
+def test_r02_transition_four_people_stay_after_new_terms(client, admin, monkeypatch):
+    """С 13 октября предел 3, но семью из 4 человек не трогаем: никого не исключаем, новых не принимаем."""
+    h, f = admin
+    monkeypatch.setattr(plans, "NEW_TERMS_FROM", datetime.now(timezone.utc) + timedelta(days=5))
+    enable_billing(client, h)
+    last = join_family(client, h, f, 3)
+    monkeypatch.setattr(plans, "NEW_TERMS_FROM", datetime.now(timezone.utc) - timedelta(seconds=1))
+    p = client.get(f"/api/families/{f}/plan", headers=h).json()
+    assert p["limits"]["members"] == p["free_limits"]["members"] == 3 and p["usage"]["members"] == 4
+    assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 4
+    assert client.get(f"/api/families/{f}/medicines", headers=last).status_code == 200  # доступ у всех сохранился
+    r = fifth_tries_to_join(client, h, f)
+    assert r.status_code == 402
+
+
+def test_free_members_limit_switches_at_new_terms_date(monkeypatch):
+    monkeypatch.setattr(plans, "NEW_TERMS_FROM", REAL_NEW_TERMS_FROM)
+    assert plans.free_members_limit(REAL_NEW_TERMS_FROM - timedelta(seconds=1)) == 4
+    assert REAL_NEW_TERMS_FROM == datetime(2026, 10, 12, 21, 0, tzinfo=timezone.utc)  # 13 октября 00:00 МСК, как в Соглашении
+    assert plans.free_members_limit(REAL_NEW_TERMS_FROM) == 3  # настройка теста: новая редакция уже действует
+    assert plans.OLD_FREE_MEMBERS == 4

@@ -2,6 +2,7 @@ import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shie
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { usePlan } from '../plan'
+import { TermsNotice } from './TermsNotice'
 
 // short — подпись в нижней панели на телефоне, если полная не помещается.
 const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?: boolean }[] = [
@@ -51,6 +52,7 @@ export function Layout() {
       </aside>
 
       <main className="main">
+        <TermsNotice />
         <Outlet />
       </main>
 

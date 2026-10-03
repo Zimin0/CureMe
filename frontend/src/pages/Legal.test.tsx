@@ -11,9 +11,18 @@ describe('юридические страницы', () => {
     expect(screen.getByRole('link', { name: /kapsulka\.ru\/offer/ })).toHaveAttribute('href', '/offer')
   })
 
-  it('Политика: редакция от 2 октября', async () => {
+  it('Политика: редакция от 3 октября, письма о приёме зависят от тарифа семьи, а не аптечки', async () => {
     renderApp('/privacy')
-    expect(await screen.findByText('Редакция от 2 октября 2026 г.')).toBeInTheDocument()
+    expect(await screen.findByText('Редакция от 3 октября 2026 г.')).toBeInTheDocument()
+    expect(screen.getByText(/Если у семьи Пользователя действует тариф «Плюс»/)).toBeInTheDocument()
+    expect(screen.queryByText(/хотя бы в одной аптечке/)).not.toBeInTheDocument()
+  })
+
+  it('Соглашение: срок вступления в силу 13 октября (п. 11.2) и «член семьи» в п. 4.2', async () => {
+    renderApp('/terms')
+    expect(await screen.findByText('Настоящая редакция вступает в силу 13 октября 2026 г.')).toBeInTheDocument()
+    expect(screen.getByText(/4\.2\. Совершеннолетний член семьи/)).toBeInTheDocument()
+    expect(screen.queryByText(/участник семейной аптечки/)).not.toBeInTheDocument()
   })
 
   it('страница оферты: автопродление по отдельному согласию и возврат, ИНН показан флагом', async () => {

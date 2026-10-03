@@ -36,6 +36,12 @@ FREE_LIMITS: dict[str, int] = {
     "own_families": 1,   # аптечек у одного человека; в бесплатной семье их столько, сколько людей (R03)
     "history_days": 30,  # сколько дней истории приёма видно
 }
+# Новая редакция Соглашения (п. 6.2: в бесплатной семье до 3 человек вместо 4) вступает в силу через десять
+# дней после публикации (п. 11.2 Соглашения). До этого момента действует прежний предел. Семьи, где людей уже
+# больше нового предела, не затрагиваются: никого не исключаем, только не принимаем новых.
+NEW_TERMS_FROM = datetime(2026, 10, 12, 21, 0, tzinfo=timezone.utc)  # 13 октября 2026 г., 00:00 по Москве
+OLD_FREE_MEMBERS = 4
+FREE_CABINETS_MAX = 3  # потолок аптечек бесплатной семьи, как бы ни менялся предел людей (R03)
 # Потолки Плюса (R02, R03): защита от того, что одна подписка держит десятки людей и аптечек.
 PLUS_MEMBERS_MAX = 5
 PLUS_OWN_FAMILIES_MAX = 8  # аптечек в семье с Плюсом
@@ -163,6 +169,15 @@ def has_plus(db: Session, family: Family) -> bool:
     return house_has_plus(db, family.household)
 
 
+def free_members_limit(now: datetime | None = None) -> int:
+    """Сколько людей в бесплатной семье: 4 до вступления в силу новой редакции Соглашения, потом 3 (R02)."""
+    return FREE_LIMITS["members"] if (now or datetime.now(timezone.utc)) >= NEW_TERMS_FROM else OLD_FREE_MEMBERS
+
+
+def free_limits() -> dict[str, int]:
+    return {**FREE_LIMITS, "members": free_members_limit()}
+
+
 def limit_for(db: Session, house: Household | None, name: str, people: int | None = None) -> int | None:
     """Действующий лимит семьи или None, если лимита нет.
 
@@ -173,8 +188,8 @@ def limit_for(db: Session, house: Household | None, name: str, people: int | Non
         return {"members": PLUS_MEMBERS_MAX, "own_families": PLUS_OWN_FAMILIES_MAX}.get(name)
     if name == "own_families":
         count = people if people is not None else (len(house.members) if house else 1)
-        return min(max(count, 1), FREE_LIMITS["members"])
-    return FREE_LIMITS[name]
+        return min(max(count, 1), FREE_CABINETS_MAX)
+    return free_members_limit() if name == "members" else FREE_LIMITS[name]
 
 
 def limit_of(db: Session, family: Family, name: str) -> int | None:
@@ -256,7 +271,7 @@ def plan_out(db: Session, family: Family) -> PlanOut:
         price_year=billing.price_year,
         has_plus=plus,
         limits={k: limit_of(db, family, k) for k in FREE_LIMITS},
-        free_limits=FREE_LIMITS,
+        free_limits=free_limits(),
         usage=usage(db, family),
         features=[PlanFeatureOut(key=k, title=feature_title(k, tg_on), description=d, available=plus) for k, (_, d) in FEATURES.items()],
     )
