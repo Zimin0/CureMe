@@ -289,10 +289,11 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                     log.exception("Автопродление упало")
                     db.rollback()
                 try:
-                    from .households import release_unverified  # здесь же: households → plans → reminders
+                    from .households import purge_old_invites, release_unverified  # здесь же: households → plans → reminders
                     release_unverified(db)  # вступившие по приглашению без подтверждённой почты за сутки освобождают место
+                    purge_old_invites(db)  # записи старых приглашений хранятся 30 дней после срока
                 except Exception:  # noqa: BLE001
-                    log.exception("Освобождение мест неподтверждённых упало")
+                    log.exception("Освобождение мест и очистка приглашений упали")
                     db.rollback()
                 try:
                     if daily_due(now, _last_run(db)):

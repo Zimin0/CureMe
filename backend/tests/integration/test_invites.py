@@ -114,6 +114,34 @@ def test_r04_t4_unverified_invitee_frees_the_seat_after_24_hours(client, owner, 
     check_household_invariants(session_factory)
 
 
+def test_r04_t8_old_invite_rows_are_deleted_30_days_after_expiry(client, owner, db):
+    """Записи приглашений (код, владелец, вступивший) не хранятся дольше нужного: 30 дней после срока."""
+    h, _, f = owner
+    used = invite_of(client, h, f)
+    register(client, "joined@example.com", "Вступил", invite=used)  # использованный код
+    revoked = invite_of(client, h, f)
+    fresh = client.post(f"/api/families/{f}/invite", headers=h).json()["invite_code"]  # прежний отозван
+    assert fresh != revoked
+
+    def codes():
+        db.expire_all()
+        return set(db.scalars(select(HouseholdInvite.code)))
+
+    assert {used, revoked, fresh} <= codes()
+    now = datetime.now(timezone.utc)
+    assert households.purge_old_invites(db, now + timedelta(days=24)) == 0  # срок вышел, но 30 дней не прошло
+    assert households.purge_old_invites(db, now + timedelta(days=31)) == 3  # использованный, отозванный и истёкший (действовавший)
+    assert codes() == set()
+    assert households.purge_old_invites(db, now + timedelta(days=32)) == 0  # повтор ничего не меняет
+
+
+def test_r04_t8_purge_keeps_the_valid_code(client, owner, db):
+    h, _, f = owner
+    code = invite_of(client, h, f)
+    assert households.purge_old_invites(db) == 0
+    assert invite_of(client, h, f) == code
+
+
 def test_r04_t5_full_family_refuses_and_the_code_survives(client, owner):
     h, _, f = owner
     enable_billing(client, h)

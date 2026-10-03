@@ -85,6 +85,7 @@ def sync_access(db: Session, house: Household) -> None:
 # --- приглашения (R04) ---
 INVITE_TTL = timedelta(hours=24)  # код живёт сутки и работает один раз
 UNVERIFIED_JOIN_TTL = timedelta(hours=24)  # вступивший по приглашению без подтверждённой почты держит место не дольше
+INVITE_KEEP = timedelta(days=30)  # записи об истёкших и использованных приглашениях удаляются через 30 дней после срока
 
 
 def _invite_valid(inv: HouseholdInvite, now: datetime) -> bool:
@@ -175,6 +176,19 @@ def release_unverified(db: Session, now: datetime | None = None) -> int:
     if freed:
         db.commit()
     return freed
+
+
+def purge_old_invites(db: Session, now: datetime | None = None) -> int:
+    """Удаляет приглашения, срок которых истёк больше 30 дней назад: использованные, отозванные и просроченные.
+
+    В записи лежат код и идентификаторы владельца и вступившего; дольше нужного хранить их незачем.
+    Кто и когда вступил, остаётся в журнале семьи.
+    """
+    now = now or datetime.now(timezone.utc)
+    removed = db.execute(delete(HouseholdInvite).where(HouseholdInvite.expires_at < now - INVITE_KEEP)).rowcount or 0
+    if removed:
+        db.commit()
+    return removed
 
 
 # --- лимиты ---

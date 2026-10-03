@@ -160,7 +160,7 @@ export function Join() {
   })
   if (info.isLoading) return <PageLoader />
   if (info.isError) {
-    return <AuthShell title="Приглашение не найдено" sub="Возможно, код обновили. Попросите новую ссылку."><Link className="btn primary block" to="/">На главную</Link></AuthShell>
+    return <AuthShell title="Приглашение не найдено" sub="Приглашение одноразовое и действует 24 часа, прежние многоразовые ссылки больше не работают. Попросите владельца семьи создать новую."><Link className="btn primary block" to="/">На главную</Link></AuthShell>
   }
   const fam = info.data!
   if (fam.full) {
