@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import payments
+from .. import households, payments
 from ..db import get_db
 from ..deps import current_user
 from ..models import Payment, User
-from ..plans import plus_active
+from ..plans import PLUS, plus_active
 from ..schemas import PayIn, PayStarted, PayStatus, PaymentBrief
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
@@ -15,10 +15,18 @@ router = APIRouter(prefix="/api/payments", tags=["payments"])
 
 def _status(db: Session, user: User) -> PayStatus:
     rows = db.scalars(select(Payment).where(Payment.user_id == user.id).order_by(Payment.id.desc()).limit(10))
+    house = user.household
+    owner = households.owner_of(house)
+    is_owner = owner is not None and owner.id == user.id
+    enabled = payments.payments_enabled(db)
+    lifetime = house is not None and house.plan == PLUS and house.plus_until is None  # Плюс без срока от администратора
     return PayStatus(
-        enabled=payments.payments_enabled(db), plus_active=plus_active(user),
-        plus_until=user.household.plus_until if user.household else None,
-        auto_renew=user.auto_renew, recurring_enabled=payments.recurring_enabled(), price_month=payments.price_for(db, "month"), price_year=payments.price_for(db, "year"),
+        enabled=enabled, plus_active=plus_active(user),
+        plus_until=house.plus_until if house else None,
+        # Платит и продлевает только владелец (R06): остальным кнопки оплаты нет, вместо неё имя владельца.
+        is_owner=is_owner, owner_name=owner.name if owner else None, can_pay=enabled and is_owner and not lifetime,
+        auto_renew=user.auto_renew and is_owner, recurring_enabled=payments.recurring_enabled(),
+        price_month=payments.price_for(db, "month"), price_year=payments.price_for(db, "year"),
         payments=[PaymentBrief.model_validate(p, from_attributes=True) for p in rows],
     )
 

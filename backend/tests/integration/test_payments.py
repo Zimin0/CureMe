@@ -6,7 +6,7 @@ import pytest
 from app import mailer, payments
 from app.config import get_settings
 from app.models import Household, Payment, User
-from tests.conftest import check_household_invariants, invite_of, register
+from tests.conftest import check_household_invariants, fid, hand_over, invite_of, register
 
 
 REAL_REQUEST = payments._request  # до подмены фикстурой yk
@@ -123,7 +123,7 @@ def test_webhook_activates_plus_once(client, shop, yk, session_factory):
     assert me["payments"][0]["status"] == "succeeded" and me["plus_active"] is True
 
 
-def test_second_payment_extends_from_current_end(client, shop, yk, session_factory):
+def test_r06_t3_second_payment_extends_from_current_end(client, shop, yk, session_factory):
     h, u = shop
     for _ in range(2):
         pay(client, h)
@@ -350,18 +350,219 @@ def test_r16_plus_given_by_admin_covers_every_person_of_the_family(client, shop,
     check_household_invariants(session_factory)
 
 
-def test_payment_by_a_member_extends_the_family_plus(client, shop, yk, session_factory):
-    """Платёж члена семьи продлевает Плюс семьи, а не его собственный (раньше он платил в пустоту). Ограничение «платит только владелец» (R06) вводится позже."""
+def succeed(client, yk, n=None, **extra):
+    """ЮKassa сообщает, что платёж прошёл (n — номер платежа, по умолчанию последний): шлём уведомление."""
+    pid = f"yk-{n or len(yk.objects)}"
+    yk.objects[pid].update(status="succeeded", **extra)
+    client.post("/api/payments/yookassa/webhook", json={"event": "payment.succeeded", "object": {"id": pid}})
+    return pid
+
+
+def refund(client, yk, pid, rub):
+    yk.objects[pid]["refunded_amount"] = {"value": f"{rub}.00", "currency": "RUB"}
+    client.post("/api/payments/yookassa/webhook", json={"event": "refund.succeeded", "object": {"id": "r-1", "payment_id": pid}})
+
+
+def family_with_mom(client, shop):
+    """Владелец (админ магазина) и мама в одной семье."""
     h, owner = shop
-    code = invite_of(client, h, owner["families"][0]["id"])
-    hm, mom = register(client, "mom@example.com", "Мама", invite=code)
-    pay(client, hm)
-    yk.objects["yk-1"]["status"] = "succeeded"
-    client.post("/api/payments/yookassa/webhook", json={"event": "payment.succeeded", "object": {"id": "yk-1"}})
+    hm, mom = register(client, "mom@example.com", "Мама", invite=invite_of(client, h, fid(owner)))
+    return h, owner, hm, mom
+
+
+# --- R06: платит только владелец, Плюс получает семья ---
+def test_r06_t1_member_cannot_pay_and_is_told_who_pays(client, shop, yk, session_factory):
+    h, owner, hm, mom = family_with_mom(client, shop)
+    st = client.get("/api/payments/me", headers=hm).json()
+    assert (st["can_pay"], st["is_owner"], st["owner_name"]) == (False, False, "Никита")
+    assert st["enabled"] is True  # оплата открыта, но этому человеку нельзя
+    r = pay(client, hm)
+    assert r.status_code == 403
+    assert "Плюс оплачивает владелец семьи: Никита" in r.json()["detail"] and "передать вам владение" in r.json()["detail"]
+    assert yk.calls == []  # до ЮKassa не дошли
+    with session_factory() as db:
+        assert db.query(Payment).count() == 0
+    mine = client.get("/api/payments/me", headers=h).json()
+    assert (mine["can_pay"], mine["is_owner"], mine["owner_name"]) == (True, True, "Никита")
+    check_household_invariants(session_factory)
+
+
+def test_r06_t2_owner_payment_gives_plus_to_every_person_of_the_family(client, shop, yk, session_factory):
+    h, owner, hm, mom = family_with_mom(client, shop)
+    assert pay(client, h).status_code == 201
+    succeed(client, yk)
     for uid in (owner["id"], mom["id"]):
         assert house_row(session_factory, uid).plan == "plus"
+    assert client.get("/api/payments/me", headers=hm).json()["plus_active"] is True
     assert client.get("/api/payments/me", headers=h).json()["plus_active"] is True
+    with session_factory() as db:
+        row = db.query(Payment).one()
+        assert row.status == "succeeded" and row.household_id == db.get(User, owner["id"]).household_id  # платёж записан на семью
+    assert yk.calls[0][3]["metadata"]["household_id"] == str(row.household_id)
     check_household_invariants(session_factory)
+
+
+def test_r06_t4_payment_too_far_ahead_is_refused_with_a_clear_text(client, shop, yk, session_factory):
+    h, owner = shop
+    now = datetime.now(timezone.utc)
+
+    def set_until(days):
+        with session_factory() as db:
+            house = db.get(User, owner["id"]).household
+            house.plan, house.plus_until = "plus", now + timedelta(days=days)
+            db.commit()
+
+    set_until(380)  # ещё месяц выйдет за 13 месяцев
+    r = pay(client, h)
+    assert r.status_code == 409
+    text = r.json()["detail"]
+    assert "Плюс уже оплачен до" in text and "13 месяцев" in text and "можно будет оплатить с" in text
+    assert yk.calls == []
+    with session_factory() as db:
+        assert db.query(Payment).count() == 0
+    assert pay(client, h, period="year").status_code == 409
+    set_until(300)  # 300 + 30 дней укладываются в 13 месяцев
+    assert pay(client, h).status_code == 201
+    set_until(100)  # год сверху (465 дней) уже не укладывается, месяц укладывается
+    assert pay(client, h, period="year").status_code == 409
+    assert pay(client, h, period="month").status_code == 201
+
+
+def test_r06_t4_months_shift_by_calendar_months():
+    shift = payments._shift_months
+    utc = timezone.utc
+    assert shift(datetime(2026, 10, 4, tzinfo=utc), 13) == datetime(2027, 11, 4, tzinfo=utc)
+    assert shift(datetime(2026, 1, 31, tzinfo=utc), 1) == datetime(2026, 2, 28, tzinfo=utc)  # короткий месяц
+    assert shift(datetime(2027, 12, 31, tzinfo=utc), 2) == datetime(2028, 2, 29, tzinfo=utc)  # високосный год
+    assert shift(datetime(2027, 11, 4, tzinfo=utc), -13) == datetime(2026, 10, 4, tzinfo=utc)
+    assert shift(datetime(2026, 3, 15, tzinfo=utc), -3) == datetime(2025, 12, 15, tzinfo=utc)  # через границу года
+
+
+def test_r06_t5_webhook_gives_plus_to_the_paid_family_not_to_the_payers_new_one(client, shop, yk, session_factory):
+    """Владелец начал оплату, передал владение и ушёл из семьи; ЮKassa сообщает об оплате позже: Плюс получает прежняя семья."""
+    h, owner, hm, mom = family_with_mom(client, shop)
+    assert pay(client, h, auto_renew=True).status_code == 201
+    hand_over(client, h, fid(owner), mom["id"], hm)
+    assert client.delete(f"/api/families/{fid(owner)}/members/{owner['id']}", headers=h).status_code == 204
+    succeed(client, yk, payment_method={"saved": True, "id": "pm-1"})
+    paid, mine = house_row(session_factory, mom["id"]), house_row(session_factory, owner["id"])
+    assert paid.id != mine.id
+    assert paid.plan == "plus" and mine.plan == "free"  # у ушедшего своя семья, и Плюса в ней нет
+    row = user_row(session_factory, owner["id"])
+    assert row.auto_renew is False and row.pay_method_id is None  # он больше не владелец, его карта не подключается
+    check_household_invariants(session_factory)
+
+
+def test_r06_t6_family_with_unlimited_plus_is_not_asked_to_pay(client, shop, yk, session_factory):
+    h, owner = shop
+    client.put(f"/api/admin/users/{owner['id']}/plan", headers=h, json={"plan": "plus"})  # без срока: выдал администратор
+    assert house_row(session_factory, owner["id"]).plus_until is None
+    st = client.get("/api/payments/me", headers=h).json()
+    assert st["can_pay"] is False and st["is_owner"] is True
+    r = pay(client, h)
+    assert r.status_code == 409 and "без ограничения срока" in r.json()["detail"]
+    assert yk.calls == []
+    assert house_row(session_factory, owner["id"]).plus_until is None  # срок не появился
+
+
+# --- R15: возврат закрывает Плюс семьи сразу ---
+def test_r15_t1_refund_ends_plus_of_the_family_at_once(client, shop, yk, session_factory):
+    h, owner, hm, mom = family_with_mom(client, shop)
+    pay(client, h, auto_renew=True)
+    pid = succeed(client, yk, payment_method={"saved": True, "id": "pm-1"})
+    assert user_row(session_factory, owner["id"]).auto_renew is True
+    before = datetime.now(timezone.utc)
+    refund(client, yk, pid, 199)
+    house = house_row(session_factory, mom["id"])
+    assert before - timedelta(seconds=5) <= house.plus_until.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)
+    for headers in (h, hm):  # у всех людей семьи Плюса нет
+        assert client.get("/api/payments/me", headers=headers).json()["plus_active"] is False
+    row = user_row(session_factory, owner["id"])
+    assert row.auto_renew is False and row.pay_method_id is None
+    assert client.get("/api/payments/me", headers=h).json()["payments"][0]["status"] == "refunded"
+    refund(client, yk, pid, 199)  # повторное уведомление ничего не меняет
+    assert house_row(session_factory, mom["id"]).plus_until == house.plus_until
+
+
+def test_r15_t3_partial_refund_for_the_unused_period_also_ends_plus(client, shop, yk, session_factory):
+    h, owner = shop
+    pay(client, h)
+    pid = succeed(client, yk)
+    refund(client, yk, pid, 150)  # пропорциональный возврат за неиспользованные дни
+    st = client.get("/api/payments/me", headers=h).json()
+    assert st["plus_active"] is False and st["payments"][0]["status"] == "refunded"
+
+
+def test_r15_t4_refund_does_not_touch_unlimited_plus_given_by_admin(client, shop, yk, session_factory):
+    h, owner = shop
+    pay(client, h)
+    pid = succeed(client, yk)
+    client.put(f"/api/admin/users/{owner['id']}/plan", headers=h, json={"plan": "plus"})  # администратор сделал Плюс бессрочным
+    refund(client, yk, pid, 199)
+    assert house_row(session_factory, owner["id"]).plus_until is None
+    assert client.get("/api/payments/me", headers=h).json()["plus_active"] is True
+
+
+# --- R21: автопродление на карте владельца, платёж пишется на семью ---
+def test_r21_t2_nothing_is_charged_after_the_owner_deleted_the_account(client, shop, yk, outbox, session_factory):
+    h, owner, hm, mom = family_with_mom(client, shop)
+    pay(client, h, auto_renew=True)
+    succeed(client, yk, payment_method={"saved": True, "id": "pm-1"})
+    hand_over(client, h, fid(owner), mom["id"], hm)
+    assert user_row(session_factory, owner["id"]).auto_renew is False
+    assert client.request("DELETE", "/api/auth/me", headers=h, json={"password": "secret123"}).status_code == 204
+    with session_factory() as db:
+        due = datetime.now(timezone.utc) - timedelta(minutes=1)
+        house = db.get(User, mom["id"]).household
+        house.plus_until = due
+        db.commit()
+        assert db.query(User).filter(User.auto_renew.is_(True)).count() == 0
+        payments.run_renewals(db)
+    assert not [c for c in yk.calls if c[3] and "payment_method_id" in c[3]]  # карту удалённого человека никто не использует
+    check_household_invariants(session_factory)
+
+
+def test_r21_t4_renewal_uses_the_owners_card_and_writes_the_payment_on_the_family(client, shop, yk, outbox, session_factory):
+    h, owner, hm, mom = family_with_mom(client, shop)
+    with session_factory() as db:
+        user = db.get(User, owner["id"])
+        house = user.household
+        house.plan, house.plus_until = "plus", datetime.now(timezone.utc) + timedelta(days=2, hours=23)
+        user.auto_renew, user.pay_method_id, user.renew_period = True, "pm-owner", "month"
+        house_id = house.id
+        db.commit()
+        payments.run_renewals(db)  # письмо владельцу за три дня
+        assert [m[0] for m in outbox] == ["nikita@example.com"]
+        user.renew_notified_at = datetime.now(timezone.utc) - timedelta(days=3)
+        house.plus_until = datetime.now(timezone.utc) - timedelta(minutes=1)
+        user.renew_notified_for = house.plus_until
+        db.commit()
+        payments.run_renewals(db)
+        charge = [c for c in yk.calls if c[3] and "payment_method_id" in c[3]]
+        assert len(charge) == 1 and charge[0][3]["payment_method_id"] == "pm-owner"
+        assert charge[0][3]["metadata"]["household_id"] == str(house_id)
+        row = db.query(Payment).one()
+        assert row.recurring and row.household_id == house_id and row.user_id == owner["id"] and row.status == "succeeded"
+        assert db.get(User, mom["id"]).household.plus_until.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) + timedelta(days=29)
+
+
+def test_r21_t5_card_left_with_a_non_owner_is_never_charged(client, shop, yk, outbox, session_factory):
+    """Данные до правила «платит владелец»: у участника осталась включённая карта. Её не списываем и отключаем."""
+    h, owner, hm, mom = family_with_mom(client, shop)
+    with session_factory() as db:
+        member = db.get(User, mom["id"])
+        house = member.household
+        house.plan, house.plus_until = "plus", datetime.now(timezone.utc) - timedelta(minutes=1)
+        member.auto_renew, member.pay_method_id, member.renew_period = True, "pm-old", "month"
+        member.renew_notified_for, member.renew_notified_at = house.plus_until, datetime.now(timezone.utc) - timedelta(days=3)
+        db.commit()
+    st = client.get("/api/payments/me", headers=hm).json()
+    assert st["auto_renew"] is False  # участнику кнопка автопродления не показывается
+    with session_factory() as db:
+        payments.run_renewals(db)
+    assert not [c for c in yk.calls if c[3] and "payment_method_id" in c[3]]
+    row = user_row(session_factory, mom["id"])
+    assert row.auto_renew is False and row.pay_method_id is None and outbox == []
 
 
 # --- ошибки ЮKassa ---

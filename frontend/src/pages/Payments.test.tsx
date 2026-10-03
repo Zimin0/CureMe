@@ -7,6 +7,7 @@ import { ME, renderApp } from '../test/utils'
 
 const STATUS: PayStatus = {
   enabled: true, plus_active: false, plus_until: null, auto_renew: false, recurring_enabled: true, price_month: 199, price_year: 1990, payments: [],
+  can_pay: true, is_owner: true, owner_name: 'Анна',
 }
 const payStatus = (over: Partial<PayStatus> = {}) => http.get('/api/payments/me', () => HttpResponse.json({ ...STATUS, ...over }))
 const billing = http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false, billing_enabled: true })))
@@ -21,6 +22,24 @@ describe('оплата Плюса на странице /plus', () => {
     renderApp('/plus')
     expect(await screen.findByText(/Оплата появится скоро/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Оплатить/ })).not.toBeInTheDocument()
+  })
+
+  it('R06: участник, не владелец, не видит кнопки оплаты, а видит, кто платит, и ссылку на «Семью»', async () => {
+    server.use(billing, payStatus({ can_pay: false, is_owner: false, owner_name: 'Анна' }))
+    renderApp('/plus')
+    expect(await screen.findByText(/Плюс оплачивает владелец семьи: Анна/)).toBeInTheDocument()
+    expect(screen.getByText(/попросите передать вам владение/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '«Семья»' })).toHaveAttribute('href', '/family')
+    expect(screen.queryByRole('button', { name: /Оплатить/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /публичной офертой/ })).not.toBeInTheDocument()
+  })
+
+  it('R06: владельцу, у семьи которого Плюс без срока, платить не предлагают', async () => {
+    server.use(billing, payStatus({ can_pay: false, is_owner: true, plus_active: true }))
+    renderApp('/plus')
+    expect(await screen.findByText(/Плюс без ограничения срока, оплачивать его не нужно/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Оплатить/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Плюс оплачивает владелец семьи/)).not.toBeInTheDocument()
   })
 
   it('автопродление по умолчанию выключено, оплата только после согласия с офертой', async () => {
