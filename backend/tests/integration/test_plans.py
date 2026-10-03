@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app import plans
 from app.db import get_db
 from app.models import Family, User
-from tests.conftest import check_household_invariants, fid, grant_plus, register
+from tests.conftest import check_household_invariants, fid, grant_plus, invite_of, register
 
 REAL_NEW_TERMS_FROM = plans.NEW_TERMS_FROM  # conftest сдвигает дату в прошлое для всех тестов; настоящую читаем при импорте
 
@@ -228,16 +228,15 @@ def test_bad_price_is_rejected(client, admin, body):
 # --- переходный период новой редакции Соглашения (п. 11.2: 10 дней до вступления в силу) -----------
 
 def join_family(client, h, f, count):
-    """Добавляет в семью `count` человек по её коду; возвращает заголовки последнего."""
-    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
+    """Добавляет в семью `count` человек: код одноразовый, для каждого свой; возвращает заголовки последнего."""
     last = None
     for i in range(count):
-        last, _ = register(client, f"member{i}@example.com", f"Человек {i}", invite=code)
+        last, _ = register(client, f"member{i}@example.com", f"Человек {i}", invite=invite_of(client, h, f))
     return last
 
 
 def fifth_tries_to_join(client, h, f):
-    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
+    code = invite_of(client, h, f)
     h5, _ = register(client, "fifth@example.com", "Пятый")
     return client.post("/api/families/join", headers=h5, json={"code": code})
 

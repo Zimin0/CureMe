@@ -104,6 +104,13 @@ def register(client, email="nikita@example.com", name="Никита", invite=Non
     return {"Authorization": f"Bearer {data['access_token']}"}, data["user"]
 
 
+def invite_of(client, h, family_id) -> str:
+    """Действующий код приглашения семьи (R04): у владельца он всегда есть, а сгоревший заменяется новым. Код одноразовый."""
+    r = client.get(f"/api/families/{family_id}", headers=h)
+    assert r.status_code == 200 and r.json()["invite_code"], r.text
+    return r.json()["invite_code"]
+
+
 def fid(user) -> int:
     return user["families"][0]["id"]
 

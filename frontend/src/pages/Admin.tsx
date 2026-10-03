@@ -269,7 +269,7 @@ function FamilySheet({ family: f, onClose }: { family: AdminFamily; onClose: () 
   return (
     <Sheet title={f.name} onClose={onClose}>
       <div className="stack">
-        <p className="muted small">Создана {fmtDate(f.created_at)} · код приглашения {f.invite_code} · {f.medicine_count} {plural(f.medicine_count, 'лекарство', 'лекарства', 'лекарств')}</p>
+        <p className="muted small">Создана {fmtDate(f.created_at)} · {f.medicine_count} {plural(f.medicine_count, 'лекарство', 'лекарства', 'лекарств')}</p>
         <form className="row" onSubmit={e => { e.preventDefault(); rename.mutate() }}>
           <input className="input grow" required value={name} onChange={e => setName(e.target.value)} aria-label="Название семьи" />
           <button className="btn" disabled={name.trim() === f.name || rename.isPending}>Переименовать</button>

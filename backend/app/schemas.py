@@ -139,7 +139,8 @@ class MemberOut(BaseModel):
 class FamilyOut(BaseModel):
     id: int
     name: str
-    invite_code: str
+    invite_code: str | None = None  # только у владельца: одноразовый код на 24 часа (R04)
+    invite_expires_at: datetime | None = None
     role: str
     members: list[MemberOut]
 
@@ -154,7 +155,7 @@ class JoinIn(BaseModel):
 
 class InviteInfo(BaseModel):
     family_name: str
-    members: int
+    owner_name: str
     full: bool = False  # в бесплатной семье уже предел участников: вступить не получится
 
 
@@ -239,7 +240,6 @@ class AdminUserUpdate(BaseModel):
 class AdminFamilyOut(BaseModel):
     id: int
     name: str
-    invite_code: str
     created_at: datetime
     medicine_count: int
     members: list[MemberOut]

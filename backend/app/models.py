@@ -72,6 +72,28 @@ class Household(Base):
 
     members: Mapped[list["User"]] = relationship(back_populates="household")
     cabinets: Mapped[list["Family"]] = relationship(back_populates="household", cascade="all, delete-orphan")
+    invites: Mapped[list["HouseholdInvite"]] = relationship(back_populates="household", cascade="all, delete-orphan")
+
+
+class HouseholdInvite(Base):
+    """Приглашение в семью (R04): одноразовый код на 24 часа. Выпускает только владелец, новый код отзывает старый.
+
+    Код «сгорает» (used_at), когда по нему вступил человек: пришёл по ссылке и принял приглашение или зарегистрировался.
+    """
+
+    __tablename__ = "household_invites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    household_id: Mapped[int] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"), index=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    household: Mapped["Household"] = relationship(back_populates="invites")
 
 
 class HouseholdEvent(Base):

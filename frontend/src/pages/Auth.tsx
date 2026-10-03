@@ -171,7 +171,7 @@ export function Join() {
     )
   }
   return (
-    <AuthShell title={`Приглашение в «${fam.family_name}»`} sub={`В семье уже ${fam.members} чел. Вы получите доступ к общей аптечке.`}>
+    <AuthShell title={`Приглашение в «${fam.family_name}»`} sub={`${fam.owner_name ? `${fam.owner_name} зовёт вас в общую аптечку` : 'Вас зовут в общую аптечку'}. Вы получите доступ ко всем аптечкам семьи.`}>
       {me ? (
         <>
           {join.error && <div className="alert error">{join.error.message}</div>}

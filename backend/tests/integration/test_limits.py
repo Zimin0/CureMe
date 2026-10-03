@@ -35,9 +35,8 @@ def fill_medicines(db, f, n):
 
 
 def fill_members(client, h, f, total):
-    code = invite_code(client, h, f)
-    for i in range(total - 1):
-        register(client, f"member{i}@example.com", f"Участник {i}", invite=code)
+    for i in range(total - 1):  # код одноразовый: для каждого человека свой
+        register(client, f"member{i}@example.com", f"Участник {i}", invite=invite_code(client, h, f))
 
 
 def add(client, h, f, name="Нурофен"):

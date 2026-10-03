@@ -48,14 +48,14 @@ describe('лимиты бесплатной версии', () => {
   })
 
   it('в заполненную семью по ссылке не вступить', async () => {
-    server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', members: 4, full: true })))
+    server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', owner_name: 'Анна', full: true })))
     renderApp('/join/ABCD2345')
     expect(await screen.findByText('В «Зимины» нет мест')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Вступить/ })).not.toBeInTheDocument()
   })
 
   it('регистрация с кодом заполненной семьи предупреждает и не отправляется', async () => {
-    server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', members: 4, full: true })))
+    server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', owner_name: 'Анна', full: true })))
     renderApp('/register?invite=ABCD2345', { loggedIn: false })
     expect(await screen.findByText(/Попросите владельца подключить Капсулку Плюс/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Создать аккаунт' })).toBeDisabled()

@@ -6,7 +6,7 @@ import pytest
 from app import mailer, payments
 from app.config import get_settings
 from app.models import Household, Payment, User
-from tests.conftest import check_household_invariants, register
+from tests.conftest import check_household_invariants, invite_of, register
 
 
 REAL_REQUEST = payments._request  # до подмены фикстурой yk
@@ -340,7 +340,7 @@ def test_r16_plus_given_by_admin_covers_every_person_of_the_family(client, shop,
     """Тариф лежит на семье: админ выдал его владельцу, и участник тоже видит Плюс (раньше нужно было отдельное пояснение)."""
     h, owner = shop
     f = owner["families"][0]["id"]
-    code = next(x for x in client.get("/api/admin/families", headers=h).json() if x["id"] == f)["invite_code"]
+    code = invite_of(client, h, f)
     register(client, "member@example.com", "Участник", invite=code)
     client.put(f"/api/admin/users/{owner['id']}/plan", headers=h, json={"plan": "plus"})
     rows = {x["email"]: x for x in client.get("/api/admin/users", headers=h).json()}
@@ -353,7 +353,7 @@ def test_r16_plus_given_by_admin_covers_every_person_of_the_family(client, shop,
 def test_payment_by_a_member_extends_the_family_plus(client, shop, yk, session_factory):
     """Платёж члена семьи продлевает Плюс семьи, а не его собственный (раньше он платил в пустоту). Ограничение «платит только владелец» (R06) вводится позже."""
     h, owner = shop
-    code = next(x for x in client.get("/api/admin/families", headers=h).json() if x["id"] == owner["families"][0]["id"])["invite_code"]
+    code = invite_of(client, h, owner["families"][0]["id"])
     hm, mom = register(client, "mom@example.com", "Мама", invite=code)
     pay(client, hm)
     yk.objects["yk-1"]["status"] = "succeeded"
