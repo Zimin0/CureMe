@@ -2,7 +2,7 @@
 from sqlalchemy import delete, update
 
 from app.models import Membership
-from tests.conftest import fid, register
+from tests.conftest import fid, invite_of, register
 
 
 def check(client, h):
@@ -21,7 +21,7 @@ def test_each_separate_family_is_its_own_household(client):
 
 def test_family_with_all_its_people_is_one_complete_household(client):
     admin, a = register(client)
-    code = next(f for f in client.get("/api/admin/families", headers=admin).json() if f["id"] == fid(a))["invite_code"]
+    code = invite_of(client, admin, fid(a))
     register(client, "masha@example.com", "Маша", invite=code)
     rep = check(client, admin)
     assert rep["would_create_households"] == 1 and rep["households"][0]["complete"] is True
@@ -30,7 +30,7 @@ def test_family_with_all_its_people_is_one_complete_household(client):
 
 def test_person_in_two_families_with_different_people_is_a_conflict(client, session_factory):
     admin, a = register(client)
-    code = next(f for f in client.get("/api/admin/families", headers=admin).json() if f["id"] == fid(a))["invite_code"]
+    code = invite_of(client, admin, fid(a))
     _, masha = register(client, "masha@example.com", "Маша", invite=code)
     # Старые данные: у владельца вторая аптечка, в которой Маши нет (новая модель такого не создаёт, строим вручную):
     # склеить их в одну семью нельзя без лишнего доступа
@@ -52,7 +52,7 @@ def test_several_own_families_of_one_person_are_not_a_conflict(client):
 
 def test_multiple_owners_are_reported_but_safe(client, session_factory):
     admin, a = register(client)
-    code = next(f for f in client.get("/api/admin/families", headers=admin).json() if f["id"] == fid(a))["invite_code"]
+    code = invite_of(client, admin, fid(a))
     _, b = register(client, "masha@example.com", "Маша", invite=code)
     with session_factory() as db:  # старые данные: два владельца (новая модель допускает одного, строим вручную)
         db.execute(update(Membership).where(Membership.family_id == fid(a), Membership.user_id == b["id"]).values(role="owner"))
@@ -63,9 +63,9 @@ def test_multiple_owners_are_reported_but_safe(client, session_factory):
 
 def test_free_family_above_new_limit_is_reported(client):
     admin, a = register(client)
-    code = next(f for f in client.get("/api/admin/families", headers=admin).json() if f["id"] == fid(a))["invite_code"]
+    code = invite_of(client, admin, fid(a))
     for i in range(3):
-        register(client, f"user{i}@example.com", f"Человек {i}", invite=code)
+        register(client, f"user{i}@example.com", f"Человек {i}", invite=invite_of(client, admin, fid(a)))
     rep = check(client, admin)
     assert rep["safe"] is True and len(rep["over_free_limits"]) == 1
 

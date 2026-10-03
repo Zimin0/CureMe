@@ -44,20 +44,22 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
             "unit/test_security.py", "unit/test_mailer.py", "unit/test_mail_addresses.py", "integration/test_auth.py",
             "integration/test_security_hardening.py", "integration/test_closed_mode.py",
             "integration/test_access_control.py", "integration/test_email_verification.py",
+            "integration/test_invites.py",
         ],
     },
     "Семьи и приглашения": {
         "sources": ["routers/families.py"],
         "tests": [
             "integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py",
-            "integration/test_plans.py", "integration/test_trial.py",
+            "integration/test_plans.py", "integration/test_trial.py", "integration/test_invites.py",
         ],
     },
     "Семья и аптечки (состав, лимиты, тариф семьи)": {
         "sources": ["households.py"],
         "tests": [
             "integration/test_households.py", "integration/test_households_concurrency.py",
-            "migrations/test_households_migration.py", "integration/test_families.py", "integration/test_auth.py",
+            "migrations/test_households_migration.py", "integration/test_invites.py",
+            "integration/test_families.py", "integration/test_auth.py",
             "integration/test_admin.py", "integration/test_limits.py", "integration/test_plans.py",
             "integration/test_trial.py", "integration/test_payments.py", "integration/test_access_control.py",
         ],
@@ -124,7 +126,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "Напоминания: почта и Telegram": {
         "sources": ["reminders.py", "telegram.py", "routers/notifications.py"],
-        "tests": ["integration/test_reminders.py", "integration/test_access_control.py"],
+        "tests": ["integration/test_reminders.py", "integration/test_invites.py", "integration/test_access_control.py"],
     },
     "Тарифы: Бесплатный и Плюс": {
         "sources": ["plans.py"],

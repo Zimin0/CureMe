@@ -19,7 +19,7 @@ const overview = http.get('/api/families/7/overview', () => HttpResponse.json({
 describe('админка', () => {
   it('проверка перед миграцией на семьи показывает конфликты и ничего не меняет', async () => {
     server.use(stats, http.get('/api/admin/families', () => HttpResponse.json([
-      { id: 7, name: 'Семья Никиты', invite_code: 'ABC', medicine_count: 2, members: [] },
+      { id: 7, name: 'Семья Никиты', medicine_count: 2, members: [] },
     ])), http.get('/api/admin/household-check', () => HttpResponse.json({
       users: 3, families: 2, would_create_households: 1, safe: false, households: [],
       conflicts: [{ users: ['Маша <m@example.com>'], families: ['Семья Никиты', 'Дача'], missing: ['m@example.com не состоит в «Дача»'] }],

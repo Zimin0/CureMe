@@ -7,7 +7,7 @@ from ..db import get_db
 from ..deps import signed_in_user
 from ..email_verification import code_matches, issue_code, mark_verified, needs_verification, send_verification
 from ..legal import CONSENT_VERSION
-from ..models import Family, User, utcnow
+from ..models import User, utcnow
 from ..plans import billing_settings, grant_trial, own_families_left, plus_active
 from ..ratelimit import client_ip, limiter
 from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
@@ -42,13 +42,12 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     email = body.email.lower()
     if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть")
-    house = None
+    house = invite = None
     if body.invite_code:
-        family = db.scalar(select(Family).where(Family.invite_code == body.invite_code.strip().upper()))
-        if not family or not family.household:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден")
-        house = family.household
-        households.lock(db, house)
+        invite = households.claim_invite(db, body.invite_code)
+        if invite is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код приглашения не найден, уже использован или устарел")
+        house = invite.household
         households.ensure_room_for_person(db, house, joining=True)
 
     first = db.scalar(select(User.id).limit(1)) is None  # первый аккаунт — администратор
@@ -58,6 +57,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     db.flush()
     if house:
         households.attach(db, user, house)
+        households.use_invite(invite, user)  # код закреплён за этой регистрацией: второй раз не сработает (R04)
     else:
         households.create_personal(db, user)
     code = issue_code(user) if needs_verification(user) else None

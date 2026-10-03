@@ -27,7 +27,7 @@ def test_create_second_family_with_default_categories(client, owner):
 def test_invite_info_is_public(client, owner):
     h, _, f = owner
     code = invite_code(client, h, f)
-    assert client.get(f"/api/invites/{code.lower()}").json() == {"family_name": "Семья Никита", "members": 1, "full": False}
+    assert client.get(f"/api/invites/{code.lower()}").json() == {"family_name": "Семья Никита", "owner_name": "Никита", "full": False}
     assert client.get("/api/invites/UNKNOWN1").status_code == 404
 
 
@@ -101,10 +101,10 @@ def test_join_by_code(client, owner):
     code = invite_code(client, h1, f)
     h2, _ = register(client, "mom@example.com", "Мама")
     fam = client.post("/api/families/join", headers=h2, json={"code": code.lower()}).json()
-    assert fam["id"] == f and fam["role"] == "member"
-    # повторное вступление ничего не ломает и не понижает роль владельца
-    assert client.post("/api/families/join", headers=h2, json={"code": code}).json()["role"] == "member"
-    assert client.post("/api/families/join", headers=h1, json={"code": code}).json()["role"] == "owner"
+    assert fam["id"] == f and fam["role"] == "member" and fam["invite_code"] is None  # участнику код не показываем
+    # код сгорел (R04), но тот, кто уже в семье, по нему входит как раньше и ничего не теряет
+    assert client.post("/api/families/join", headers=h2, json={"code": code}).status_code == 404
+    assert client.post("/api/families/join", headers=h1, json={"code": invite_code(client, h1, f)}).json()["role"] == "owner"
     assert len(client.get(f"/api/families/{f}", headers=h1).json()["members"]) == 2
     assert client.post("/api/families/join", headers=h2, json={"code": "WRONG123"}).status_code == 404
 
@@ -141,10 +141,7 @@ def test_cabinets_over_limit_are_kept_and_joining_is_free(client):
     assert client.post("/api/families", headers=h2, json={"name": "Ещё одна"}).status_code == 402
     # Созданное раньше остаётся, и в неё можно зайти.
     assert client.get(f"/api/families/{mine}", headers=h2).status_code == 200
-    # Вступить в чужую аптечку по приглашению можно и без Плюса.
-    other = client.post("/api/families/join", headers=h1, json={"code": invite_code(client, h2, mine)})
-    assert other.status_code == 200
-    # Первую аптечку всегда можно создать: например, после выхода из всех семей.
+    # Вступить в семью по приглашению можно и без Плюса, пока есть место; первую аптечку всегда можно создать.
     h3, _ = register(client, "dad@example.com", "Папа", invite=invite_code(client, h1, f))
     assert client.get("/api/auth/me", headers=h3).json()["own_families_left"] == 1
     assert client.post("/api/families", headers=h3, json={"name": "Гараж"}).status_code == 201

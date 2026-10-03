@@ -9,7 +9,7 @@ import { DeleteAccountButton } from '../components/DeleteAccount'
 import { Reminders } from '../components/Reminders'
 import { PageLoader, Sheet, useToast } from '../components/ui'
 import { copyText } from '../clipboard'
-import { avatarColor } from '../format'
+import { avatarColor, fmtDateTime } from '../format'
 import { useLimitReached } from '../limits'
 import { LimitCounter, planLabel, usePlan } from '../plan'
 import { versionLabel } from '../version'
@@ -50,7 +50,7 @@ export function Family() {
   })
   if (isLoading || !f) return <PageLoader />
   const owner = f.role === 'owner'
-  const link = `${location.origin}/join/${f.invite_code}`
+  const link = `${location.origin}/join/${f.invite_code ?? ''}`
 
   const copyLink = async () => {
     const ok = await copyText(link)
@@ -99,22 +99,34 @@ export function Family() {
 
       <section className="card stack">
         <h2>Пригласить в семью</h2>
-        <p className="muted small">Отправьте ссылку человеку сами. Он создаст аккаунт или войдёт в свой, сам примет документы и вступит в семью. Почту человека указывать не нужно.</p>
-        <div className="invite-box">
-          <div>
-            <div className="small muted">Ссылка-приглашение</div>
-            <div className="invite-link">{link}</div>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            <button className="icon-btn" title="Скопировать ссылку" onClick={copyLink}><Copy size={18} /></button>
-            {owner && <button className="icon-btn" title="Создать новую ссылку" onClick={() => confirm('Старая ссылка перестанет работать. Продолжить?') && regen.mutate()}><RefreshCw size={18} /></button>}
-          </div>
-        </div>
-        <button className="btn primary block" onClick={copyLink}><Share2 size={18} />Поделиться ссылкой</button>
-        {membersFull && (
-          <div className="alert warn">
-            <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> в семье до 5 человек.</span>
-          </div>
+        {owner ? (
+          <>
+            <p className="muted small">Отправьте ссылку человеку сами: она сработает один раз и действует 24 часа. Он создаст аккаунт или войдёт в свой, сам примет документы и вступит в семью. Почту человека указывать не нужно. Прежние многоразовые ссылки больше не работают: отправьте новую.</p>
+            {f.invite_code ? (
+              <>
+                <div className="invite-box">
+                  <div>
+                    <div className="small muted">Ссылка-приглашение{f.invite_expires_at && ` · действует до ${fmtDateTime(f.invite_expires_at)}`}</div>
+                    <div className="invite-link">{link}</div>
+                  </div>
+                  <div className="row" style={{ gap: 8 }}>
+                    <button className="icon-btn" title="Скопировать ссылку" onClick={copyLink}><Copy size={18} /></button>
+                    <button className="icon-btn" title="Создать новую ссылку" onClick={() => confirm('Старая ссылка перестанет работать. Продолжить?') && regen.mutate()}><RefreshCw size={18} /></button>
+                  </div>
+                </div>
+                <button className="btn primary block" onClick={copyLink}><Share2 size={18} />Поделиться ссылкой</button>
+              </>
+            ) : (
+              <button className="btn primary block" onClick={() => regen.mutate()} disabled={regen.isPending}><Share2 size={18} />Создать приглашение</button>
+            )}
+            {membersFull && (
+              <div className="alert warn">
+                <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> в семье до 5 человек.</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="muted small">Приглашает владелец семьи{f.members.find(m => m.role === 'owner')?.name ? ` (${f.members.find(m => m.role === 'owner')!.name})` : ''}. Если нужно позвать ещё кого-то, попросите его прислать ссылку.</p>
         )}
       </section>
 

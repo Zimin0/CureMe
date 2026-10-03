@@ -47,6 +47,7 @@ test('участник не видит кнопок владельца', async (
   await expect(page.getByRole('heading', { name: 'Семья Никита' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Переименовать' })).toHaveCount(0)
   await expect(page.getByTitle('Создать новую ссылку')).toHaveCount(0)
+  await expect(page.locator('.invite-link')).toHaveCount(0)  // приглашает только владелец (R04)
 })
 
 test('версия приложения видна внизу раздела «Семья» и совпадает с сервером', async ({ page, request }) => {

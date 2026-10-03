@@ -8,13 +8,15 @@
 Каждая операция сначала берёт блокировку строки семьи (lock), а потом проверяет лимиты по свежим данным:
 два одновременных вступления при одном свободном месте не пройдут оба (R20).
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from .models import Family, Household, HouseholdEvent, Intake, Medicine, Membership, Schedule, User, utcnow
+from .models import (
+    Family, Household, HouseholdEvent, HouseholdInvite, Intake, Medicine, Membership, Schedule, User, utcnow,
+)
 from .plans import (
     FREE_CABINETS_MAX, LIMIT_FEATURE, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required,
 )
@@ -78,6 +80,115 @@ def sync_access(db: Session, house: Household) -> None:
     db.flush()
     for user in house.members:
         db.expire(user, ["memberships"])
+
+
+# --- приглашения (R04) ---
+INVITE_TTL = timedelta(hours=24)  # код живёт сутки и работает один раз
+UNVERIFIED_JOIN_TTL = timedelta(hours=24)  # вступивший по приглашению без подтверждённой почты держит место не дольше
+INVITE_KEEP = timedelta(days=30)  # записи об истёкших и использованных приглашениях удаляются через 30 дней после срока
+
+
+def _invite_valid(inv: HouseholdInvite, now: datetime) -> bool:
+    return inv.used_at is None and inv.revoked_at is None and _aware(inv.expires_at) > now
+
+
+def find_invite(db: Session, code: str, now: datetime | None = None) -> HouseholdInvite | None:
+    """Действующее приглашение по коду. Использованный, отозванный и просроченный код не находится."""
+    inv = db.scalar(select(HouseholdInvite).where(HouseholdInvite.code == code.strip().upper()))
+    return inv if inv is not None and _invite_valid(inv, now or datetime.now(timezone.utc)) else None
+
+
+def active_invite(db: Session, house: Household, now: datetime | None = None) -> HouseholdInvite | None:
+    now = now or datetime.now(timezone.utc)
+    rows = db.scalars(select(HouseholdInvite).where(
+        HouseholdInvite.household_id == house.id, HouseholdInvite.used_at.is_(None), HouseholdInvite.revoked_at.is_(None),
+    ).order_by(HouseholdInvite.id.desc())).all()
+    return next((i for i in rows if _invite_valid(i, now)), None)
+
+
+def issue_invite(db: Session, house: Household, actor: User | None) -> HouseholdInvite:
+    """Новое приглашение: прежний действующий код перестаёт работать. Вызывает только владелец семьи (проверяет роутер)."""
+    lock(db, house)
+    now = datetime.now(timezone.utc)
+    for old in db.scalars(select(HouseholdInvite).where(
+            HouseholdInvite.household_id == house.id, HouseholdInvite.used_at.is_(None), HouseholdInvite.revoked_at.is_(None))):
+        old.revoked_at = now
+    code = new_invite_code()
+    while db.scalar(select(HouseholdInvite.id).where(HouseholdInvite.code == code)) is not None:
+        code = new_invite_code()
+    inv = HouseholdInvite(household_id=house.id, code=code, created_at=now, expires_at=now + INVITE_TTL,
+                          created_by_id=actor.id if actor else None)
+    db.add(inv)
+    db.flush()
+    return inv
+
+
+def ensure_invite(db: Session, house: Household, actor: User | None) -> HouseholdInvite:
+    """У владельца всегда есть действующая ссылка: если прежняя сгорела или просрочена, выпускаем новую."""
+    return active_invite(db, house) or issue_invite(db, house, actor)
+
+
+def claim_invite(db: Session, code: str, user: User | None = None) -> HouseholdInvite | None:
+    """Приглашение по коду под блокировкой семьи: из двух одновременных вступлений по одному коду пройдёт одно (R04, R20).
+
+    Блокируем семью приглашения (и семью вступающего, если он уже в сервисе) в порядке возрастания id, как и join:
+    встречные вступления двух людей друг к другу не ждут друг друга. Потом перечитываем приглашение и проверяем,
+    что оно ещё действует: пока мы ждали, семья могла раствориться (её единственный человек вступил в другую).
+    """
+    code = code.strip().upper()
+    inv = db.scalar(select(HouseholdInvite).where(HouseholdInvite.code == code))
+    house = db.get(Household, inv.household_id) if inv is not None else None
+    if house is None:
+        return None
+    mine = user.household if user is not None else None
+    for h in sorted({house, mine} - {None}, key=lambda x: x.id):
+        lock(db, h)
+    inv = db.scalar(select(HouseholdInvite).where(HouseholdInvite.code == code).execution_options(populate_existing=True))
+    return inv if inv is not None and _invite_valid(inv, datetime.now(timezone.utc)) else None
+
+
+def use_invite(inv: HouseholdInvite, user: User) -> None:
+    inv.used_at, inv.used_by_id = utcnow(), user.id
+
+
+def release_unverified(db: Session, now: datetime | None = None) -> int:
+    """Освобождает места тех, кто вступил по приглашению и не подтвердил почту за сутки (R04-T4).
+
+    Человек остаётся зарегистрированным: у него снова личная семья и своя аптечка, но в чужой семье он больше
+    не занимает место. Владелец приглашает его заново, когда тот подтвердит почту.
+    """
+    from .email_verification import needs_verification  # здесь, чтобы не зациклить импорты
+
+    now = now or datetime.now(timezone.utc)
+    freed = 0
+    used = db.scalars(select(HouseholdInvite).where(HouseholdInvite.used_by_id.is_not(None))).all()
+    for inv in used:
+        user = db.get(User, inv.used_by_id)
+        if (user is None or user.household_id != inv.household_id or user.household_role == "owner"
+                or not needs_verification(user) or now - _aware(inv.used_at) < UNVERIFIED_JOIN_TTL):
+            continue
+        house = user.household
+        lock(db, house)
+        if len(house.members) < 2 or user.household_id != inv.household_id:
+            continue
+        leave(db, user, actor=None, kicked=True, detail="почта не подтверждена за 24 часа после вступления по приглашению")
+        freed += 1
+    if freed:
+        db.commit()
+    return freed
+
+
+def purge_old_invites(db: Session, now: datetime | None = None) -> int:
+    """Удаляет приглашения, срок которых истёк больше 30 дней назад: использованные, отозванные и просроченные.
+
+    В записи лежат код и идентификаторы владельца и вступившего; дольше нужного хранить их незачем.
+    Кто и когда вступил, остаётся в журнале семьи.
+    """
+    now = now or datetime.now(timezone.utc)
+    removed = db.execute(delete(HouseholdInvite).where(HouseholdInvite.expires_at < now - INVITE_KEEP)).rowcount or 0
+    if removed:
+        db.commit()
+    return removed
 
 
 # --- лимиты ---
@@ -216,7 +327,7 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
     sync_access(db, target)
 
 
-def leave(db: Session, user: User, actor: User | None = None, kicked: bool = False) -> Family:
+def leave(db: Session, user: User, actor: User | None = None, kicked: bool = False, detail: str = "") -> Family:
     """Человек уходит из семьи (R09) или его исключает владелец (R10): новая личная семья и одна аптечка, созданная им.
 
     Остальные его аптечки остаются семье. Приёмы человека переезжают с ним, расписание по оставшимся аптечкам
@@ -249,7 +360,7 @@ def leave(db: Session, user: User, actor: User | None = None, kicked: bool = Fal
         keep = add_cabinet(db, new_house, f"Семья {user.name}", user)
     _move_history(db, user, left_ids, keep)
     db.execute(delete(Schedule).where(Schedule.user_id == user.id, Schedule.family_id.in_(left_ids)))
-    record(db, house, "kick" if kicked else "leave", user=user, actor=actor)
+    record(db, house, "kick" if kicked else "leave", user=user, actor=actor, detail=detail)
     sync_access(db, house)
     sync_access(db, new_house)
     return keep

@@ -5,14 +5,14 @@ export type StockStatus = 'ok' | 'low' | 'out' | 'expiring' | 'expired'
 export interface FamilyBrief { id: number; name: string; role: Role }
 export interface Me { id: number; email: string; name: string; is_admin: boolean; consent_needed?: boolean; access_blocked?: boolean; email_verified?: boolean; verification_needed?: boolean; families: FamilyBrief[]; own_families_left?: number | null; plus_active?: boolean }
 export interface Member { user_id: number; name: string; email: string; role: Role; joined_at: string }
-export interface Family { id: number; name: string; invite_code: string; role: Role; members: Member[] }
+export interface Family { id: number; name: string; invite_code: string | null; invite_expires_at?: string | null; role: Role; members: Member[] }
 /** Публичные сведения о приглашении. full — в бесплатной семье уже предел участников, вступить нельзя. */
-export interface InviteInfo { family_name: string; members: number; full: boolean }
+export interface InviteInfo { family_name: string; owner_name: string; full: boolean }
 export interface Category { id: number; name: string; icon: string; color: string; medicine_count: number }
 
 export interface AdminStats { users: number; admins: number; families: number; medicines: number; categories: number }
 export interface AdminUser { id: number; email: string; name: string; is_admin: boolean; email_verified: boolean; created_at: string; families: FamilyBrief[]; plan: PlanName; plus_until: string | null; plus_active: boolean; auto_renew?: boolean; household_id?: number | null; is_owner?: boolean }
-export interface AdminFamily { id: number; name: string; invite_code: string; created_at: string; medicine_count: number; members: Member[]; plan: PlanName; plus_until: string | null; plus_active: boolean; owner_id?: number | null; owner_name?: string | null }
+export interface AdminFamily { id: number; name: string; created_at: string; medicine_count: number; members: Member[]; plan: PlanName; plus_until: string | null; plus_active: boolean; owner_id?: number | null; owner_name?: string | null }
 
 // --- тарифы: backend/app/plans.py ---
 export type PlanName = 'free' | 'plus'

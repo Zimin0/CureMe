@@ -1,13 +1,15 @@
 """Одновременные запросы (R20): проверка и запись идут под блокировкой строки семьи. Нужен Postgres: у SQLite нет блокировок строк."""
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from tests.conftest import check_household_invariants, fid, grant_plus, register
+from app.models import HouseholdInvite, User, utcnow
+from tests.conftest import check_household_invariants, fid, grant_plus, invite_of, register
 
 pytestmark = pytest.mark.skipif(not os.environ.get("CUREME_TEST_DATABASE_URL"), reason="блокировки строк проверяются на Postgres")
 
@@ -33,13 +35,41 @@ def test_r20_t1_bc23_two_joins_for_one_free_seat_let_one_through(client, session
     h, u = register(client)
     f = fid(u)
     billing_on(client, h)
-    code = client.get(f"/api/families/{f}", headers=h).json()["invite_code"]
-    register(client, "mom@example.com", "Мама", invite=code)  # в семье двое, свободно одно место из трёх
+    register(client, "mom@example.com", "Мама", invite=invite_of(client, h, f))  # в семье двое, свободно одно место из трёх
+    code_a = invite_of(client, h, f)
+    with session_factory() as db:  # второй действующий код кладём в базу: через API у владельца он всегда один (R04)
+        house = db.get(User, u["id"]).household
+        db.add(HouseholdInvite(household_id=house.id, code="SECOND22", expires_at=utcnow() + timedelta(hours=24)))
+        db.commit()
+    ha, _ = register(client, "a@example.com", "Аня")
+    hb, _ = register(client, "b@example.com", "Боря")
+    join = lambda hh, code: (lambda c: c.post("/api/families/join", headers=hh, json={"code": code}))  # noqa: E731
+    assert race([join(ha, code_a), join(hb, "SECOND22")]) == [200, 402]
+    assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 3
+    check_household_invariants(session_factory)
+
+
+def test_r04_t7_two_joins_with_one_code_let_one_through(client, session_factory):
+    """Одноразовый код при одновременных запросах: сработает один, второй получит 404 (R04, R20)."""
+    h, u = register(client)
+    f = fid(u)
+    code = invite_of(client, h, f)
     ha, _ = register(client, "a@example.com", "Аня")
     hb, _ = register(client, "b@example.com", "Боря")
     join = lambda hh: (lambda c: c.post("/api/families/join", headers=hh, json={"code": code}))  # noqa: E731
-    assert race([join(ha), join(hb)]) == [200, 402]
-    assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 3
+    assert race([join(ha), join(hb)]) == [200, 404]
+    assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 2
+    check_household_invariants(session_factory)
+
+
+def test_r04_t7_two_registrations_with_one_code_let_one_through(client, session_factory):
+    h, u = register(client)
+    f = fid(u)
+    code = invite_of(client, h, f)
+    signup = lambda email: (lambda c: c.post("/api/auth/register", json={  # noqa: E731
+        "email": email, "name": "Новый", "password": "secret123", "invite_code": code, "consent": True}))
+    assert race([signup("a@example.com"), signup("b@example.com")]) == [201, 400]
+    assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 2
     check_household_invariants(session_factory)
 
 

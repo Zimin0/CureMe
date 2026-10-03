@@ -54,7 +54,7 @@ def _family_out(db: Session, f: Family) -> AdminFamilyOut:
     owner = households.owner_of(house)
     members = households.people(house) if house else []
     return AdminFamilyOut(
-        id=f.id, name=f.name, invite_code=f.invite_code, created_at=f.created_at, medicine_count=count,
+        id=f.id, name=f.name, created_at=f.created_at, medicine_count=count,
         members=[
             MemberOut(user_id=u.id, name=u.name, email=u.email, role=u.household_role,
                       is_owner=u.household_role == "owner", joined_at=u.household_joined_at)

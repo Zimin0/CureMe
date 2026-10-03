@@ -47,7 +47,7 @@ describe('регистрация', () => {
   it('по приглашению показывает название семьи и отправляет код', async () => {
     let body: Record<string, unknown> = {}
     server.use(
-      http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', members: 2 })),
+      http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', owner_name: 'Анна', full: false })),
       http.post('/api/auth/register', async ({ request }) => {
         body = await request.json() as Record<string, unknown>
         return HttpResponse.json({ access_token: 'jwt', user: ME }, { status: 201 })
@@ -77,7 +77,7 @@ describe('регистрация', () => {
 
 describe('ссылка-приглашение', () => {
   it('гостю предлагает зарегистрироваться или войти', async () => {
-    server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', members: 2 })))
+    server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', owner_name: 'Анна', full: false })))
     renderApp('/join/ABCD2345', { loggedIn: false })
     expect(await screen.findByRole('link', { name: 'Создать аккаунт и вступить' })).toHaveAttribute('href', '/register?invite=ABCD2345')
     expect(screen.getByRole('link', { name: 'У меня уже есть аккаунт' })).toHaveAttribute('href', '/login?next=/join/ABCD2345')
@@ -85,7 +85,7 @@ describe('ссылка-приглашение', () => {
 
   it('вошедший вступает одной кнопкой', async () => {
     server.use(
-      http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', members: 2 })),
+      http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', owner_name: 'Анна', full: false })),
       http.post('/api/families/join', () => HttpResponse.json({ id: 9, name: 'Зимины', invite_code: 'ABCD2345', role: 'member', members: [] })),
       overview,
     )
