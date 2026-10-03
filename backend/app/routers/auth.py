@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 def me_out(user: User, db: Session) -> MeOut:
     fams = sorted(user.memberships, key=lambda m: m.joined_at)
+    transfer = households.pending_transfer(db, user.household)
     return MeOut(
         id=user.id, email=user.email, name=user.name, is_admin=user.is_admin,
         consent_needed=user.consent_version != CONSENT_VERSION,
@@ -26,6 +27,7 @@ def me_out(user: User, db: Session) -> MeOut:
         email_verified=user.email_verified_at is not None,
         verification_needed=needs_verification(user),
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
+        owner_transfer_waiting=transfer is not None and transfer.to_user_id == user.id,
         own_families_left=own_families_left(db, user.id),
         plus_active=plus_active(user),
     )

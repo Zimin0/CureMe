@@ -13,7 +13,7 @@
 
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 os.environ["CUREME_REMOTE_LOOKUP"] = "false"
@@ -113,6 +113,27 @@ def invite_of(client, h, family_id) -> str:
 
 def fid(user) -> int:
     return user["families"][0]["id"]
+
+
+def hand_over(client, h_from, family_id, to_user_id, h_to):
+    """Передача владения по правилам R23: предложение владельца и согласие принимающего."""
+    r = client.post(f"/api/families/{family_id}/owner-transfer", headers=h_from, json={"user_id": to_user_id})
+    assert r.status_code == 201, r.text
+    r = client.post(f"/api/families/{family_id}/owner-transfer/accept", headers=h_to)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def age_owner_events(session_factory, days=8):
+    """Сдвигает прошлые смены владельца в прошлое: кулдаун передачи (7 дней, R23-T5) уже закончился."""
+    from sqlalchemy import select
+
+    from app.models import HouseholdEvent
+
+    with session_factory() as db:
+        for e in db.scalars(select(HouseholdEvent).where(HouseholdEvent.kind == "owner")):
+            e.created_at = e.created_at - timedelta(days=days)
+        db.commit()
 
 
 def check_household_invariants(session_factory):

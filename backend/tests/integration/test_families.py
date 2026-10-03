@@ -1,6 +1,6 @@
 """Семьи: приглашения, роли, выход из семьи."""
 
-from tests.conftest import fid, grant_plus, register
+from tests.conftest import fid, grant_plus, hand_over, register
 
 
 def invite_code(client, h, family_id):
@@ -63,17 +63,16 @@ def test_owner_cannot_add_member_by_email(client, owner):
 def test_roles(client):
     (h1, u1), (h2, u2), f = two_members(client)
     url = f"/api/families/{f}/members"
-    # единственного владельца нельзя понизить
-    assert client.patch(f"{url}/{u1['id']}", headers=h1, json={"role": "member"}).status_code == 400
-    assert client.patch(f"{url}/{u2['id']}", headers=h1, json={"role": "admin"}).status_code == 422
-    assert client.patch(f"{url}/99999", headers=h1, json={"role": "owner"}).status_code == 404
-    # назначаем второго владельца: владелец один (R02), прежний становится участником
-    assert client.patch(f"{url}/{u2['id']}", headers=h1, json={"role": "owner"}).status_code == 200
-    r = client.patch(f"{url}/{u1['id']}", headers=h2, json={"role": "member"})
-    assert r.status_code == 200
-    assert {m["name"]: m["role"] for m in r.json()["members"]} == {"Никита": "member", "Мама": "owner"}
-    # и бывший владелец больше не может управлять ролями
-    assert client.patch(f"{url}/{u2['id']}", headers=h1, json={"role": "member"}).status_code == 403
+    # прямой смены роли больше нет: владельцем становятся только по согласию (R23, подробно в test_owner_transfer.py)
+    assert client.patch(f"{url}/{u2['id']}", headers=h1, json={"role": "owner"}).status_code in (404, 405)
+    assert client.patch(f"{url}/{u1['id']}", headers=h1, json={"role": "member"}).status_code in (404, 405)
+    r = client.post(f"/api/families/{f}/owner-transfer", headers=h1, json={"user_id": 99999})
+    assert r.status_code == 404
+    hand_over(client, h1, f, u2["id"], h2)  # владелец один (R02), прежний становится участником
+    members = client.get(f"/api/families/{f}", headers=h2).json()["members"]
+    assert {m["name"]: m["role"] for m in members} == {"Никита": "member", "Мама": "owner"}
+    # и бывший владелец больше не может предлагать передачу
+    assert client.post(f"/api/families/{f}/owner-transfer", headers=h1, json={"user_id": u1["id"]}).status_code == 403
 
 
 def test_member_can_leave(client):
