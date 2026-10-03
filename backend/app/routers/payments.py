@@ -17,7 +17,7 @@ def _status(db: Session, user: User) -> PayStatus:
     rows = db.scalars(select(Payment).where(Payment.user_id == user.id).order_by(Payment.id.desc()).limit(10))
     return PayStatus(
         enabled=payments.payments_enabled(db), plus_active=plus_active(user), plus_until=user.plus_until,
-        auto_renew=user.auto_renew, price_month=payments.price_for(db, "month"), price_year=payments.price_for(db, "year"),
+        auto_renew=user.auto_renew, recurring_enabled=payments.recurring_enabled(), price_month=payments.price_for(db, "month"), price_year=payments.price_for(db, "year"),
         payments=[PaymentBrief.model_validate(p, from_attributes=True) for p in rows],
     )
 
@@ -31,11 +31,13 @@ def my_payments(user: User = Depends(current_user), db: Session = Depends(get_db
 def start(body: PayIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     if not payments.payments_enabled(db):
         raise HTTPException(409, "Оплата пока недоступна")
+    if body.auto_renew and not payments.recurring_enabled():
+        raise HTTPException(409, "Автопродление пока недоступно")
     try:
-        pay, token = payments.create_payment(db, user, body.period, body.auto_renew)
+        pay, url = payments.create_payment(db, user, body.period, body.auto_renew)
     except payments.PaymentError as e:
         raise HTTPException(502, str(e)) from e
-    return PayStarted(payment_id=pay.id, confirmation_token=token)
+    return PayStarted(payment_id=pay.id, confirmation_url=url)
 
 
 @router.post("/auto-renew/off", response_model=PayStatus)

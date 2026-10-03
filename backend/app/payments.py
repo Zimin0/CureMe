@@ -1,8 +1,8 @@
 """Оплата Плюса через ЮKassa.
 
 Как это устроено:
-- Карту вводят в виджете ЮKassa на нашей странице: номер карты до нашего сервера не доходит (мы получаем
-  только confirmation_token для виджета и потом идентификатор сохранённого способа оплаты).
+- Карту вводят на странице оплаты ЮKassa: номер карты до нашего сервера не доходит (мы получаем
+  только адрес страницы оплаты и потом идентификатор сохранённого способа оплаты).
 - Что оплата прошла, мы узнаём не из браузера, а от ЮKassa: приходит HTTP-уведомление (webhook), и мы
   сами запрашиваем платёж по его id с нашим секретным ключом. Поддельное уведомление ничего не даст:
   статус берём только из ответа ЮKassa. Повторное уведомление безопасно (операция идемпотентна).
@@ -41,6 +41,10 @@ def configured() -> bool:
     return get_settings().yookassa_enabled
 
 
+def recurring_enabled() -> bool:
+    return configured() and get_settings().yookassa_recurring
+
+
 def price_for(db: Session, period: str) -> int | None:
     b = billing_settings(db)
     return b.price_month if period == "month" else b.price_year
@@ -62,8 +66,22 @@ def _request(method: str, path: str, *, key: str | None = None, json: dict | Non
         raise PaymentError("Платёжный сервис не отвечает") from e
     if r.status_code >= 400:
         log.error("ЮKassa %s %s: %s %s", method, path, r.status_code, r.text[:300])
-        raise PaymentError(f"ЮKassa вернула ошибку {r.status_code}")
+        raise PaymentError(_error_text(r, bool(json and json.get("save_payment_method"))))
     return r.json()
+
+
+def _error_text(r: httpx.Response, wanted_autopay: bool) -> str:
+    """Понятное сообщение об отказе ЮKassa: код ошибки и, если вероятна причина, подсказка."""
+    try:
+        code = r.json().get("code") or ""
+    except ValueError:
+        code = ""
+    text = f"ЮKassa отказала ({r.status_code}{', ' + code if code else ''})"
+    if r.status_code == 403 and wanted_autopay:
+        text += ". Возможно, в ЮKassa не подключены автоплатежи: попробуйте без галочки автопродления"
+    elif r.status_code in (401, 403):
+        text += ". Проверьте ключи ЮKassa и права магазина"
+    return text
 
 
 def _amount(rub: int) -> dict:
@@ -75,7 +93,7 @@ def _description(user: User, period: str) -> str:
 
 
 def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tuple[Payment, str]:
-    """Создаёт платёж с виджетом ЮKassa. Возвращает запись и confirmation_token для виджета."""
+    """Создаёт платёж ЮKassa. Возвращает запись и адрес страницы оплаты ЮKassa, куда отправляем человека."""
     amount = price_for(db, period)
     if not amount:
         raise PaymentError("Для этого срока цена не задана")
@@ -85,7 +103,7 @@ def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tu
     body = {
         "amount": _amount(amount),
         "capture": True,
-        "confirmation": {"type": "embedded"},
+        "confirmation": {"type": "redirect", "return_url": f"{_site()}/plus?paid={pay.id}"},
         "description": _description(user, period),
         "metadata": {"payment_id": str(pay.id), "user_id": str(user.id), "period": period},
     }
@@ -97,7 +115,7 @@ def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tu
         # Пока платёж не прошёл, автопродление не включаем; помним выбор в metadata ЮKassa и здесь:
         user.renew_period = period
     db.commit()
-    return pay, data["confirmation"]["confirmation_token"]
+    return pay, data["confirmation"]["confirmation_url"]
 
 
 def extend_plus(user: User, period: str, now: datetime | None = None) -> None:

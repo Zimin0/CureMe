@@ -713,7 +713,7 @@ class PayIn(BaseModel):
 
 class PayStarted(BaseModel):
     payment_id: int
-    confirmation_token: str  # для виджета ЮKassa
+    confirmation_url: str  # страница оплаты ЮKassa
 
 
 class PaymentBrief(BaseModel):
@@ -732,6 +732,7 @@ class PayStatus(BaseModel):
     plus_active: bool
     plus_until: datetime | None = None
     auto_renew: bool
+    recurring_enabled: bool = False  # автоплатежи подключены: можно показывать галочку автопродления
     price_month: int | None = None
     price_year: int | None = None
     payments: list[PaymentBrief] = []

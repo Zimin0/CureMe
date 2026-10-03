@@ -9,12 +9,16 @@ from app.models import Payment, User
 from tests.conftest import register
 
 
+REAL_REQUEST = payments._request  # до подмены фикстурой yk
+
+
 @pytest.fixture
 def yk(monkeypatch):
     """Ключи ЮKassa заданы, платная версия включена, цена 199/1990. Возвращает «сервер ЮKassa»."""
     s = get_settings()
     monkeypatch.setattr(s, "yookassa_shop_id", "1480957")
     monkeypatch.setattr(s, "yookassa_secret_key", "test-secret")
+    monkeypatch.setattr(s, "yookassa_recurring", True)
 
     class Fake:
         def __init__(self):
@@ -28,7 +32,7 @@ def yk(monkeypatch):
             if method == "POST":
                 n = len(self.objects) + 1
                 obj = {"id": f"yk-{n}", "status": "pending", "amount": json["amount"], "metadata": json["metadata"],
-                       "confirmation": {"confirmation_token": f"tok-{n}"}}
+                       "confirmation": {"confirmation_url": f"https://yookassa.ru/checkout/payments/v2/contract?orderId=yk-{n}"}}
                 if "payment_method_id" in json:
                     obj["status"] = "succeeded"
                 self.objects[obj["id"]] = obj
@@ -90,11 +94,11 @@ def test_checkout_requires_agreement(client, shop):
 def test_create_payment_sends_amount_no_card_data(client, shop, yk):
     h, _ = shop
     r = pay(client, h, "year")
-    assert r.status_code == 201 and r.json()["confirmation_token"] == "tok-1"
+    assert r.status_code == 201 and r.json()["confirmation_url"].endswith("orderId=yk-1")
     method, path, key, body = yk.calls[0]
     assert (method, path) == ("POST", "/payments") and key.startswith("pay-")
     assert body["amount"] == {"value": "1990.00", "currency": "RUB"}
-    assert body["confirmation"] == {"type": "embedded"} and "save_payment_method" not in body
+    assert body["confirmation"] == {"type": "redirect", "return_url": "https://kapsulka.ru/plus?paid=1"} and "save_payment_method" not in body
 
 
 def test_webhook_activates_plus_once(client, shop, yk, session_factory):
@@ -335,3 +339,42 @@ def test_admin_sees_plus_that_comes_from_cabinet_owner(client, shop):
     assert rows["member@example.com"]["plus_active"] is False
     assert any("Плюс у" in s for s in rows["member@example.com"]["plus_from_others"])
     assert rows[owner["email"]]["plus_from_others"] == []
+
+
+# --- ошибки ЮKassa ---
+def _http_error(monkeypatch, status, body):
+    import httpx
+
+    def fake(method, url, **kw):
+        return httpx.Response(status, json=body, request=httpx.Request(method, url))
+    monkeypatch.setattr(payments.httpx, "request", fake)
+
+
+def test_403_with_autopay_hints_at_autopayments(client, shop, monkeypatch):
+    h, _ = shop
+    monkeypatch.setattr(payments, "_request", REAL_REQUEST)  # настоящий вызов, подменяем только сеть
+    _http_error(monkeypatch, 403, {"type": "error", "code": "forbidden", "description": "x"})
+    r = client.post("/api/payments", headers=h, json={"period": "month", "auto_renew": True, "agree": True})
+    assert r.status_code == 502
+    assert "403, forbidden" in r.json()["detail"] and "без галочки автопродления" in r.json()["detail"]
+    r = client.post("/api/payments", headers=h, json={"period": "month", "auto_renew": False, "agree": True})
+    assert "403, forbidden" in r.json()["detail"] and "Проверьте ключи" in r.json()["detail"]
+
+
+def test_non_json_error_body(client, shop, monkeypatch):
+    import httpx
+    h, _ = shop
+    monkeypatch.setattr(payments, "_request", REAL_REQUEST)
+    monkeypatch.setattr(payments.httpx, "request", lambda m, u, **kw: httpx.Response(500, text="oops", request=httpx.Request(m, u)))
+    r = client.post("/api/payments", headers=h, json={"period": "month", "agree": True})
+    assert r.status_code == 502 and "500" in r.json()["detail"]
+
+
+def test_autorenew_hidden_and_refused_until_shop_has_autopayments(client, shop, yk, monkeypatch):
+    h, _ = shop
+    assert client.get("/api/payments/me", headers=h).json()["recurring_enabled"] is True
+    monkeypatch.setattr(get_settings(), "yookassa_recurring", False)  # ЮKassa ещё не подключила автоплатежи
+    assert client.get("/api/payments/me", headers=h).json()["recurring_enabled"] is False
+    assert pay(client, h, auto_renew=True).status_code == 409
+    assert yk.calls == []  # до ЮKassa не дошли: не ловим 403
+    assert pay(client, h, auto_renew=False).status_code == 201
