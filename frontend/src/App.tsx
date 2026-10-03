@@ -9,6 +9,7 @@ import { ClosedGate, ConsentGate, Join, Login, Register, VerifyGate } from './pa
 import { Consent, Offer, Privacy, ShareConsent, TelegramConsent, Terms, TrustedConsent } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
+import { AdminPayments } from './pages/AdminPayments'
 import { Family } from './pages/Family'
 import { Find } from './pages/Find'
 import { History } from './pages/History'
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="plus" element={<Plus />} />
         <Route path="export" element={<Export />} />
         <Route path="admin" element={<Admin />} />
+        <Route path="admin/payments" element={<AdminPayments />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -70,6 +70,7 @@ CUREME_SECRET_KEY=$(openssl rand -hex 32) docker compose up --build   # http://l
 | `CUREME_PUBLIC_URL` | из запроса | Адрес сайта для ссылок в письмах. На сервере `https://<домен>` |
 | `CUREME_EMAIL_VERIFICATION` | авто | Требовать подтверждения почты. По умолчанию включено, только если задан `CUREME_SMTP_HOST` |
 | `CUREME_TELEGRAM_BOT_TOKEN` / `CUREME_TELEGRAM_BOT_USERNAME` | пусто | Токен Telegram-бота от @BotFather и его имя без @. Пусто — напоминания только на почту |
+| `CUREME_YOOKASSA_SHOP_ID` / `CUREME_YOOKASSA_SECRET_KEY` | пусто | Идентификатор магазина и секретный ключ ЮKassa. Пока пусто, оплата Плюса выключена |
 | `CUREME_REMINDERS_HOUR` | `10` | В котором часу по Москве рассылать напоминания |
 | `CUREME_BACKGROUND_JOBS` | `true` | Фоновые потоки (рассылка напоминаний, Telegram-бот). В тестах выключены |
 | `CUREME_REMOTE_LOOKUP` | `true` | Искать незнакомые штрихкоды в интернете (поисковики, затем Open Food Facts) |

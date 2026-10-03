@@ -25,6 +25,9 @@ services:
       # Telegram-бот для напоминаний (DEPLOY.md, раздел 8). Пусто — напоминания только на почту.
       CUREME_TELEGRAM_BOT_TOKEN: ${CUREME_TELEGRAM_BOT_TOKEN:-}
       CUREME_TELEGRAM_BOT_USERNAME: ${CUREME_TELEGRAM_BOT_USERNAME:-}
+      # ЮKassa (оплата Плюса, DEPLOY.md, раздел 9). Пусто — оплата выключена.
+      CUREME_YOOKASSA_SHOP_ID: ${CUREME_YOOKASSA_SHOP_ID:-}
+      CUREME_YOOKASSA_SECRET_KEY: ${CUREME_YOOKASSA_SECRET_KEY:-}
       CUREME_REMINDERS_HOUR: ${CUREME_REMINDERS_HOUR:-10}
     security_opt: ["no-new-privileges:true"]
     # Журналы (в них IP-адреса посетителей) не копятся бесконечно: Docker сам стирает старые при переполнении.

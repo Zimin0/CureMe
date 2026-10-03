@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Check, Lock, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api, LimitName } from '../api'
+import { PayBox, usePayStatus } from '../components/PayBox'
 import { PayTerms } from '../components/PayTerms'
 import { SellerInfo } from '../components/SellerInfo'
 import { PageLoader } from '../components/ui'
@@ -18,6 +19,7 @@ const COMPARE: { name: LimitName; label: string }[] = [
 /** Страница «Капсулка Плюс»: что даёт подписка, чем отличается от бесплатной версии, тариф этой семьи. */
 export function Plus() {
   const { plan, loading } = usePlan()
+  const pay = usePayStatus()
   if (loading || !plan) return <PageLoader />
   const free = plan.free_limits
 
@@ -43,10 +45,12 @@ export function Plus() {
           </>
         )}
         {!plan.billing_enabled && <p className="muted small">Платная версия пока не включена, поэтому все функции Плюса доступны бесплатно.</p>}
-        {plan.billing_enabled && !plan.plus_active && (
+        {plan.billing_enabled && !plan.plus_active && !pay.data?.enabled && (
           <p className="muted small">Оплата появится скоро. Пока Плюс включает администратор.</p>
         )}
       </section>
+
+      <PayBox />
 
       <section className="card flush plus-list">
         <div style={{ padding: '18px 18px 6px' }}><h2>Что входит в Плюс</h2></div>

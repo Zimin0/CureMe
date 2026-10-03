@@ -313,3 +313,16 @@ export async function fetchText(path: string): Promise<string> {
   if (!res.ok) return failure(res)
   return res.text()
 }
+
+// --- оплата Плюса (ЮKassa) ---
+export type PaymentBrief = {
+  id: number; period: 'month' | 'year'; amount: number; status: 'pending' | 'succeeded' | 'canceled' | 'refunded'
+  recurring: boolean; created_at: string; paid_at: string | null; receipt_url: string | null
+}
+export type PayStatus = {
+  enabled: boolean; plus_active: boolean; plus_until: string | null; auto_renew: boolean
+  price_month: number | null; price_year: number | null; payments: PaymentBrief[]
+}
+export type AdminPayment = PaymentBrief & {
+  email: string; user_id: number | null; user_name: string | null; receipt_sent_at: string | null
+}

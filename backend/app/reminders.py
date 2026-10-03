@@ -283,6 +283,12 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                     log.exception("Уведомления по расписанию упали")
                     db.rollback()
                 try:
+                    from .payments import run_renewals  # здесь же: payments → plans → ..., без циклов
+                    run_renewals(db)  # автопродление Плюса: письмо за 3 дня и списание (если настроена ЮKassa)
+                except Exception:  # noqa: BLE001
+                    log.exception("Автопродление упало")
+                    db.rollback()
+                try:
                     if daily_due(now, _last_run(db)):
                         _save_last_run(db, now.date().isoformat())  # сначала отметка: сбой не зациклит рассылку
                         run_daily(db)
