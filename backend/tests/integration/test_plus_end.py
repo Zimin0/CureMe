@@ -55,6 +55,9 @@ def big(client, session_factory, letters):
         client.post(f"/api/families/{fam['id']}/medicines", headers=h,
                     json={"name": f"Лекарство {fam['name']}", "unit": "таб", "packages": [{"quantity": 30}]})
     assert len(me(client, h)["families"]) == 8
+    with session_factory() as db:  # семья собрана до 13.10.2026 и получила «было четверо»; здесь проверяем общий случай (три человека)
+        db.get(User, owner["id"]).household.kept_four = False
+        db.commit()
     check_household_invariants(session_factory)
     return people
 
@@ -406,3 +409,77 @@ def test_r14_frozen_cabinets_do_not_count_in_the_active_limit(client, big, sessi
     assert len(active) == 3
     assert client.delete(f"/api/families/{active[-1]['id']}", headers=h).status_code == 204
     assert client.post("/api/families", headers=h, json={"name": "Ещё"}).status_code == 201
+
+
+# --- семьи, где было четверо до 13.10.2026 (Соглашение п. 6.12) ---
+def kept_four(session_factory, uid):
+    with session_factory() as db:
+        return db.get(User, uid).household.kept_four
+
+
+def test_four_people_before_the_new_terms_are_remembered_and_stay_four(client, big, session_factory, letters):
+    """Семье, где уже было четверо, после окончания Плюса остаются четверо, а не трое; пятый уходит."""
+    h, owner = big["owner"]
+    with session_factory() as db:
+        db.get(User, owner["id"]).household.kept_four = True
+        db.commit()
+    t0 = T0_REAL()
+    plus_ends(session_factory, owner["id"], t0)
+    assert client.get("/api/auth/me", headers=h).json()["plus_ending"]["people_limit"] == 4
+    run(session_factory, t0 + 5 * DAY + timedelta(hours=1))
+    f = fid(owner)
+    assert [m["name"] for m in client.get(f"/api/families/{f}", headers=h).json()["members"]] == ["Никита", "Вторая", "Третий", "Четвёртый"]
+    assert [x["name"] for x in me(client, big["p5"][0])["families"]] == ["П1"]  # ушла только пятая
+    done = [text for to, subj, text in letters if subj == "Капсулка: состав семьи сжат"]
+    assert len(done) == 1 and "остались 4 человек, 1 перешли в личные семьи" in done[0]
+    # у четырёх активных аптечек будет не больше трёх (потолок бесплатной версии)
+    assert sum(1 for x in me(client, h)["families"] if x["status"] == "active") == 3
+    check_household_invariants(session_factory)
+
+
+def test_owner_choice_may_keep_four_when_the_family_was_four(client, big, session_factory):
+    h, owner = big["owner"]
+    f = fid(owner)
+    plus_ends(session_factory, owner["id"], T0_REAL())
+    four = [big[k][1]["id"] for k in ("p2", "p3", "p4")]
+    assert client.post(f"/api/families/{f}/compress", headers=h, json={"keep_user_ids": four}).status_code == 422  # трое по умолчанию
+    with session_factory() as db:
+        db.get(User, owner["id"]).household.kept_four = True
+        db.commit()
+    assert client.post(f"/api/families/{f}/compress", headers=h, json={"keep_user_ids": four}).status_code == 200
+    assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 4
+
+
+def test_fourth_person_before_the_new_terms_sets_the_flag_and_after_does_not(client, session_factory, monkeypatch):
+    from app import households
+    h, owner = register(client)
+    f = fid(owner)
+    grant_plus(client, h, f)
+    for i, name in enumerate(("Вторая", "Третий"), start=2):
+        register(client, f"q{i}@example.com", name, invite=invite_of(client, h, f))
+    assert kept_four(session_factory, owner["id"]) is False  # трое: помнить нечего
+    register(client, "q4@example.com", "Четвёртый", invite=invite_of(client, h, f))
+    assert kept_four(session_factory, owner["id"]) is True  # до 13.10.2026 четверо: запомнили
+
+    h2, owner2 = register(client, "late@example.com", "Поздний")
+    f2 = fid(owner2)
+    grant_plus(client, h, f2)  # Плюс выдаёт администратор (первый аккаунт)
+    monkeypatch.setattr(households, "NEW_TERMS_FROM", datetime.now(timezone.utc) - DAY)  # новые условия уже действуют
+    for i in range(3):
+        register(client, f"late{i}@example.com", f"П{i}", invite=invite_of(client, h2, f2))
+    assert kept_four(session_factory, owner2["id"]) is False
+
+
+def test_letters_say_moscow_time_and_the_wording_asked_by_the_legal_review(client, big, session_factory, letters):
+    h, owner = big["owner"]
+    t0 = T0_REAL()
+    plus_ends(session_factory, owner["id"], t0)
+    run(session_factory, t0 + timedelta(minutes=1))   # письмо в день конца
+    run(session_factory, t0 + 3 * DAY + DAY // 2)     # напоминание
+    run(session_factory, t0 + 5 * DAY + timedelta(hours=1))  # сжатие
+    with_dates = [text for _, subj, text in letters if "заканчивается" in subj or "закончился" in subj or "осталось" in subj]
+    assert len(with_dates) >= 2 and all("по московскому времени" in text for text in with_dates)
+    ended = next(text for _, subj, text in letters if subj == "Капсулка: Плюс вашей семьи закончился")
+    assert "После оплаты Плюса заморозка снимается сразу" in ended and "Продлите Плюс, и заморозка" not in ended
+    moved = [text for _, subj, text in letters if "перенесены" in subj]
+    assert moved and all("Если вы не согласны, ответьте на это письмо" in text for text in moved)

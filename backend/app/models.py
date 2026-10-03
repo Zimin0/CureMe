@@ -72,6 +72,8 @@ class Household(Base):
     # 4 через 4 дня, 5 сжатие выполнено). Пусто и 0, пока Плюс идёт или человек его не терял. Ведёт compression.py.
     plus_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     compress_stage: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # В семье было четверо до 13.10.2026: после окончания Плюса остаются четверо, а не трое (Соглашение п. 6.12).
+    kept_four: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     members: Mapped[list["User"]] = relationship(back_populates="household")

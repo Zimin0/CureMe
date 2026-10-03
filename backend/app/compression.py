@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from . import households as hh
 from .mailer import send_mail
 from .models import AppSetting, Family, Household, User
-from .plans import FREE_CABINETS_MAX, PLUS, free_members_limit, house_has_plus, limit_for, plus_active
+from .plans import FREE_CABINETS_MAX, OLD_FREE_MEMBERS, PLUS, free_members_limit, house_has_plus, limit_for, plus_active
 
 log = logging.getLogger("cureme.compression")
 
@@ -62,9 +62,14 @@ def _msk(moment: datetime) -> str:
     return moment.astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y")
 
 
-def people_limit(now: datetime) -> int:
-    """Сколько людей остаётся в семье после сжатия: бесплатный предел на этот день (R02)."""
-    return free_members_limit(now)
+def people_limit(now: datetime, house: Household | None = None) -> int:
+    """Сколько людей остаётся в семье после сжатия: бесплатный предел на этот день (R02).
+
+    Семье, где было четверо до 13.10.2026, остаются четверо (Соглашение п. 6.12): иначе заплативший и потом
+    отключившийся Плюс оказался бы в худшем положении, чем тот, кто не платил.
+    """
+    limit = free_members_limit(now)
+    return max(limit, OLD_FREE_MEMBERS) if house is not None and house.kept_four else limit
 
 
 def cabinet_cap(people: int) -> int:
@@ -92,7 +97,7 @@ def plan_compression(house: Household, now: datetime, keep_user_ids: set[int] | 
     members = hh.people(house)  # владелец первым, дальше самые давние
     owner = hh.owner_of(house)
     if keep_user_ids is None:
-        keep = members[:people_limit(now)]
+        keep = members[:people_limit(now, house)]
     else:
         keep = [u for u in members if u.id in keep_user_ids or u is owner]
     leaving = [u for u in members if u not in keep]
@@ -136,12 +141,13 @@ def mark_ended(house: Household, now: datetime) -> None:
 
 
 # --- письма (без ссылок: почта Яндекса отклоняет письма со ссылкой на сайт) ---
+MSK_NOTE = "\n\nВсе даты в письме указаны по московскому времени."
 SIGN = "\n\n— Капсулка, домашняя аптечка"
 
 
 def _facts(house: Household, now: datetime) -> dict:
     plan = plan_compression(house, now)
-    return {"n": len(house.members), "c": len(hh.active_cabinets(house)), "limit": people_limit(now),
+    return {"n": len(house.members), "c": len(hh.active_cabinets(house)), "limit": people_limit(now, house),
             "k": len(plan.leaving), "m": len(plan.frozen)}
 
 
@@ -153,7 +159,7 @@ def _ending_letter(name: str, until: datetime, f: dict) -> tuple[str, str]:
             f"{f['limit']} человек и столько аптечек, сколько людей. Поэтому у вас будет ещё {COMPRESS_DAYS} дней, до {d5}, чтобы выбрать, "
             "кто и какие аптечки остаются: до этого срока всё остаётся доступным. Ничего не удаляется: лишние аптечки остаются "
             "замороженными (их можно смотреть и выгружать), а людей мы переводим в их личные семьи с их данными.\n\n"
-            "Чтобы ничего не менялось, продлите Плюс на странице «Плюс» в приложении." + SIGN)
+            "Чтобы ничего не менялось, продлите Плюс на странице «Плюс» в приложении." + MSK_NOTE + SIGN)
 
 
 def _ended_letter(name: str, t0: datetime, f: dict) -> tuple[str, str]:
@@ -164,7 +170,7 @@ def _ended_letter(name: str, t0: datetime, f: dict) -> tuple[str, str]:
             f"«Семья» в приложении, кто остаётся и какие аптечки остаются активными. Если выбора не будет, {d5} останетесь вы и самые давние по "
             f"вступлению участники (всего {f['limit']}), остальные {f['k']} человек перейдут в личные семьи со своей аптечкой, а {f['m']} аптечек "
             "будут заморожены: их можно смотреть и выгружать, но нельзя менять. Ничего не удаляется.\n\n"
-            "Продлите Плюс, и заморозка снимется сразу, а отключённых людей можно снова пригласить." + SIGN)
+            "После оплаты Плюса заморозка снимается сразу, а отключённых людей можно снова пригласить." + MSK_NOTE + SIGN)
 
 
 def _remind_letter(name: str, t0: datetime, f: dict, days_left: int) -> tuple[str, str]:
@@ -173,7 +179,7 @@ def _remind_letter(name: str, t0: datetime, f: dict, days_left: int) -> tuple[st
     return (f"Капсулка: осталось {left} на выбор состава семьи",
             f"Здравствуйте, {name}!\n\n{d5} без вашего выбора {f['k']} человек семьи перейдут в личные семьи, а {f['m']} аптечек будут "
             "заморожены (смотреть и выгружать можно, менять нельзя). Ничего не удаляется.\n\n"
-            "Выбрать, кто и какие аптечки остаются, можно на странице «Семья» в приложении, а продление Плюса отменяет всё это." + SIGN)
+            "Выбрать, кто и какие аптечки остаются, можно на странице «Семья» в приложении, а продление Плюса отменяет всё это." + MSK_NOTE + SIGN)
 
 
 def _done_owner_letter(name: str, plan: Plan) -> tuple[str, str]:
@@ -187,7 +193,7 @@ def _moved_letter(name: str, cabinet: str) -> tuple[str, str]:
     return ("Капсулка: вы перенесены в личную семью",
             f"Здравствуйте, {name}!\n\nПлюс семьи закончился, и вы перешли в личную семью: вы её владелец. Ваши приёмы, расписание и "
             f"избранное остались с вами, с вами и ваша аптечка «{cabinet}». Лекарства других аптечек прежней семьи вам больше не видны. "
-            "Ничего не удалено.\n\nВладелец прежней семьи может пригласить вас снова." + SIGN)
+            "Ничего не удалено.\n\nВладелец прежней семьи может пригласить вас снова. Если вы не согласны, ответьте на это письмо." + SIGN)
 
 
 def _mail(user: User | None, letter: tuple[str, str]) -> None:
@@ -256,8 +262,9 @@ def choose(db: Session, owner: User, keep_user_ids: list[int], keep_cabinet_ids:
     if not set(keep_user_ids) <= members or not set(keep_cabinet_ids) <= cabinets:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Человек или аптечка не из вашей семьи")
     keep_people = set(keep_user_ids) | {owner.id}
-    if len(keep_people) > people_limit(now):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"В бесплатной семье не больше {people_limit(now)} человек, вместе с вами")
+    limit = people_limit(now, house)
+    if len(keep_people) > limit:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"В бесплатной семье не больше {limit} человек, вместе с вами")
     if len(set(keep_cabinet_ids)) > cabinet_cap(len(keep_people)):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Активных аптечек столько, сколько людей: не больше {cabinet_cap(len(keep_people))}")
     plan = plan_compression(house, now, set(keep_user_ids), set(keep_cabinet_ids))
@@ -369,7 +376,7 @@ def banner(db: Session, user: User, now: datetime | None = None) -> dict | None:
     if house is None or not enabled(db):
         return None
     owner = hh.owner_of(house)
-    base = {"is_owner": owner is not None and owner.id == user.id, "people_limit": people_limit(now)}
+    base = {"is_owner": owner is not None and owner.id == user.id, "people_limit": people_limit(now, house)}
     if house_has_plus(db, house):
         until = _aware(house.plus_until) if house.plus_until is not None else None
         if (until is not None and house.plan == PLUS and now >= until - NOTICE_BEFORE and not _owner_autorenews(house)

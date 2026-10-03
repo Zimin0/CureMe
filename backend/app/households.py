@@ -19,7 +19,8 @@ from .models import (
     utcnow,
 )
 from .plans import (
-    FREE_CABINETS_MAX, LIMIT_FEATURE, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for, plus_active, plus_required,
+    FREE_CABINETS_MAX, LIMIT_FEATURE, NEW_TERMS_FROM, OLD_FREE_MEMBERS, PLUS_MEMBERS_MAX, PLUS_OWN_FAMILIES_MAX, limit_for,
+    plus_active, plus_required,
 )
 from .routers.files import _drop_photo
 from .security import new_invite_code
@@ -270,10 +271,17 @@ def create_personal(db: Session, user: User) -> Family:
     return add_cabinet(db, house, f"Семья {user.name}", user)
 
 
+def remember_four(house: Household, now: datetime | None = None) -> None:
+    """В семье стало четверо и больше до 13.10.2026: после окончания Плюса ей остаются четверо, не трое (Соглашение п. 6.12)."""
+    if len(house.members) >= OLD_FREE_MEMBERS and (now or datetime.now(timezone.utc)) < NEW_TERMS_FROM:
+        house.kept_four = True
+
+
 def attach(db: Session, user: User, house: Household) -> None:
     """Новый аккаунт, пришедший по приглашению, становится участником семьи (R01: личная семья ему не создаётся)."""
     user.household, user.household_role, user.household_joined_at = house, "member", utcnow()
     record(db, house, "join", user=user, detail="регистрация по приглашению")
+    remember_four(house)
     sync_access(db, house)
 
 
@@ -350,6 +358,7 @@ def join(db: Session, user: User, target: Household, actor: User | None = None, 
         db.expire(mine, ["members", "cabinets"])
         drop_household(db, mine)
     record(db, target, "join", user=user, actor=actor)
+    remember_four(target)
     sync_access(db, target)
 
 
@@ -692,6 +701,8 @@ def invariant_problems(db: Session) -> list[str]:
             if {t.from_user_id, t.to_user_id} - {u.id for u in members}:
                 problems.append(f"R23: в передаче {t.id} участвует человек не из семьи {house.id}")
         limit = limit_for(db, house, "members")
+        if limit is not None and house.kept_four:
+            limit = max(limit, OLD_FREE_MEMBERS)  # семья, где было четверо до 13.10.2026, остаётся на четырёх (Соглашение п. 6.12)
         if limit is not None and len(members) > limit:
             problems.append(f"R02: в семье {house.id} людей {len(members)} при лимите {limit}")
         limit = limit_for(db, house, "own_families")
