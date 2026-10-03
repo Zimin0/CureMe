@@ -37,6 +37,18 @@ describe('юридические страницы', () => {
     renderApp('/privacy')
     expect(await screen.findByText(/5\.9\. Оплата\./)).toBeInTheDocument()
   })
+
+  it('Политика: сроки хранения приглашений и журнала семьи (п. 6.4)', async () => {
+    renderApp('/privacy')
+    expect(await screen.findByText(/6\.4\. Служебные сведения о приглашениях в семью/)).toBeInTheDocument()
+    expect(screen.getByText(/хранится 12 месяцев либо до удаления семьи/)).toBeInTheDocument()
+  })
+
+  it('Соглашение п. 6.8: передача владения только с согласием, исключение для администрации', async () => {
+    renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/Владение передаётся только с согласия принимающего человека/)).toBeInTheDocument()
+    expect(screen.getByText(/уведомив об этом всех членов семьи по электронной почте/)).toBeInTheDocument()
+  })
 })
 
 describe('согласие на передачу сведений доверенному лицу', () => {
