@@ -44,9 +44,27 @@ describe('юридические страницы', () => {
     expect(screen.getByText(/ИНН 470418719903/)).toBeInTheDocument()
   })
 
+  it('оферта: платит владелец семьи, возврат прекращает Плюс для всей семьи', async () => {
+    renderApp('/offer')
+    expect(await screen.findByText(/Оплату вносит владелец семьи; подписка действует и в пользу остальных/)).toBeInTheDocument()
+    expect(screen.getByText(/5\.6\. С момента возврата, полного или за неиспользованный период/)).toBeInTheDocument()
+  })
+
   it('Политика называет платёжный сервис ЮKassa', async () => {
     renderApp('/privacy')
     expect(await screen.findByText(/5\.9\. Оплата\./)).toBeInTheDocument()
+  })
+
+  it('Политика: сроки хранения приглашений и журнала семьи (п. 6.4)', async () => {
+    renderApp('/privacy')
+    expect(await screen.findByText(/6\.4\. Служебные сведения о приглашениях в семью/)).toBeInTheDocument()
+    expect(screen.getByText(/хранится 12 месяцев либо до удаления семьи/)).toBeInTheDocument()
+  })
+
+  it('Соглашение п. 6.8: передача владения только с согласием, исключение для администрации', async () => {
+    renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/Владение передаётся только с согласия принимающего человека/)).toBeInTheDocument()
+    expect(screen.getByText(/уведомив об этом всех членов семьи по электронной почте/)).toBeInTheDocument()
   })
 })
 
