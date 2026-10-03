@@ -1,8 +1,8 @@
 """Оплата Плюса через ЮKassa.
 
 Как это устроено:
-- Карту вводят в виджете ЮKassa на нашей странице: номер карты до нашего сервера не доходит (мы получаем
-  только confirmation_token для виджета и потом идентификатор сохранённого способа оплаты).
+- Карту вводят на странице оплаты ЮKassa: номер карты до нашего сервера не доходит (мы получаем
+  только адрес страницы оплаты и потом идентификатор сохранённого способа оплаты).
 - Что оплата прошла, мы узнаём не из браузера, а от ЮKassa: приходит HTTP-уведомление (webhook), и мы
   сами запрашиваем платёж по его id с нашим секретным ключом. Поддельное уведомление ничего не даст:
   статус берём только из ответа ЮKassa. Повторное уведомление безопасно (операция идемпотентна).
@@ -93,7 +93,7 @@ def _description(user: User, period: str) -> str:
 
 
 def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tuple[Payment, str]:
-    """Создаёт платёж с виджетом ЮKassa. Возвращает запись и confirmation_token для виджета."""
+    """Создаёт платёж ЮKassa. Возвращает запись и адрес страницы оплаты ЮKassa, куда отправляем человека."""
     amount = price_for(db, period)
     if not amount:
         raise PaymentError("Для этого срока цена не задана")
@@ -103,7 +103,7 @@ def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tu
     body = {
         "amount": _amount(amount),
         "capture": True,
-        "confirmation": {"type": "embedded"},
+        "confirmation": {"type": "redirect", "return_url": f"{_site()}/plus?paid={pay.id}"},
         "description": _description(user, period),
         "metadata": {"payment_id": str(pay.id), "user_id": str(user.id), "period": period},
     }
@@ -115,7 +115,7 @@ def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tu
         # Пока платёж не прошёл, автопродление не включаем; помним выбор в metadata ЮKassa и здесь:
         user.renew_period = period
     db.commit()
-    return pay, data["confirmation"]["confirmation_token"]
+    return pay, data["confirmation"]["confirmation_url"]
 
 
 def extend_plus(user: User, period: str, now: datetime | None = None) -> None:

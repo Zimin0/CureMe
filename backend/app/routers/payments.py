@@ -34,10 +34,10 @@ def start(body: PayIn, user: User = Depends(current_user), db: Session = Depends
     if body.auto_renew and not payments.recurring_enabled():
         raise HTTPException(409, "Автопродление пока недоступно")
     try:
-        pay, token = payments.create_payment(db, user, body.period, body.auto_renew)
+        pay, url = payments.create_payment(db, user, body.period, body.auto_renew)
     except payments.PaymentError as e:
         raise HTTPException(502, str(e)) from e
-    return PayStarted(payment_id=pay.id, confirmation_token=token)
+    return PayStarted(payment_id=pay.id, confirmation_url=url)
 
 
 @router.post("/auto-renew/off", response_model=PayStatus)

@@ -713,7 +713,7 @@ class PayIn(BaseModel):
 
 class PayStarted(BaseModel):
     payment_id: int
-    confirmation_token: str  # для виджета ЮKassa
+    confirmation_url: str  # страница оплаты ЮKassa
 
 
 class PaymentBrief(BaseModel):

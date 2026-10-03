@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminPayment, PayStatus } from '../api'
 import { planFixture, server } from '../test/server'
 import { ME, renderApp } from '../test/utils'
@@ -11,7 +11,9 @@ const STATUS: PayStatus = {
 const payStatus = (over: Partial<PayStatus> = {}) => http.get('/api/payments/me', () => HttpResponse.json({ ...STATUS, ...over }))
 const billing = http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false, billing_enabled: true })))
 
-afterEach(() => { delete window.YooMoneyCheckoutWidget })
+const assign = vi.fn()
+beforeEach(() => { vi.stubGlobal('location', { ...window.location, assign, origin: window.location.origin, pathname: '/plus', search: '' }) })
+afterEach(() => { vi.unstubAllGlobals(); assign.mockClear() })
 
 describe('оплата Плюса на странице /plus', () => {
   it('оплата выключена: блока оплаты нет', async () => {
@@ -36,54 +38,32 @@ describe('оплата Плюса на странице /plus', () => {
     expect(pay).toBeEnabled()
   })
 
-  it('создаёт платёж с выбранным сроком и согласием и открывает форму ЮKassa', async () => {
-    const render = vi.fn()
-    const Widget = vi.fn(function (this: unknown) { return { render } })
-    window.YooMoneyCheckoutWidget = Widget as never
+  it('создаёт платёж с выбранным сроком и согласием и отправляет на страницу оплаты ЮKassa', async () => {
     let sent: unknown
     server.use(billing, payStatus(), http.post('/api/payments', async ({ request }) => {
       sent = await request.json()
-      return HttpResponse.json({ payment_id: 5, confirmation_token: 'tok-5' }, { status: 201 })
+      return HttpResponse.json({ payment_id: 5, confirmation_url: 'https://yookassa.ru/checkout/payments/v2/contract?orderId=x' }, { status: 201 })
     }))
     const { user } = renderApp('/plus')
     await user.click(await screen.findByRole('radio', { name: /1\D990 ₽ за год/ }))
     await user.click(screen.getByRole('checkbox', { name: /публичной офертой/ }))
     await user.click(screen.getByRole('checkbox', { name: /автоматически продлевать/ }))
     await user.click(screen.getByRole('button', { name: /Оплатить 1\D990 ₽/ }))
-    await waitFor(() => expect(render).toHaveBeenCalledWith('yk-widget'))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://yookassa.ru/checkout/payments/v2/contract?orderId=x'))
     expect(sent).toEqual({ period: 'year', auto_renew: true, agree: true })
-    expect(Widget).toHaveBeenCalledWith(expect.objectContaining({ confirmation_token: 'tok-5', return_url: expect.stringContaining('/plus?paid=5') }))
   })
 
   it('пока ЮKassa не подключила автоплатежи, галочки автопродления нет и она не уходит на сервер', async () => {
-    const render = vi.fn()
-    window.YooMoneyCheckoutWidget = vi.fn(function () { return { render } }) as never
     let sent: unknown
     server.use(billing, payStatus({ recurring_enabled: false }), http.post('/api/payments', async ({ request }) => {
       sent = await request.json()
-      return HttpResponse.json({ payment_id: 6, confirmation_token: 'tok-6' }, { status: 201 })
+      return HttpResponse.json({ payment_id: 6, confirmation_url: 'https://yookassa.ru/x' }, { status: 201 })
     }))
     const { user } = renderApp('/plus')
     await user.click(await screen.findByRole('checkbox', { name: /публичной офертой/ }))
     expect(screen.queryByRole('checkbox', { name: /автоматически продлевать/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Оплатить 199 ₽/ }))
     await waitFor(() => expect(sent).toEqual({ period: 'month', auto_renew: false, agree: true }))
-  })
-
-  it('если браузер заблокировал форму оплаты, подсказывает обновить страницу', async () => {
-    server.use(billing, payStatus(), http.post('/api/payments', () => HttpResponse.json({ payment_id: 8, confirmation_token: 'tok-8' }, { status: 201 })))
-    const { user } = renderApp('/plus')
-    await user.click(await screen.findByRole('checkbox', { name: /публичной офертой/ }))
-    await user.click(screen.getByRole('button', { name: /Оплатить 199 ₽/ }))
-    const script = await waitFor(() => {
-      const el = document.querySelector<HTMLScriptElement>('script[src*="yookassa"]')
-      expect(el).not.toBeNull()
-      return el!
-    })
-    document.dispatchEvent(Object.assign(new Event('securitypolicyviolation'), { blockedURI: 'https://yookassa.ru/checkout-widget/v1/checkout-widget.js' }))
-    script.onerror?.(new Event('error'))
-    expect(await screen.findByText(/Браузер заблокировал форму оплаты/)).toBeInTheDocument()
-    script.remove()
   })
 
   it('незавершённые попытки оплаты в списке не показываются', async () => {

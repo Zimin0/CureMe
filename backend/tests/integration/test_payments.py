@@ -32,7 +32,7 @@ def yk(monkeypatch):
             if method == "POST":
                 n = len(self.objects) + 1
                 obj = {"id": f"yk-{n}", "status": "pending", "amount": json["amount"], "metadata": json["metadata"],
-                       "confirmation": {"confirmation_token": f"tok-{n}"}}
+                       "confirmation": {"confirmation_url": f"https://yookassa.ru/checkout/payments/v2/contract?orderId=yk-{n}"}}
                 if "payment_method_id" in json:
                     obj["status"] = "succeeded"
                 self.objects[obj["id"]] = obj
@@ -94,11 +94,11 @@ def test_checkout_requires_agreement(client, shop):
 def test_create_payment_sends_amount_no_card_data(client, shop, yk):
     h, _ = shop
     r = pay(client, h, "year")
-    assert r.status_code == 201 and r.json()["confirmation_token"] == "tok-1"
+    assert r.status_code == 201 and r.json()["confirmation_url"].endswith("orderId=yk-1")
     method, path, key, body = yk.calls[0]
     assert (method, path) == ("POST", "/payments") and key.startswith("pay-")
     assert body["amount"] == {"value": "1990.00", "currency": "RUB"}
-    assert body["confirmation"] == {"type": "embedded"} and "save_payment_method" not in body
+    assert body["confirmation"] == {"type": "redirect", "return_url": "https://kapsulka.ru/plus?paid=1"} and "save_payment_method" not in body
 
 
 def test_webhook_activates_plus_once(client, shop, yk, session_factory):
