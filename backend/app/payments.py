@@ -6,23 +6,28 @@
 - Что оплата прошла, мы узнаём не из браузера, а от ЮKassa: приходит HTTP-уведомление (webhook), и мы
   сами запрашиваем платёж по его id с нашим секретным ключом. Поддельное уведомление ничего не даст:
   статус берём только из ответа ЮKassa. Повторное уведомление безопасно (операция идемпотентна).
-- Автопродление: за 3 дня до окончания Плюса уходит письмо, в день окончания списываем по сохранённому
-  способу оплаты. Включается только галочкой при оплате, выключается кнопкой на странице «Плюс».
+- Платит только владелец семьи (R06), а Плюс продлевается семье: платёж помнит семью (payments.household_id),
+  и по уведомлению срок получает она, даже если владелец с тех пор сменился. Возврат закрывает Плюс семьи сразу (R15).
+- Автопродление (одна карта на семью, карта владельца, R21): за 3 дня до окончания Плюса уходит письмо, в день
+  окончания списываем по сохранённому способу оплаты. Включается только галочкой при оплате, выключается кнопкой на странице «Плюс».
 - Чек самозанятого (422-ФЗ) ЮKassa выпустить не может: админ оформляет его в «Мой налог» и вставляет ссылку
   на странице «Оплаты и чеки», письмо с ссылкой уходит покупателю.
 Пока в .env нет CUREME_YOOKASSA_SHOP_ID и CUREME_YOOKASSA_SECRET_KEY, всё выключено.
 """
+import calendar
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx
+from fastapi import HTTPException, status as http_status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .households import owner_of, stop_autorenew
 from .mailer import send_mail
-from .models import Payment, User
+from .models import Household, Payment, User
 from .plans import PLUS, billing_settings, plus_active
 
 log = logging.getLogger("cureme.payments")
@@ -31,6 +36,7 @@ PERIOD_DAYS = {"month": 30, "year": 365}
 PERIOD_TITLE = {"month": "1 месяц", "year": "1 год"}
 NOTICE_DAYS = 3  # за сколько дней предупреждаем о списании
 RETRY_HOURS = 2  # письмо должно уйти не позже чем за 3 дня минус эта погрешность
+MAX_AHEAD_MONTHS = 13  # Плюс семьи нельзя оплатить дальше чем на столько месяцев вперёд (R06)
 
 
 class PaymentError(Exception):
@@ -92,12 +98,58 @@ def _description(user: User, period: str) -> str:
     return f"Подписка Капсулка Плюс на {PERIOD_TITLE[period]}, аккаунт {user.email}"[:128]
 
 
+def _shift_months(moment: datetime, months: int) -> datetime:
+    """Сдвиг на целые календарные месяцы (назад при отрицательном числе); 31-е в коротком месяце становится его последним днём."""
+    index = moment.year * 12 + moment.month - 1 + months
+    year, month = divmod(index, 12)
+    month += 1
+    day = min(moment.day, calendar.monthrange(year, month)[1])
+    return moment.replace(year=year, month=month, day=day)
+
+
+def _msk_date(moment: datetime) -> str:
+    return moment.astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y")
+
+
+def _new_end(house: Household, period: str, now: datetime) -> datetime:
+    """Когда закончится Плюс семьи, если сейчас продлить его на период: от конца идущего срока, иначе от сегодня."""
+    until = _until(house)
+    base = max(now, until) if plus_active(house) and until is not None else now
+    return base + timedelta(days=PERIOD_DAYS[period])
+
+
+def check_can_pay(user: User, period: str, now: datetime | None = None) -> Household:
+    """Может ли человек сейчас оплатить Плюс своей семье (R06). Возвращает семью или отказывает с понятным текстом."""
+    now = now or datetime.now(timezone.utc)
+    house = user.household
+    owner = owner_of(house)
+    if house is None or owner is None or owner.id != user.id:
+        who = f": {owner.name}" if owner is not None else ""
+        raise HTTPException(
+            http_status.HTTP_403_FORBIDDEN,
+            f"Плюс оплачивает владелец семьи{who}. Хотите платить сами, попросите передать вам владение.",
+        )
+    if house.plan == PLUS and house.plus_until is None:
+        raise HTTPException(http_status.HTTP_409_CONFLICT, "У вашей семьи Плюс без ограничения срока, оплачивать его не нужно.")
+    new_end, limit = _new_end(house, period, now), _shift_months(now, MAX_AHEAD_MONTHS)
+    if new_end > limit:
+        until = _until(house)
+        text = f"Плюс уже оплачен до {_msk_date(until)}" if until is not None else "Плюс уже оплачен"
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT,
+            f"{text}: вперёд можно оплатить не больше чем на {MAX_AHEAD_MONTHS} месяцев. "
+            f"Этот срок можно будет оплатить с {_msk_date(_shift_months(new_end, -MAX_AHEAD_MONTHS))}.",
+        )
+    return house
+
+
 def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tuple[Payment, str]:
-    """Создаёт платёж ЮKassa. Возвращает запись и адрес страницы оплаты ЮKassa, куда отправляем человека."""
+    """Создаёт платёж ЮKassa на семью плательщика. Возвращает запись и адрес страницы оплаты ЮKassa, куда отправляем человека."""
+    house = check_can_pay(user, period)
     amount = price_for(db, period)
     if not amount:
         raise PaymentError("Для этого срока цена не задана")
-    pay = Payment(user_id=user.id, email=user.email, period=period, amount=amount)
+    pay = Payment(user_id=user.id, household_id=house.id, email=user.email, period=period, amount=amount)
     db.add(pay)
     db.flush()
     body = {
@@ -105,7 +157,7 @@ def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tu
         "capture": True,
         "confirmation": {"type": "redirect", "return_url": f"{_site()}/plus?paid={pay.id}"},
         "description": _description(user, period),
-        "metadata": {"payment_id": str(pay.id), "user_id": str(user.id), "period": period},
+        "metadata": {"payment_id": str(pay.id), "user_id": str(user.id), "household_id": str(house.id), "period": period},
     }
     if auto_renew:
         body["save_payment_method"] = True
@@ -125,19 +177,30 @@ def _until(house) -> datetime | None:
     return house.plus_until if house.plus_until.tzinfo else house.plus_until.replace(tzinfo=timezone.utc)
 
 
-def extend_plus(user: User, period: str, now: datetime | None = None) -> None:
-    """Продлевает Плюс семьи человека: от конца текущего срока, если он ещё идёт, иначе от сегодняшнего дня."""
-    now = now or datetime.now(timezone.utc)
-    house = user.household
-    if house is None:
-        return
-    base = now
-    until = _until(house)
-    if plus_active(house) and until is not None:
-        base = max(now, until)
+def extend_plus(house: Household, period: str, now: datetime | None = None) -> None:
+    """Продлевает Плюс семьи: от конца текущего срока, если он ещё идёт, иначе от сегодняшнего дня.
+
+    Здесь потолка в 13 месяцев нет: деньги уже получены, и срок выдаётся полностью. Потолок проверяется
+    при создании платежа (check_can_pay).
+    """
+    house.plus_until = _new_end(house, period, now or datetime.now(timezone.utc))
     house.plan = PLUS
-    house.plus_until = base + timedelta(days=PERIOD_DAYS[period])
     house.plus_is_trial = False
+
+
+def end_plus(db: Session, house: Household, pay: Payment, now: datetime) -> None:
+    """Возврат денег или чарджбэк: Плюс семьи заканчивается сразу (R15), автопродление выключается (R21).
+
+    Любой возврат закрывает весь Плюс, даже если оплачено вперёд несколько периодов: иначе можно было бы
+    вернуть деньги и сохранить срок. Бессрочный Плюс, выданный администратором, возврат не трогает.
+    """
+    until = _until(house)
+    if house.plan == PLUS and until is not None and until > now:
+        house.plus_until = now
+    for person in {pay.user_id, getattr(owner_of(house), "id", None)} - {None}:
+        who = db.get(User, person)
+        if who is not None:
+            stop_autorenew(who)
 
 
 def sync_payment(db: Session, yk_id: str) -> Payment | None:
@@ -154,16 +217,23 @@ def sync_payment(db: Session, yk_id: str) -> Payment | None:
     paid_rub = data.get("amount", {}).get("value")
     status = data.get("status")
     user = db.get(User, pay.user_id) if pay.user_id else None
+    # Плюс получает семья, за которую платили (R06), а не та, где плательщик оказался к моменту уведомления.
+    # Платежи без семьи (созданы прежней версией кода) идут семье плательщика.
+    house = db.get(Household, pay.household_id) if pay.household_id else (user.household if user else None)
     if status == "succeeded" and pay.status == "pending":
         if paid_rub is not None and int(float(paid_rub)) != pay.amount:
             log.error("Платёж %s: сумма %s не совпадает с %s, Плюс не выдан", yk_id, paid_rub, pay.amount)
         else:
             pay.status = "succeeded"
             pay.paid_at = datetime.now(timezone.utc)
-            if user:
-                extend_plus(user, pay.period, pay.paid_at)
+            if house is None:
+                log.error("Платёж %s оплачен, но семьи, которой он предназначался, уже нет: Плюс никому не выдан", yk_id)
+            else:
+                extend_plus(house, pay.period, pay.paid_at)
+            if user and house is not None:
                 method = data.get("payment_method") or {}
-                if method.get("saved") and method.get("id") and not pay.recurring:
+                owner = owner_of(house)
+                if method.get("saved") and method.get("id") and not pay.recurring and owner is user:
                     user.auto_renew = True
                     user.pay_method_id = method["id"]
                     user.renew_period = pay.period
@@ -174,9 +244,10 @@ def sync_payment(db: Session, yk_id: str) -> Payment | None:
             _renewal_failed(user)
     if pay.status == "succeeded" and float(data.get("refunded_amount", {}).get("value", 0) or 0) > 0:
         pay.status = "refunded"
-        if user:
-            user.auto_renew = False
-            user.pay_method_id = None
+        if house is not None:
+            end_plus(db, house, pay, datetime.now(timezone.utc))
+        elif user:
+            stop_autorenew(user)
     db.commit()
     return pay
 
@@ -206,7 +277,14 @@ def run_renewals(db: Session, now: datetime | None = None) -> None:
     now = now or datetime.now(timezone.utc)
     users = db.scalars(select(User).where(User.auto_renew.is_(True), User.pay_method_id.is_not(None)))
     for user in list(users):
-        until = _until(user.household)
+        house = user.household
+        if owner_of(house) is not user:
+            # Карта осталась у человека, который не владелец семьи (данные до правила «платит владелец», R06): не списываем.
+            log.warning("Автопродление пользователя %s отключено: он не владелец семьи", user.id)
+            stop_autorenew(user)
+            db.commit()
+            continue
+        until = _until(house)
         if until is None:
             continue
         notified_for = user.renew_notified_for
@@ -251,14 +329,14 @@ def _charge(db: Session, user: User, price: int, until: datetime) -> None:
     pay = db.scalar(select(Payment).where(Payment.user_id == user.id, Payment.recurring.is_(True), Payment.yk_id == key))
     if pay is not None:
         return  # уже пробовали для этого срока
-    pay = Payment(user_id=user.id, email=user.email, period=period, amount=price, recurring=True, yk_id=None)
+    pay = Payment(user_id=user.id, household_id=user.household_id, email=user.email, period=period, amount=price, recurring=True, yk_id=None)
     db.add(pay)
     db.flush()
     try:
         data = _request("POST", "/payments", key=key, json={
             "amount": _amount(price), "capture": True, "payment_method_id": user.pay_method_id,
             "description": _description(user, period),
-            "metadata": {"payment_id": str(pay.id), "user_id": str(user.id), "period": period},
+            "metadata": {"payment_id": str(pay.id), "user_id": str(user.id), "household_id": str(user.household_id), "period": period},
         })
         pay.yk_id = data["id"]
         db.commit()

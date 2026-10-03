@@ -323,6 +323,7 @@ export type PaymentBrief = {
 }
 export type PayStatus = {
   enabled: boolean; plus_active: boolean; plus_until: string | null; auto_renew: boolean; recurring_enabled?: boolean
+  can_pay: boolean; is_owner: boolean; owner_name: string | null  // платит только владелец семьи
   price_month: number | null; price_year: number | null; payments: PaymentBrief[]
 }
 export type AdminPayment = PaymentBrief & {

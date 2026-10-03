@@ -38,5 +38,6 @@ export const server = setupServer(
   // оплата выключена; тесты оплаты подменяют ответ
   http.get('/api/payments/me', () => HttpResponse.json({
     enabled: false, plus_active: false, plus_until: null, auto_renew: false, price_month: null, price_year: null, payments: [],
+    can_pay: false, is_owner: true, owner_name: 'Анна',
   })),
 )
