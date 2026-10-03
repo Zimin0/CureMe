@@ -41,8 +41,19 @@ def _user_out(u: User) -> AdminUserOut:
         id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, email_verified=u.email_verified_at is not None,
         created_at=u.created_at,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
-        plan=u.plan, plus_until=u.plus_until, plus_active=plus_active(u),
+        plan=u.plan, plus_until=u.plus_until, plus_active=plus_active(u), auto_renew=u.auto_renew,
+        plus_from_others=_plus_from_others(u),
     )
+
+
+def _plus_from_others(u: User) -> list[str]:
+    """Аптечки, где человек не главный владелец, но Плюс есть: он идёт от тарифа главного владельца, а не от тарифа человека."""
+    out = []
+    for m in sorted(u.memberships, key=lambda m: m.joined_at):
+        owner = family_owner_user(m.family)
+        if owner and owner.id != u.id and plus_active(owner):
+            out.append(f"{m.family.name} (Плюс у {owner.name})")
+    return out
 
 
 def _family_out(db: Session, f: Family) -> AdminFamilyOut:
@@ -98,10 +109,13 @@ def list_users(db: Session = Depends(get_db)):
 @router.put("/users/{user_id}/plan", response_model=AdminUserOut)
 def set_user_plan(user_id: int, body: AdminPlanIn, db: Session = Depends(get_db)):
     """Ручное включение Плюса аккаунту (оплаты пока нет). Плюс действует на все аптечки, где он главный владелец.
-    Бесплатный тариф сбрасывает и срок."""
+    Бесплатный тариф сбрасывает срок и автопродление: сохранённый способ оплаты забываем, иначе человек остался бы
+    с включённым автопродлением и кнопкой «Отключить» у тарифа, которого у него уже нет."""
     u = _get_user(db, user_id)
     u.plan = body.plan
     u.plus_until = body.plus_until if body.plan == "plus" else None
+    if body.plan != "plus":
+        u.auto_renew, u.pay_method_id, u.renew_period, u.renew_notified_for, u.renew_notified_at = False, None, None, None, None
     db.commit()
     return _user_out(u)
 

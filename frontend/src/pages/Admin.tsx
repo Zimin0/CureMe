@@ -695,6 +695,12 @@ function PlanSheet({ person, onClose }: { person: AdminUser; onClose: () => void
           </>
         )}
         <p className="muted small">Сейчас: {planText(person)}. Действует на все аптечки, где {person.name} главный владелец.</p>
+        {person.auto_renew && <p className="muted small">Автопродление включено: при выборе «Бесплатный» оно отключится и сохранённый способ оплаты будет забыт.</p>}
+        {!!person.plus_from_others?.length && (
+          <p className="muted small">
+            Плюс на этих аптечках идёт не от тарифа {person.name}, а от главного владельца аптечки, поэтому снятие тарифа его не уберёт: {person.plus_from_others.join('; ')}.
+          </p>
+        )}
         <button className="btn primary block" disabled={save.isPending}>{save.isPending ? 'Сохраняем…' : 'Сохранить'}</button>
       </form>
     </Sheet>

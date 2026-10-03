@@ -212,6 +212,9 @@ class AdminUserOut(BaseModel):
     plan: str = "free"
     plus_until: datetime | None = None
     plus_active: bool = False  # Плюс аккаунта оплачен и не истёк
+    auto_renew: bool = False  # включено автопродление (способ оплаты сохранён в ЮKassa)
+    # Аптечки, где у человека есть Плюс не от его тарифа, а от главного владельца аптечки.
+    plus_from_others: list[str] = []
 
 
 class AdminUserUpdate(BaseModel):
