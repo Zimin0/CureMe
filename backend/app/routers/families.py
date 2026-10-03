@@ -127,7 +127,7 @@ def invite_info(code: str, request: Request, db: Session = Depends(get_db)):
 @router.post("/families/join", response_model=FamilyOut)
 def join(body: JoinIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     limiter.hit(f"invite:{client_ip(request)}", limit=30, window=600)
-    inv = households.claim_invite(db, body.code)
+    inv = households.claim_invite(db, body.code, user)
     if inv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено или устарело")
     house = inv.household

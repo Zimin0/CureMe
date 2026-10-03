@@ -127,17 +127,23 @@ def ensure_invite(db: Session, house: Household, actor: User | None) -> Househol
     return active_invite(db, house) or issue_invite(db, house, actor)
 
 
-def claim_invite(db: Session, code: str) -> HouseholdInvite | None:
+def claim_invite(db: Session, code: str, user: User | None = None) -> HouseholdInvite | None:
     """Приглашение по коду под блокировкой семьи: из двух одновременных вступлений по одному коду пройдёт одно (R04, R20).
 
-    Блокируем семью, перечитываем приглашение и только потом проверяем, что оно ещё действует.
+    Блокируем семью приглашения (и семью вступающего, если он уже в сервисе) в порядке возрастания id, как и join:
+    встречные вступления двух людей друг к другу не ждут друг друга. Потом перечитываем приглашение и проверяем,
+    что оно ещё действует: пока мы ждали, семья могла раствориться (её единственный человек вступил в другую).
     """
-    inv = db.scalar(select(HouseholdInvite).where(HouseholdInvite.code == code.strip().upper()))
-    if inv is None:
+    code = code.strip().upper()
+    inv = db.scalar(select(HouseholdInvite).where(HouseholdInvite.code == code))
+    house = db.get(Household, inv.household_id) if inv is not None else None
+    if house is None:
         return None
-    lock(db, inv.household)
-    db.refresh(inv)
-    return inv if _invite_valid(inv, datetime.now(timezone.utc)) else None
+    mine = user.household if user is not None else None
+    for h in sorted({house, mine} - {None}, key=lambda x: x.id):
+        lock(db, h)
+    inv = db.scalar(select(HouseholdInvite).where(HouseholdInvite.code == code).execution_options(populate_existing=True))
+    return inv if inv is not None and _invite_valid(inv, datetime.now(timezone.utc)) else None
 
 
 def use_invite(inv: HouseholdInvite, user: User) -> None:
