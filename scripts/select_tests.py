@@ -41,7 +41,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     "Аккаунты и вход": {
         "sources": ["routers/auth.py", "security.py", "legal.py", "ratelimit.py", "email_verification.py", "mailer.py"],
         "tests": [
-            "unit/test_security.py", "unit/test_mailer.py", "integration/test_auth.py",
+            "unit/test_security.py", "unit/test_mailer.py", "unit/test_mail_addresses.py", "integration/test_auth.py",
             "integration/test_security_hardening.py", "integration/test_closed_mode.py",
             "integration/test_access_control.py", "integration/test_email_verification.py",
         ],
