@@ -303,3 +303,35 @@ def test_payments_admin_only(client, shop, yk):
     assert client.get("/api/admin/payments", headers=other).status_code == 403
     assert client.put("/api/admin/payments/1/receipt", headers=other, json={"url": "https://x.example/aaaa"}).status_code == 403
     assert client.get("/api/payments/me").status_code == 401
+
+
+# --- снятие Плюса в админке ---
+def test_revoking_plus_also_switches_off_autorenew(client, shop, yk, session_factory):
+    h, _ = shop
+    buyer, u = register(client, "buyer@example.com", "Покупатель")
+    with session_factory() as db:
+        user = db.get(User, u["id"])
+        user.plan, user.plus_until = "plus", datetime.now(timezone.utc) + timedelta(days=20)
+        user.auto_renew, user.pay_method_id, user.renew_period = True, "pm-1", "month"
+        user.renew_notified_for = user.plus_until
+        db.commit()
+    assert client.get("/api/admin/users", headers=h).json()[1]["auto_renew"] is True
+    r = client.put(f"/api/admin/users/{u['id']}/plan", headers=h, json={"plan": "free"})
+    assert r.status_code == 200 and r.json()["plus_active"] is False and r.json()["auto_renew"] is False
+    row = user_row(session_factory, u["id"])
+    assert (row.plan, row.plus_until, row.auto_renew, row.pay_method_id, row.renew_period, row.renew_notified_for) == ("free", None, False, None, None, None)
+    assert client.get("/api/payments/me", headers=buyer).json()["auto_renew"] is False
+    with session_factory() as db:
+        payments.run_renewals(db)  # списывать больше нечего
+    assert not [c for c in yk.calls if c[3] and "payment_method_id" in c[3]]
+
+
+def test_admin_sees_plus_that_comes_from_cabinet_owner(client, shop):
+    h, owner = shop  # админ владеет аптечкой
+    code = next(f for f in client.get("/api/admin/families", headers=h).json() if f["id"] == owner["families"][0]["id"])["invite_code"]
+    register(client, "member@example.com", "Участник", invite=code)
+    client.put(f"/api/admin/users/{owner['id']}/plan", headers=h, json={"plan": "plus"})
+    rows = {x["email"]: x for x in client.get("/api/admin/users", headers=h).json()}
+    assert rows["member@example.com"]["plus_active"] is False
+    assert any("Плюс у" in s for s in rows["member@example.com"]["plus_from_others"])
+    assert rows[owner["email"]]["plus_from_others"] == []
