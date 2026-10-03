@@ -17,6 +17,20 @@ const overview = http.get('/api/families/7/overview', () => HttpResponse.json({
 }))
 
 describe('админка', () => {
+  it('проверка перед миграцией на семьи показывает конфликты и ничего не меняет', async () => {
+    server.use(stats, http.get('/api/admin/families', () => HttpResponse.json([
+      { id: 7, name: 'Семья Никиты', invite_code: 'ABC', medicine_count: 2, members: [] },
+    ])), http.get('/api/admin/household-check', () => HttpResponse.json({
+      users: 3, families: 2, would_create_households: 1, safe: false, households: [],
+      conflicts: [{ users: ['Маша <m@example.com>'], families: ['Семья Никиты', 'Дача'], missing: ['m@example.com не состоит в «Дача»'] }],
+      multi_owner_families: [], families_without_owner: [], users_without_family: [], families_without_people: [], over_free_limits: [],
+    })))
+    const { user } = renderApp('/admin?tab=families', { me: ADMIN })
+    await user.click(await screen.findByRole('button', { name: 'Проверить данные' }))
+    expect(await screen.findByText(/Есть конфликты, миграцию пока нельзя/)).toBeInTheDocument()
+    expect(screen.getByText(/m@example.com не состоит в «Дача»/)).toBeInTheDocument()
+  })
+
   it('обычного пользователя не пускает и ссылку не показывает', async () => {
     server.use(overview)
     renderApp('/admin')
