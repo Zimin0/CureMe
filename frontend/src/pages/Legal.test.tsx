@@ -25,6 +25,17 @@ describe('юридические страницы', () => {
     expect(screen.queryByText(/участник семейной аптечки/)).not.toBeInTheDocument()
   })
 
+  it('Соглашение п. 6.12 и Политика п. 5.10: окончание Плюса и перенос в личные семьи', async () => {
+    renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/6\.12\. После окончания оплаченного срока тарифа «Плюс»/)).toBeInTheDocument()
+    expect(screen.getByText(/Замороженная аптечка хранится без ограничения срока/, { exact: false })).toBeInTheDocument()
+  })
+
+  it('Политика п. 5.10: перенос данных между семьями без передачи третьим лицам', async () => {
+    renderApp('/privacy')
+    expect(await screen.findByText(/5\.10\. Перенос данных между семьями\./)).toBeInTheDocument()
+  })
+
   it('страница оферты: автопродление по отдельному согласию и возврат, ИНН показан флагом', async () => {
     renderApp('/offer')
     expect(await screen.findByRole('heading', { name: 'Публичная оферта «Капсулка Плюс»' })).toBeInTheDocument()
