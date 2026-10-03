@@ -62,8 +62,22 @@ def _request(method: str, path: str, *, key: str | None = None, json: dict | Non
         raise PaymentError("Платёжный сервис не отвечает") from e
     if r.status_code >= 400:
         log.error("ЮKassa %s %s: %s %s", method, path, r.status_code, r.text[:300])
-        raise PaymentError(f"ЮKassa вернула ошибку {r.status_code}")
+        raise PaymentError(_error_text(r, bool(json and json.get("save_payment_method"))))
     return r.json()
+
+
+def _error_text(r: httpx.Response, wanted_autopay: bool) -> str:
+    """Понятное сообщение об отказе ЮKassa: код ошибки и, если вероятна причина, подсказка."""
+    try:
+        code = r.json().get("code") or ""
+    except ValueError:
+        code = ""
+    text = f"ЮKassa отказала ({r.status_code}{', ' + code if code else ''})"
+    if r.status_code == 403 and wanted_autopay:
+        text += ". Возможно, в ЮKassa не подключены автоплатежи: попробуйте без галочки автопродления"
+    elif r.status_code in (401, 403):
+        text += ". Проверьте ключи ЮKassa и права магазина"
+    return text
 
 
 def _amount(rub: int) -> dict:

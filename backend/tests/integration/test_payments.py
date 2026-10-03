@@ -9,6 +9,9 @@ from app.models import Payment, User
 from tests.conftest import register
 
 
+REAL_REQUEST = payments._request  # до подмены фикстурой yk
+
+
 @pytest.fixture
 def yk(monkeypatch):
     """Ключи ЮKassa заданы, платная версия включена, цена 199/1990. Возвращает «сервер ЮKassa»."""
@@ -335,3 +338,32 @@ def test_admin_sees_plus_that_comes_from_cabinet_owner(client, shop):
     assert rows["member@example.com"]["plus_active"] is False
     assert any("Плюс у" in s for s in rows["member@example.com"]["plus_from_others"])
     assert rows[owner["email"]]["plus_from_others"] == []
+
+
+# --- ошибки ЮKassa ---
+def _http_error(monkeypatch, status, body):
+    import httpx
+
+    def fake(method, url, **kw):
+        return httpx.Response(status, json=body, request=httpx.Request(method, url))
+    monkeypatch.setattr(payments.httpx, "request", fake)
+
+
+def test_403_with_autopay_hints_at_autopayments(client, shop, monkeypatch):
+    h, _ = shop
+    monkeypatch.setattr(payments, "_request", REAL_REQUEST)  # настоящий вызов, подменяем только сеть
+    _http_error(monkeypatch, 403, {"type": "error", "code": "forbidden", "description": "x"})
+    r = client.post("/api/payments", headers=h, json={"period": "month", "auto_renew": True, "agree": True})
+    assert r.status_code == 502
+    assert "403, forbidden" in r.json()["detail"] and "без галочки автопродления" in r.json()["detail"]
+    r = client.post("/api/payments", headers=h, json={"period": "month", "auto_renew": False, "agree": True})
+    assert "403, forbidden" in r.json()["detail"] and "Проверьте ключи" in r.json()["detail"]
+
+
+def test_non_json_error_body(client, shop, monkeypatch):
+    import httpx
+    h, _ = shop
+    monkeypatch.setattr(payments, "_request", REAL_REQUEST)
+    monkeypatch.setattr(payments.httpx, "request", lambda m, u, **kw: httpx.Response(500, text="oops", request=httpx.Request(m, u)))
+    r = client.post("/api/payments", headers=h, json={"period": "month", "agree": True})
+    assert r.status_code == 502 and "500" in r.json()["detail"]
