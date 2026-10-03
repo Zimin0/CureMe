@@ -187,7 +187,7 @@ it('кулдаун смены семьи: дату видно заранее, а
   const future = new Date(Date.now() + 10 * 86400_000).toISOString()
   server.use(http.get('/api/invites/ABCD2345', () => HttpResponse.json({ family_name: 'Зимины', owner_name: 'Анна', full: false })))
   const first = renderApp('/join/ABCD2345', { me: { ...ME, next_change_at: future } })
-  expect(await screen.findByRole('note')).toHaveTextContent('Сменить семью можно раз в 30 дней')
+  expect(await screen.findByRole('note')).toHaveTextContent(/Сменить семью можно раз в 30 дней: следующий раз с .* \(по московскому времени\)\. Если нужно срочно, напишите нам\./)
   first.unmount()
 
   renderApp('/join/ABCD2345', { me: { ...ME, next_change_at: new Date(Date.now() - 86400_000).toISOString() } })

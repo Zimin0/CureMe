@@ -1,7 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { api, Family } from './api'
 import { useAuth } from './auth'
-import { fmtDate } from './format'
 
 /** Начало ответа сервера, когда у человека оплачен Плюс и без переноса дней вступить нельзя (R08 «а»). */
 const NEEDS_CARRY = 'У вашей семьи оплачен Плюс'
@@ -37,5 +36,7 @@ export function CooldownNote() {
   const { me } = useAuth()
   const until = me?.next_change_at
   if (!until || new Date(until).getTime() <= Date.now()) return null
-  return <p className="muted small" role="note">Сменить семью можно раз в 30 дней: следующий раз с {fmtDate(until)}.</p>
+  const when = new Date(until).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  // Слова те же, что в ответе сервера и в п. 6.13 Соглашения: дата по московскому времени и «напишите нам» для срочного случая.
+  return <p className="muted small" role="note">Сменить семью можно раз в 30 дней: следующий раз с {when} (по московскому времени). Если нужно срочно, напишите нам.</p>
 }
