@@ -88,8 +88,8 @@ export function Family() {
             {m.role === 'owner' && <span className="badge accent"><Crown size={12} />Владелец</span>}
             {owner && m.user_id !== me?.id && (
               <>
-                <button className="icon-btn" title={m.role === 'owner' ? 'Сделать участником' : 'Сделать владельцем'}
-                  onClick={() => setRole.mutate({ uid: m.user_id, role: m.role === 'owner' ? 'member' : 'owner' })}><Crown size={16} /></button>
+                <button className="icon-btn" title="Передать владение"
+                  onClick={() => confirm(`Передать владение: ${m.name}? Вы станете участником, автопродление Плюса отключится.`) && setRole.mutate({ uid: m.user_id, role: 'owner' })}><Crown size={16} /></button>
                 <button className="icon-btn" title="Убрать из семьи" onClick={() => confirm(`Убрать ${m.name} из семьи?`) && removeMember.mutate(m.user_id)}><Trash2 size={16} /></button>
               </>
             )}
@@ -113,7 +113,7 @@ export function Family() {
         <button className="btn primary block" onClick={copyLink}><Share2 size={18} />Поделиться ссылкой</button>
         {membersFull && (
           <div className="alert warn">
-            <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> участников сколько угодно.</span>
+            <span>В семье уже предел бесплатной версии: по ссылке больше никто не вступит. В <Link to="/plus">Капсулке Плюс</Link> в семье до 5 человек.</span>
           </div>
         )}
       </section>
@@ -126,7 +126,7 @@ export function Family() {
         <h2>Аккаунт</h2>
         <div className="row wrap">
           {me?.is_admin && <Link to="/admin" className="btn"><Shield size={16} />Панель администратора</Link>}
-          <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»?`) && removeMember.mutate(me!.id)}>Покинуть семью</button>
+          {!owner && <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»? У вас будет своя семья и одна из созданных вами аптечек.`) && removeMember.mutate(me!.id)}>Покинуть семью</button>}
           <button className="btn danger" onClick={signOut}><LogOut size={16} />Выйти из аккаунта</button>
           <DeleteAccountButton />
         </div>

@@ -53,6 +53,15 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
             "integration/test_plans.py", "integration/test_trial.py",
         ],
     },
+    "Семья и аптечки (состав, лимиты, тариф семьи)": {
+        "sources": ["households.py"],
+        "tests": [
+            "integration/test_households.py", "integration/test_households_concurrency.py",
+            "migrations/test_households_migration.py", "integration/test_families.py", "integration/test_auth.py",
+            "integration/test_admin.py", "integration/test_limits.py", "integration/test_plans.py",
+            "integration/test_trial.py", "integration/test_payments.py", "integration/test_access_control.py",
+        ],
+    },
     "Лекарства, упаковки, остатки": {
         "sources": ["routers/medicines.py", "services.py"],
         "tests": [

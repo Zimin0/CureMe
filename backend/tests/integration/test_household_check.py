@@ -1,4 +1,7 @@
 """Проверка данных перед миграцией на «семья + аптечки»: находит группы, которые нельзя склеить без потери приватности."""
+from sqlalchemy import delete, update
+
+from app.models import Membership
 from tests.conftest import fid, register
 
 
@@ -25,12 +28,16 @@ def test_family_with_all_its_people_is_one_complete_household(client):
     assert rep["conflicts"] == [] and rep["safe"] is True
 
 
-def test_person_in_two_families_with_different_people_is_a_conflict(client):
+def test_person_in_two_families_with_different_people_is_a_conflict(client, session_factory):
     admin, a = register(client)
     code = next(f for f in client.get("/api/admin/families", headers=admin).json() if f["id"] == fid(a))["invite_code"]
-    register(client, "masha@example.com", "Маша", invite=code)
-    # у владельца вторая аптечка, в которой Маши нет: склеить в одну семью нельзя без лишнего доступа
-    assert client.post("/api/families", headers=admin, json={"name": "Дача"}).status_code == 201
+    _, masha = register(client, "masha@example.com", "Маша", invite=code)
+    # Старые данные: у владельца вторая аптечка, в которой Маши нет (новая модель такого не создаёт, строим вручную):
+    # склеить их в одну семью нельзя без лишнего доступа
+    dacha = client.post("/api/families", headers=admin, json={"name": "Дача"}).json()["id"]
+    with session_factory() as db:
+        db.execute(delete(Membership).where(Membership.family_id == dacha, Membership.user_id == masha["id"]))
+        db.commit()
     rep = check(client, admin)
     assert rep["safe"] is False and len(rep["conflicts"]) == 1
     assert any("masha@example.com не состоит в «Дача»" in m for m in rep["conflicts"][0]["missing"])
@@ -43,12 +50,13 @@ def test_several_own_families_of_one_person_are_not_a_conflict(client):
     assert rep["would_create_households"] == 1 and rep["safe"] is True
 
 
-def test_multiple_owners_are_reported_but_safe(client):
+def test_multiple_owners_are_reported_but_safe(client, session_factory):
     admin, a = register(client)
     code = next(f for f in client.get("/api/admin/families", headers=admin).json() if f["id"] == fid(a))["invite_code"]
     _, b = register(client, "masha@example.com", "Маша", invite=code)
-    r = client.patch(f"/api/admin/families/{fid(a)}/members/{b['id']}", headers=admin, json={"role": "owner"})
-    assert r.status_code == 200
+    with session_factory() as db:  # старые данные: два владельца (новая модель допускает одного, строим вручную)
+        db.execute(update(Membership).where(Membership.family_id == fid(a), Membership.user_id == b["id"]).values(role="owner"))
+        db.commit()
     rep = check(client, admin)
     assert len(rep["multi_owner_families"]) == 1 and rep["safe"] is True
 
@@ -62,10 +70,12 @@ def test_free_family_above_new_limit_is_reported(client):
     assert rep["safe"] is True and len(rep["over_free_limits"]) == 1
 
 
-def test_user_without_family_is_listed(client):
+def test_user_without_family_is_listed(client, session_factory):
     admin, a = register(client)
     _, b = register(client, "masha@example.com", "Маша")
-    assert client.delete(f"/api/admin/families/{fid(b)}", headers=admin).status_code == 204
+    with session_factory() as db:  # старые данные: человек без аптечки (новая модель создаёт личную семью, строим вручную)
+        db.execute(delete(Membership).where(Membership.user_id == b["id"]))
+        db.commit()
     rep = check(client, admin)
     assert rep["users_without_family"] == ["masha@example.com"]
 

@@ -39,7 +39,7 @@ it('в бесплатной версии вторая своя аптечка п
   let created = false
   server.use(http.post('/api/families', () => { created = true; return HttpResponse.json({}, { status: 201 }) }))
   const { user } = renderApp('/family', { me: { ...ME, own_families_left: 0 } })
-  expect(await screen.findByText(/В бесплатной версии одна своя аптечка/)).toBeInTheDocument()
+  expect(await screen.findByText(/аптечек столько, сколько людей в семье/)).toBeInTheDocument()
   // Серой неактивной кнопки нет: единственная «Новая аптечка» — в плашке Плюса.
   expect(screen.getAllByRole('button', { name: 'Новая аптечка' })).toHaveLength(1)
   await user.click(within(screen.getByRole('note')).getByRole('button', { name: 'Новая аптечка' }))

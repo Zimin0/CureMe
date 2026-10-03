@@ -5,22 +5,21 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import household_check
+from .. import household_check, households
 from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
 from ..mailer import send_mail
-from ..models import Category, Family, Medicine, MedicineCategory, Membership, Payment, User
+from ..models import Category, Family, HouseholdEvent, Medicine, MedicineCategory, Membership, Payment, User
 from ..schemas import (
     AccessSettings, AdminPaymentOut, AdminPlanIn, ReceiptIn, BillingSettings, DebugSettings, TelegramSettings,
     AdminFamilyOut, AdminMemberIn, AdminStats, AdminUserOut, AdminUserUpdate, CategoryIn, CategoryOrderIn,
-    CategoryOut, FamilyBrief, FamilyIn, IndicationHintsIn, MemberOut, RoleIn,
+    CategoryOut, FamilyBrief, FamilyIn, HouseholdEventOut, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
-from ..plans import billing_settings, family_owner_user, plus_active, set_billing_settings
+from ..plans import PLUS, billing_settings, plus_active, set_billing_settings
 from ..security import hash_password
 from ..services import access_settings, debug_enabled, indication_hints, set_access_settings, set_debug_enabled, set_indication_hints, set_telegram_switch, telegram_switch_on
-from .files import _drop_photo
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_user)])
 
@@ -38,55 +37,34 @@ def _get_user(db: Session, user_id: int) -> User:
 
 def _user_out(u: User) -> AdminUserOut:
     fams = sorted(u.memberships, key=lambda m: m.joined_at)
+    house = u.household
     return AdminUserOut(
         id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, email_verified=u.email_verified_at is not None,
         created_at=u.created_at,
         families=[FamilyBrief(id=m.family_id, name=m.family.name, role=m.role) for m in fams],
-        plan=u.plan, plus_until=u.plus_until, plus_active=plus_active(u), auto_renew=u.auto_renew,
-        plus_from_others=_plus_from_others(u),
+        plan=house.plan if house else "free", plus_until=house.plus_until if house else None,
+        plus_active=plus_active(house), auto_renew=u.auto_renew,
+        household_id=u.household_id, is_owner=u.household_role == "owner",
     )
-
-
-def _plus_from_others(u: User) -> list[str]:
-    """Аптечки, где человек не главный владелец, но Плюс есть: он идёт от тарифа главного владельца, а не от тарифа человека."""
-    out = []
-    for m in sorted(u.memberships, key=lambda m: m.joined_at):
-        owner = family_owner_user(m.family)
-        if owner and owner.id != u.id and plus_active(owner):
-            out.append(f"{m.family.name} (Плюс у {owner.name})")
-    return out
 
 
 def _family_out(db: Session, f: Family) -> AdminFamilyOut:
     count = db.scalar(select(func.count()).select_from(Medicine).where(Medicine.family_id == f.id)) or 0
-    members = sorted(f.memberships, key=lambda m: (m.role != "owner", m.joined_at))
-    owner = family_owner_user(f)
+    house = f.household
+    owner = households.owner_of(house)
+    members = households.people(house) if house else []
     return AdminFamilyOut(
         id=f.id, name=f.name, invite_code=f.invite_code, created_at=f.created_at, medicine_count=count,
         members=[
-            MemberOut(user_id=m.user_id, name=m.user.name, email=m.user.email, role=m.role, joined_at=m.joined_at)
-            for m in members
+            MemberOut(user_id=u.id, name=u.name, email=u.email, role=u.household_role,
+                      is_owner=u.household_role == "owner", joined_at=u.household_joined_at)
+            for u in members
         ],
-        plan=owner.plan if owner else "free", plus_until=owner.plus_until if owner else None,
-        plus_active=plus_active(owner), owner_id=owner.id if owner else None, owner_name=owner.name if owner else None,
+        plan=house.plan if house else "free", plus_until=house.plus_until if house else None,
+        plus_active=plus_active(house), owner_id=owner.id if owner else None, owner_name=owner.name if owner else None,
+        household_id=house.id if house else None, household_people=len(members),
+        household_cabinets=len(house.cabinets) if house else 0,
     )
-
-
-def _delete_family(db: Session, f: Family) -> None:
-    for name in db.scalars(select(Medicine.photo).where(Medicine.family_id == f.id, Medicine.photo.is_not(None))):
-        _drop_photo(name)
-    db.delete(f)
-
-
-def _leave(db: Session, m: Membership) -> None:
-    """Убирает человека из семьи так, чтобы у семьи остался владелец, а пустая семья исчезла."""
-    others = sorted((x for x in m.family.memberships if x.id != m.id), key=lambda x: x.joined_at)
-    if not others:
-        _delete_family(db, m.family)
-        return
-    if m.role == "owner" and not any(x.role == "owner" for x in others):
-        others[0].role = "owner"
-    db.delete(m)
 
 
 @router.get("/stats", response_model=AdminStats)
@@ -114,15 +92,23 @@ def list_users(db: Session = Depends(get_db)):
 
 
 @router.put("/users/{user_id}/plan", response_model=AdminUserOut)
-def set_user_plan(user_id: int, body: AdminPlanIn, db: Session = Depends(get_db)):
-    """Ручное включение Плюса аккаунту (оплаты пока нет). Плюс действует на все аптечки, где он главный владелец.
-    Бесплатный тариф сбрасывает срок и автопродление: сохранённый способ оплаты забываем, иначе человек остался бы
-    с включённым автопродлением и кнопкой «Отключить» у тарифа, которого у него уже нет."""
+def set_user_plan(user_id: int, body: AdminPlanIn, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    """Ручное включение Плюса семье человека (R16). Плюс действует на всех людей семьи и все её аптечки; выдача пишется
+    в журнал семьи. Бесплатный тариф сбрасывает срок и автопродление: сохранённый способ оплаты забываем, иначе
+    у семьи осталось бы включённое автопродление и кнопка «Отключить» у тарифа, которого уже нет."""
     u = _get_user(db, user_id)
-    u.plan = body.plan
-    u.plus_until = body.plus_until if body.plan == "plus" else None
-    if body.plan != "plus":
-        u.auto_renew, u.pay_method_id, u.renew_period, u.renew_notified_for, u.renew_notified_at = False, None, None, None, None
+    house = u.household
+    if house is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "У человека нет семьи: тариф выдавать некому")
+    house.plan = body.plan
+    house.plus_until = body.plus_until if body.plan == PLUS else None
+    house.plus_is_trial = False
+    if body.plan != PLUS:
+        # Карта привязана к человеку, но платит он за семью: сбрасываем у всех её людей, а не только у выбранного.
+        for member in house.members:
+            households.stop_autorenew(member)
+    until = f" до {body.plus_until:%Y-%m-%d}" if body.plan == PLUS and body.plus_until else ""
+    households.record(db, house, "plan", user=u, actor=me, detail=body.plan + until)
     db.commit()
     return _user_out(u)
 
@@ -158,10 +144,7 @@ def delete_user(user_id: int, me: User = Depends(admin_user), db: Session = Depe
     u = _get_user(db, user_id)
     if u.id == me.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя удалить свой собственный аккаунт")
-    for m in list(u.memberships):
-        _leave(db, m)
-    db.flush()
-    db.expire(u, ["memberships"])  # часть членств уже удалилась вместе с опустевшими семьями
+    households.delete_account(db, u, admin=True)  # владельцу при других людях владение передаётся самому давнему участнику
     db.delete(u)
     db.commit()
     return Response(status_code=204)
@@ -192,49 +175,66 @@ def rename_family(family_id: int, body: FamilyIn, db: Session = Depends(get_db))
 
 
 @router.delete("/families/{family_id}", status_code=204)
-def delete_family(family_id: int, db: Session = Depends(get_db)):
-    _delete_family(db, _family(db, family_id))
+def delete_family(family_id: int, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    """Администратор может удалить и последнюю аптечку семьи: человек потом создаст новую (в отличие от R24 для людей)."""
+    households.delete_cabinet(db, _family(db, family_id), actor=me, force=True)
     db.commit()
     return Response(status_code=204)
 
 
 @router.post("/families/{family_id}/members", response_model=AdminFamilyOut)
-def add_member(family_id: int, body: AdminMemberIn, db: Session = Depends(get_db)):
+def add_member(family_id: int, body: AdminMemberIn, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    """Вносит человека в семью этой аптечки по тем же правилам, что и приглашение (R08, лимиты R02, R03)."""
     f = _family(db, family_id)
     user = db.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
     if not user:
         raise _not_found("Аккаунт с такой почтой")
-    if any(m.user_id == user.id for m in f.memberships):
+    if user.household_id is not None and user.household_id == f.household_id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Этот человек уже в семье")
-    db.add(Membership(family=f, user=user, role=body.role))
+    if f.household is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "У аптечки нет семьи")
+    households.join(db, user, f.household, actor=me, force=True)
+    if body.role == "owner":
+        households.make_owner(db, f.household, user, actor=me)
     db.commit()
     db.refresh(f)
     return _family_out(db, f)
 
 
-def _member(f: Family, user_id: int) -> Membership:
-    m = next((m for m in f.memberships if m.user_id == user_id), None)
-    if not m:
+def _member(f: Family, user_id: int) -> User:
+    u = next((u for u in f.household.members if u.id == user_id), None) if f.household else None
+    if not u:
         raise _not_found("Участник")
-    return m
+    return u
 
 
 @router.patch("/families/{family_id}/members/{user_id}", response_model=AdminFamilyOut)
-def set_role(family_id: int, user_id: int, body: RoleIn, db: Session = Depends(get_db)):
+def set_role(family_id: int, user_id: int, body: RoleIn, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    """Передача владения без согласия: инструмент поддержки. Владелец один, поэтому «участник» самому владельцу не ставится."""
     f = _family(db, family_id)
-    m = _member(f, user_id)
-    if body.role == "member" and m.role == "owner" and sum(x.role == "owner" for x in f.memberships) == 1:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "В семье должен остаться хотя бы один владелец")
-    m.role = body.role
+    u = _member(f, user_id)
+    if body.role == "member" and u.household_role == "owner":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "В семье должен быть владелец: назначьте владельцем другого человека")
+    if body.role == "owner":
+        households.make_owner(db, f.household, u, actor=me)
     db.commit()
     return _family_out(db, f)
 
 
 @router.delete("/families/{family_id}/members/{user_id}", status_code=204)
-def remove_member(family_id: int, user_id: int, db: Session = Depends(get_db)):
-    _leave(db, _member(_family(db, family_id), user_id))
+def remove_member(family_id: int, user_id: int, me: User = Depends(admin_user), db: Session = Depends(get_db)):
+    """Администратор убирает человека из семьи: тот же выход, что и у человека (R09). Владельца сначала меняют."""
+    households.leave(db, _member(_family(db, family_id), user_id), actor=me, kicked=True)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get("/households/{household_id}/events", response_model=list[HouseholdEventOut])
+def household_events(household_id: int, db: Session = Depends(get_db)):
+    """Журнал семьи: вступления, выходы, передача владения, выдача Плюса (R16)."""
+    rows = db.scalars(select(HouseholdEvent).where(HouseholdEvent.household_id == household_id)
+                      .order_by(HouseholdEvent.id.desc()).limit(200))
+    return [HouseholdEventOut.model_validate(r, from_attributes=True) for r in rows]
 
 
 # --- категории (общие для всех семей) ---

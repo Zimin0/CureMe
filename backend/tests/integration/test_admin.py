@@ -108,6 +108,7 @@ def test_admin_manages_families(client):
     assert [m["name"] for m in r.json()["members"]] == ["Маша", "Никита"]
     assert client.post(f"/api/admin/families/{fid}/members", headers=admin, json={"email": "nobody@example.com"}).status_code == 404
 
+    # владелец один (R02): понизить единственного нельзя, владелец меняется назначением другого
     assert client.patch(f"/api/admin/families/{fid}/members/{masha['id']}", headers=admin, json={"role": "member"}).status_code == 400
     client.patch(f"/api/admin/families/{fid}/members/{me['id']}", headers=admin, json={"role": "owner"})
     assert client.patch(f"/api/admin/families/{fid}/members/{masha['id']}", headers=admin, json={"role": "member"}).status_code == 200
@@ -115,7 +116,9 @@ def test_admin_manages_families(client):
     assert client.patch(f"/api/admin/families/{fid}", headers=admin, json={"name": "Дача"}).json()["name"] == "Дача"
     assert client.delete(f"/api/admin/families/{fid}/members/{masha['id']}", headers=admin).status_code == 204
     fams = {f["id"]: f for f in client.get("/api/admin/families", headers=admin).json()}
-    assert [m["name"] for m in fams[fid]["members"]] == ["Никита"]
+    # Маша создала эту аптечку и уходит с ней (R09), а у оставшегося Никиты появляется пустая
+    assert [m["name"] for m in fams[fid]["members"]] == ["Маша"]
+    assert sorted(f["id"] for f in fams.values() if [m["name"] for m in f["members"]] == ["Никита"]) != []
 
     assert client.delete(f"/api/admin/families/{fid}", headers=admin).status_code == 204
     assert fid not in {f["id"] for f in client.get("/api/admin/families", headers=admin).json()}

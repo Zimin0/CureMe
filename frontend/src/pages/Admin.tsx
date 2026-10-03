@@ -283,8 +283,8 @@ function FamilySheet({ family: f, onClose }: { family: AdminFamily; onClose: () 
                 <div style={{ fontWeight: 700 }} className="ellipsis">{m.name}</div>
                 <div className="small muted ellipsis">{m.email}</div>
               </div>
-              <button className="icon-btn" title={m.role === 'owner' ? 'Владелец. Сделать участником' : 'Сделать владельцем'}
-                onClick={() => setRole.mutate({ uid: m.user_id, role: m.role === 'owner' ? 'member' : 'owner' })}>
+              <button className="icon-btn" title={m.role === 'owner' ? 'Владелец семьи' : 'Сделать владельцем (прежний станет участником)'}
+                disabled={m.role === 'owner'} onClick={() => setRole.mutate({ uid: m.user_id, role: 'owner' })}>
                 <Crown size={16} color={m.role === 'owner' ? 'var(--warning)' : undefined} />
               </button>
               <button className="icon-btn" title="Убрать из семьи" onClick={() => confirm(`Убрать ${m.name} из «${f.name}»?`) && removeMember.mutate(m.user_id)}><Trash2 size={16} /></button>
@@ -580,7 +580,7 @@ const planText = (f: { plan: PlanName; plus_until: string | null; plus_active: b
   f.plus_active ? (f.plus_until ? `Плюс до ${fmtDate(f.plus_until)}` : 'Плюс бессрочно')
     : f.plan === 'plus' ? 'Плюс истёк' : 'Бесплатный'
 
-/** Платная версия: общий переключатель и ручное включение Плюса аккаунтам (оплаты пока нет). Плюс действует на все аптечки, где человек главный владелец. */
+/** Платная версия: общий переключатель и ручное включение Плюса семьям. Плюс действует на всех людей семьи и все её аптечки. */
 function PlansTab() {
   const toast = useToast()
   const qc = useQueryClient()
@@ -622,7 +622,7 @@ function PlansTab() {
         <input type="checkbox" checked={billing.data.enabled} disabled={save.isPending}
           onChange={e => {
             const on = e.target.checked
-            if (!on || confirm('Включить платную версию? Аккаунты без Плюса получат лимиты бесплатной версии: 4 участника, 60 лекарств, 1 своя аптечка, история за 30 дней.')) save.mutate({ ...billing.data!, enabled: on })
+            if (!on || confirm('Включить платную версию? Семьи без Плюса получат лимиты бесплатной версии: 3 человека, аптечек по числу людей, 60 лекарств в аптечке, история за 30 дней.')) save.mutate({ ...billing.data!, enabled: on })
           }} />
         <span>
           <b>Платная версия включена</b><br />
@@ -664,7 +664,7 @@ function PlansTab() {
           <button className="btn primary" style={{ alignSelf: 'flex-end' }} disabled={save.isPending}>Сохранить срок</button>
         </form>
       )}
-      <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'аккаунта', 'аккаунтов', 'аккаунтов')}. Нажмите на человека, чтобы включить или продлить Плюс вручную. Плюс действует на все аптечки, где он главный владелец (самый ранний владелец семьи); платящий участник чужой аптечки ей Плюс не даёт.</p>
+      <p className="muted small">Плюс у {plusCount} {plural(plusCount, 'человека', 'людей', 'людей')}. Нажмите на человека, чтобы включить или продлить Плюс его семье вручную. Плюс один на всю семью: им пользуются все её люди и все аптечки.</p>
       <div className="search"><Search size={18} /><input className="input" placeholder="Имя, почта или аптечка" value={q} onChange={e => setQ(e.target.value)} /></div>
       <section className="card flush">
         {list.length === 0 && <div style={{ padding: 18 }} className="muted">Ничего не нашли</div>}
@@ -732,13 +732,8 @@ function PlanSheet({ person, onClose }: { person: AdminUser; onClose: () => void
             </div>
           </>
         )}
-        <p className="muted small">Сейчас: {planText(person)}. Действует на все аптечки, где {person.name} главный владелец.</p>
+        <p className="muted small">Сейчас: {planText(person)}. Тариф у семьи, а не у человека: он действует на всех людей семьи {person.name} и все её аптечки.</p>
         {person.auto_renew && <p className="muted small">Автопродление включено: при выборе «Бесплатный» оно отключится и сохранённый способ оплаты будет забыт.</p>}
-        {!!person.plus_from_others?.length && (
-          <p className="muted small">
-            Плюс на этих аптечках идёт не от тарифа {person.name}, а от главного владельца аптечки, поэтому снятие тарифа его не уберёт: {person.plus_from_others.join('; ')}.
-          </p>
-        )}
         <button className="btn primary block" disabled={save.isPending}>{save.isPending ? 'Сохраняем…' : 'Сохранить'}</button>
       </form>
     </Sheet>

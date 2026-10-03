@@ -118,15 +118,26 @@ def create_payment(db: Session, user: User, period: str, auto_renew: bool) -> tu
     return pay, data["confirmation"]["confirmation_url"]
 
 
+def _until(house) -> datetime | None:
+    """Конец Плюса семьи с часовым поясом (SQLite отдаёт время без него)."""
+    if house is None or house.plus_until is None:
+        return None
+    return house.plus_until if house.plus_until.tzinfo else house.plus_until.replace(tzinfo=timezone.utc)
+
+
 def extend_plus(user: User, period: str, now: datetime | None = None) -> None:
-    """Продлевает Плюс: от конца текущего срока, если он ещё идёт, иначе от сегодняшнего дня."""
+    """Продлевает Плюс семьи человека: от конца текущего срока, если он ещё идёт, иначе от сегодняшнего дня."""
     now = now or datetime.now(timezone.utc)
+    house = user.household
+    if house is None:
+        return
     base = now
-    if plus_active(user) and user.plus_until is not None:
-        until = user.plus_until if user.plus_until.tzinfo else user.plus_until.replace(tzinfo=timezone.utc)
+    until = _until(house)
+    if plus_active(house) and until is not None:
         base = max(now, until)
-    user.plan = PLUS
-    user.plus_until = base + timedelta(days=PERIOD_DAYS[period])
+    house.plan = PLUS
+    house.plus_until = base + timedelta(days=PERIOD_DAYS[period])
+    house.plus_is_trial = False
 
 
 def sync_payment(db: Session, yk_id: str) -> Payment | None:
@@ -193,9 +204,11 @@ def run_renewals(db: Session, now: datetime | None = None) -> None:
     if not configured():
         return
     now = now or datetime.now(timezone.utc)
-    users = db.scalars(select(User).where(User.auto_renew.is_(True), User.pay_method_id.is_not(None), User.plus_until.is_not(None)))
+    users = db.scalars(select(User).where(User.auto_renew.is_(True), User.pay_method_id.is_not(None)))
     for user in list(users):
-        until = user.plus_until if user.plus_until.tzinfo else user.plus_until.replace(tzinfo=timezone.utc)
+        until = _until(user.household)
+        if until is None:
+            continue
         notified_for = user.renew_notified_for
         if notified_for is not None and notified_for.tzinfo is None:
             notified_for = notified_for.replace(tzinfo=timezone.utc)

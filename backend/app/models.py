@@ -48,8 +48,47 @@ class User(Base):
     renew_notified_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     renew_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Семья человека (docs/household-model, R01): ровно одна. Роль в семье: owner | member, владелец один (R02).
+    household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="SET NULL"), index=True)
+    household_role: Mapped[str] = mapped_column(String(16), default="member", server_default="member")
+    household_joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    household: Mapped["Household | None"] = relationship(back_populates="members")
+
+
+class Household(Base):
+    """Семья: группа людей с общим тарифом и одним владельцем. Аптечки семьи — таблица families (docs/household-model)."""
+
+    __tablename__ = "households"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Тариф семьи: free | plus. Пусто в plus_until при plan = plus — бессрочно (ручная выдача админом).
+    plan: Mapped[str] = mapped_column(String(16), default="free", server_default="free")
+    plus_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Текущий Плюс только пробный: оплаченные дни при вступлении в чужую семью переносятся, пробные нет (R07, R08).
+    plus_is_trial: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    members: Mapped[list["User"]] = relationship(back_populates="household")
+    cabinets: Mapped[list["Family"]] = relationship(back_populates="household", cascade="all, delete-orphan")
+
+
+class HouseholdEvent(Base):
+    """Журнал семьи: вступления, выходы, передача владения, выдача Плюса админом (R16, R23).
+
+    Нужен и людям (кто и когда менял тариф), и правилам, которые считают смены состава за период.
+    """
+
+    __tablename__ = "household_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="SET NULL"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))  # join | leave | kick | owner | plan | cabinet_add | cabinet_delete
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))   # о ком запись
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))  # кто сделал
+    detail: Mapped[str] = mapped_column(Text, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class Payment(Base):
@@ -79,7 +118,12 @@ class Family(Base):
     name: Mapped[str] = mapped_column(String(100))
     invite_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Аптечка принадлежит семье (docs/household-model). Пока таблица остаётся «аптечкой», все связи лекарств не меняются.
+    household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"), index=True)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(16), default="active", server_default="active")  # active | frozen
 
+    household: Mapped["Household | None"] = relationship(back_populates="cabinets")
     memberships: Mapped[list["Membership"]] = relationship(back_populates="family", cascade="all, delete-orphan")
     medicines: Mapped[list["Medicine"]] = relationship(back_populates="family", cascade="all, delete-orphan")
 
