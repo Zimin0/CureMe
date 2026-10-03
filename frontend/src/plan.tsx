@@ -14,6 +14,7 @@ export const FEATURE_TITLES: Record<PlusFeature, string> = {
   export_pdf: 'Экспорт в PDF и Excel для врача',
   cabinets: 'Несколько своих аптечек',
   schedule: 'Расписание приёма',
+  search_all: 'Поиск по всем аптечкам',
   no_limits: 'Без лимитов',
 }
 

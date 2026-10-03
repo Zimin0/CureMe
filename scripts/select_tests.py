@@ -52,26 +52,23 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "tests": [
             "integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py",
             "integration/test_plans.py", "integration/test_trial.py", "integration/test_invites.py",
-            "integration/test_owner_transfer.py", "integration/test_plus_end.py",
-        ],
+            "integration/test_owner_transfer.py", "integration/test_plus_end.py", "integration/test_cabinet_ops.py"],
     },
     "Семья и аптечки (состав, лимиты, тариф семьи)": {
-        "sources": ["households.py", "compression.py"],
+        "sources": ["households.py", "compression.py", "cabinet_ops.py"],
         "tests": [
             "integration/test_households.py", "integration/test_households_concurrency.py",
             "migrations/test_households_migration.py", "integration/test_invites.py", "integration/test_owner_transfer.py",
             "integration/test_household_journal.py", "integration/test_families.py", "integration/test_auth.py",
             "integration/test_admin.py", "integration/test_limits.py", "integration/test_plans.py",
             "integration/test_trial.py", "integration/test_payments.py", "integration/test_access_control.py",
-            "integration/test_plus_end.py",
-        ],
+            "integration/test_plus_end.py", "integration/test_cabinet_ops.py"],
     },
     "Лекарства, упаковки, остатки": {
         "sources": ["routers/medicines.py", "services.py"],
         "tests": [
             "unit/test_services.py", "integration/test_medicines.py", "integration/test_api.py",
-            "integration/test_categories.py", "integration/test_intakes.py", "integration/test_access_control.py",
-        ],
+            "integration/test_categories.py", "integration/test_intakes.py", "integration/test_access_control.py", "integration/test_cabinet_ops.py"],
     },
     "История приёма лекарств": {
         "sources": ["routers/intakes.py"],
@@ -101,8 +98,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/assist.py", "search.py"],
         "tests": [
             "unit/test_search.py", "integration/test_assist.py", "integration/test_api.py",
-            "integration/test_scan_lookup.py", "integration/test_access_control.py",
-        ],
+            "integration/test_scan_lookup.py", "integration/test_access_control.py", "integration/test_cabinet_ops.py"],
     },
     "Разбор кодов и поиск товара в интернете": {
         "sources": ["codes.py", "lookup.py", "websearch.py"],
@@ -113,7 +109,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "Фото и экспорт": {
         "sources": ["routers/files.py"],
-        "tests": ["integration/test_files.py", "integration/test_access_control.py"],
+        "tests": ["integration/test_files.py", "integration/test_access_control.py", "integration/test_cabinet_ops.py"],
     },
     "Выписка для врача (PDF и Excel)": {
         "sources": ["routers/reports.py", "doctor_report.py"],
