@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Sparkles, Stethoscope, Users } from 'lucide-react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { planLabel, usePlan } from '../plan'
 import { cabinetLabel, FrozenNotice, PlusEndingBanner } from './PlusEnding'
@@ -17,7 +17,15 @@ const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?
   { to: '/history', label: 'История приёма', short: 'История', icon: History },
 ]
 
+// Нижняя панель телефона: 7 слотов, скан посередине; «История» открывается вкладкой на странице «Приём».
+const BOTTOM = [
+  LINKS[0], LINKS[1],
+  { to: '/plus', label: 'Плюс', icon: Sparkles },
+  LINKS[2], LINKS[3], LINKS[4], LINKS[5],
+]
+
 export function Layout() {
+  const onHistory = useLocation().pathname.startsWith('/history')
   const { me, familyId, setFamilyId, signOut } = useAuth()
   const { plan } = usePlan()
   const isPlus = !!me?.plus_active
@@ -81,13 +89,14 @@ export function Layout() {
       </main>
 
       <nav className="bottom-nav seven" aria-label="Навигация">
-        {LINKS.map(({ to, label, short, icon: Icon, end }) =>
+        {BOTTOM.map(({ to, label, short, icon: Icon, end }) =>
           to === '/scan' ? (
             <NavLink key={to} to={to} className="scan-link" aria-label={label}>
               <span className="scan-fab"><Icon size={26} /></span>
             </NavLink>
           ) : (
-            <NavLink key={to} to={to} end={end} aria-label={label}>
+            <NavLink key={to} to={to} end={end} aria-label={label}
+              className={to === '/schedule' && onHistory ? 'active' : undefined}>
               <Icon size={22} />{short ?? label}
             </NavLink>
           ),

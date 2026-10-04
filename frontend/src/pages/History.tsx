@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Search, Stethoscope, X } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { IntakeTabs } from '../components/IntakeTabs'
 import { api, Family, Intake, OlderHistory } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { PlusBanner, usePlusSheet } from '../plan'
@@ -73,13 +74,14 @@ export function History() {
 
   return (
     <div className="page">
+      <IntakeTabs />
       <div className="page-head">
         <div>
           <h1>История приёма</h1>
           <p className="sub">Кто, когда и сколько принял. Нажатия за одну минуту сложены в одну запись.</p>
         </div>
         <button type="button" className={`btn ${report ? 'primary' : 'ghost'}`} aria-expanded={report} onClick={() => setReport(v => !v)}>
-          <Stethoscope size={18} />Для врача
+          <Stethoscope size={18} />Выгрузить
         </button>
       </div>
 
