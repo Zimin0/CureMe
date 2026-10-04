@@ -7,7 +7,7 @@ from .. import cabinet_ops, compression, households
 from ..db import get_db
 from ..deps import current_user, family_membership, family_owner, get_family as family_dep
 from ..models import Family, Membership, OwnerTransfer, User
-from ..plans import plan_out
+from ..plans import plan_out, require_plus
 from ..ratelimit import client_ip, limiter
 from ..schemas import CompressIn, FamilyIn, MoveOut, SplitIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut, ShelfPlan
 
@@ -213,6 +213,7 @@ def get_shelf_plan(fam: Family = Depends(family_dep)):
 @router.put("/families/{family_id}/shelf-plan", response_model=ShelfPlan)
 def put_shelf_plan(body: ShelfPlan, fam: Family = Depends(family_dep), db: Session = Depends(get_db)):
     """Сохраняет схему целиком. Менять может любой участник аптечки, как и сами лекарства."""
+    require_plus(db, fam, "shelf_plan")
     if len({s.id for s in body.shelves}) != len(body.shelves):
         raise HTTPException(400, "Повторяются идентификаторы полок")
     fam.shelf_plan = body.model_dump_json()

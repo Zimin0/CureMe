@@ -156,6 +156,8 @@ def update_medicine(
         _set_categories(db, med, data.pop("category_ids") or [])
     if "gtin" in data:
         data["gtin"] = _normalize_gtin(data["gtin"])
+    if any(data.get(k) is not None for k in ("place_x", "place_y", "place_r")):
+        require_plus(db, fam, "shelf_plan")  # поставить метку может Плюс; убрать её можно всем
     if any(k.startswith("place_") for k in data):
         # Метка целиком: либо все три числа, либо ни одного.
         vals = [data.get(k, getattr(med, k)) for k in ("place_x", "place_y", "place_r")]

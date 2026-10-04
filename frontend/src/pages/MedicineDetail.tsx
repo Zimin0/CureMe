@@ -6,6 +6,7 @@ import { api, Intake, MedicineDetail as Detail, Package, PackageInput, uploadFil
 import { ExpiryInput } from '../components/ExpiryInput'
 import { CommentSheet, IntakeList } from '../components/IntakeList'
 import { useFamilyPath } from '../auth'
+import { useRequirePlus } from '../plan'
 import { PlaceSheet, PlanEditor, ShelfMap, shelfAt, usePlan } from '../components/ShelfMap'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
@@ -34,6 +35,7 @@ export function MedicineDetail() {
   const [dose, setDose] = useState(1)
   const [photoOpen, setPhotoOpen] = useState(false)
   const [commentOpen, setCommentOpen] = useState(false)
+  const requirePlus = useRequirePlus()
   const [placeOpen, setPlaceOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
   const hasPlace = m?.place_x != null && m?.place_y != null && m?.place_r != null
@@ -164,7 +166,7 @@ export function MedicineDetail() {
           <section className="card">
             <div className="card-head">
               <h2>Где лежит</h2>
-              <button className="btn sm ghost" onClick={() => setPlaceOpen(true)}><MapPin size={16} />{hasPlace ? 'Изменить' : 'Отметить'}</button>
+              <button className="btn sm ghost" onClick={() => hasPlace ? setPlaceOpen(true) : requirePlus('shelf_plan', () => setPlaceOpen(true))}><MapPin size={16} />{hasPlace ? 'Изменить' : 'Отметить'}</button>
             </div>
             {hasPlace && plan.data ? (
               <>
