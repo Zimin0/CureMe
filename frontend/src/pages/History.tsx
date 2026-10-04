@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Search, Stethoscope, X } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { IntakeTabs } from '../components/IntakeTabs'
 import { api, Family, Intake, OlderHistory } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { PlusBanner, usePlusSheet } from '../plan'
@@ -73,6 +74,7 @@ export function History() {
 
   return (
     <div className="page">
+      <IntakeTabs />
       <div className="page-head">
         <div>
           <h1>История приёма</h1>

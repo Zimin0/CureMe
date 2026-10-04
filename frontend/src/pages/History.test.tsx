@@ -130,7 +130,7 @@ it('на странице лекарства «Принял» — одно на�
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-it('в меню «История приёма» вместо «Экспорт», а экспорт — кнопкой в аптечке', async () => {
+it('в нижнем меню есть «Плюс», а истории нет (она вкладкой на «Приём»); экспорт — кнопкой в аптечке', async () => {
   server.use(
     http.get('/api/families/7/intakes', () => HttpResponse.json([])),
     http.get('/api/families/7/medicines', () => HttpResponse.json([])),
@@ -138,8 +138,9 @@ it('в меню «История приёма» вместо «Экспорт»,
   )
   const { user } = renderApp('/medicines')
   const nav = await screen.findByRole('navigation', { name: 'Навигация' })
-  expect(within(nav).getByRole('link', { name: 'История приёма' })).toHaveAttribute('href', '/history')
-  expect(within(nav).getByText('История')).toBeInTheDocument()  // на телефоне короткая подпись
+  expect(within(nav).getByRole('link', { name: 'Плюс' })).toHaveAttribute('href', '/plus')
+  expect(within(nav).queryByRole('link', { name: 'История приёма' })).toBeNull()
+  expect(within(nav).getAllByRole('link')).toHaveLength(7)  // скан посередине: 3 слева, 3 справа
   expect(within(nav).queryByRole('link', { name: 'Экспорт' })).toBeNull()
   await user.click(await screen.findByRole('link', { name: 'Экспорт' }))
   expect(location()).toBe('/export')
@@ -155,4 +156,17 @@ it('без Плюса внизу истории замочек: ранние з�
   expect(await screen.findByRole('note')).toHaveTextContent('Более ранняя история доступна в Капсулке Плюс')
   await user.click(within(screen.getByRole('note')).getByRole('button', { name: 'Подробнее' }))
   expect(await screen.findByRole('dialog')).toHaveTextContent('Доступно в Капсулке Плюс')
+})
+
+it('на странице «Приём» вкладки «Расписание» и «История» переключают разделы', async () => {
+  server.use(
+    http.get('/api/families/7/intakes', () => HttpResponse.json([])),
+    http.get('/api/families/7/medicines', () => HttpResponse.json([])),
+    http.get('/api/families/7/categories', () => HttpResponse.json([])),
+  )
+  const { user } = renderApp('/history')
+  const tabs = await screen.findByRole('navigation', { name: 'Приём' })
+  expect(within(tabs).getByRole('link', { name: 'История' })).toHaveClass('on')
+  await user.click(within(tabs).getByRole('link', { name: 'Расписание' }))
+  expect(location()).toBe('/schedule')
 })
