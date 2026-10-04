@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import compression, households
@@ -64,7 +65,11 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     user = User(email=email, name=body.name.strip(), password_hash=hash_password(body.password), is_admin=first,
                 consent_at=utcnow(), consent_version=CONSENT_VERSION)
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:  # два запроса с одной почтой одновременно: проверка выше обоих пропустила, базу не обманешь
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Аккаунт с такой почтой уже есть") from None
     if house:
         households.attach(db, user, house)
         households.use_invite(invite, user)  # код закреплён за этой регистрацией: второй раз не сработает (R04)
