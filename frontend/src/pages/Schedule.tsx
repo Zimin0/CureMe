@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronLeft, ChevronRight, CalendarClock, Clock, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
+import { IntakeTabs } from '../components/IntakeTabs'
 import { api, Occurrence, Schedule as ScheduleT, ScheduleSlot } from '../api'
 import { useFamilyPath } from '../auth'
 import { ScheduleEditor } from '../components/ScheduleEditor'
@@ -78,6 +79,7 @@ export function Schedule() {
 
   return (
     <div className="page" data-testid="schedule-page">
+      <IntakeTabs />
       <div className="page-head">
         <div>
           <h1>Расписание</h1>

@@ -651,3 +651,7 @@ a.intake-med { color: var(--primary); }
   .lp-cta .lp-btn { width: 100%; }
   .lp-plus-cta .lp-btn { width: 100%; }
 }
+
+.intake-tabs { margin-bottom: 14px; max-width: 360px; }
+.intake-tabs a { display: grid; place-items: center; height: 38px; border-radius: 11px; font-weight: 700; color: var(--muted); text-decoration: none; }
+.intake-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
