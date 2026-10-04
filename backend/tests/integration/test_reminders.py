@@ -376,7 +376,7 @@ def test_account_deletion_removes_settings(client, db, home):
     h, u, f = home
     add(client, h, f, "Нурофен", 3, min_quantity=5)
     remind(db, u["id"])
-    r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "secret123"})
+    r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "kapsula-secret-123"})
     assert r.status_code == 204
     db.expire_all()
     assert db.query(NotificationPrefs).count() == 0 and db.query(ReminderSent).count() == 0

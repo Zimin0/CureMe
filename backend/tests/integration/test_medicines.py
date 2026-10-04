@@ -107,9 +107,12 @@ def test_gtin_is_normalized_and_remembered(client, owner):
     assert client.post(url, headers=h, json={"name": "X", "gtin": "123"}).status_code == 400
     m = client.post(url, headers=h, json={"name": "Нурофен", "dosage": "200 мг", "gtin": "4601669002013"}).json()
     assert m["gtin"] == "04601669002013"
-    # код попал в общий справочник
-    p = client.get("/api/products/4601669002013", headers=h).json()
+    # код попал в справочник этой аптечки (не в общий), и виден только ей
+    p = client.get(f"/api/products/4601669002013?family_id={f}", headers=h).json()
     assert (p["name"], p["dosage"], p["source"]) == ("Нурофен", "200 мг", "user")
+    assert client.get("/api/products/4601669002013", headers=h).status_code == 404
+    h2, _ = register(client, "stranger@example.com", "Чужой")
+    assert client.get(f"/api/products/4601669002013?family_id={f}", headers=h2).status_code == 404  # не их семья
 
 
 def test_update_is_partial(client, cabinet):

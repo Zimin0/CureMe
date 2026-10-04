@@ -290,10 +290,12 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                     db.rollback()
                 try:
                     from .households import (  # здесь же: households → plans → reminders
-                        expire_owner_transfers, purge_old_events, purge_old_invites, purge_old_transfers, release_unverified,
+                        expire_owner_transfers, purge_old_events, purge_old_invites, purge_old_transfers, purge_unverified_accounts,
+                        release_unverified,
                     )
                     release_unverified(db)  # вступившие по приглашению без подтверждённой почты за сутки освобождают место
                     expire_owner_transfers(db)  # предложения передать владение без ответа за сутки отменяются
+                    purge_unverified_accounts(db)  # аккаунты без подтверждённой почты за 7 дней удаляются
                     purge_old_invites(db)  # записи старых приглашений хранятся 30 дней после срока
                     purge_old_transfers(db)  # и записи о предложениях передать владение
                     purge_old_events(db)  # журнал семьи хранится 12 месяцев

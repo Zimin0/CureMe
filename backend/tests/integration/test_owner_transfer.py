@@ -251,7 +251,7 @@ def test_r23_t9_pending_offer_is_cancelled_when_the_person_leaves(client, owner,
 def test_r23_t9_pending_offer_is_cancelled_when_the_account_is_deleted(client, owner, session_factory):
     f, (h, _), (hm, mom), (hd, _) = trio(client, owner)
     offer(client, h, f, mom["id"])
-    r = client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=hm)
+    r = client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=hm)
     assert r.status_code == 204
     assert view(client, h, f)["owner_transfer"] is None
     check_household_invariants(session_factory)
@@ -304,8 +304,8 @@ def test_r23_t12_family_dissolving_removes_its_offers(client, owner, session_fac
     accept(client, hm, f)  # Мама владелец
     with session_factory() as db:
         assert db.scalar(select(Household.id).where(Household.id == db.get(User, u["id"]).household_id)) is not None
-    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
-    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=hm).status_code == 204
+    assert client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=h).status_code == 204
+    assert client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=hm).status_code == 204
     with session_factory() as db:
         assert db.scalars(select(OwnerTransfer)).all() == []
         assert db.scalars(select(Household)).all() == []

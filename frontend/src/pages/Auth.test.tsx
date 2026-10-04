@@ -19,10 +19,10 @@ describe('вход', () => {
     )
     const { user } = renderApp('/login?next=/medicines', { loggedIn: false })
     await user.type(await screen.findByLabelText('Почта'), 'nikita@example.com')
-    await user.type(screen.getByLabelText('Пароль'), 'secret123')
+    await user.type(screen.getByLabelText('Пароль'), 'kapsula-secret-123')
     await user.click(screen.getByRole('button', { name: 'Войти' }))
     await waitFor(() => expect(location()).toBe('/medicines'))
-    expect(body).toEqual({ email: 'nikita@example.com', password: 'secret123' })
+    expect(body).toEqual({ email: 'nikita@example.com', password: 'kapsula-secret-123' })
     expect(localStorage.getItem('cureme.token')).toBe('jwt-1')
     expect(await screen.findByText('Аптечка пустая')).toBeInTheDocument()
   })
@@ -43,6 +43,41 @@ describe('вход', () => {
   })
 })
 
+describe('восстановление пароля', () => {
+  it('со страницы входа: почта, затем код и новый пароль, потом обратно ко входу', async () => {
+    const calls: Record<string, unknown> = {}
+    server.use(
+      http.post('/api/auth/password-reset/request', async ({ request }) => { calls.ask = await request.json(); return new HttpResponse(null, { status: 204 }) }),
+      http.post('/api/auth/password-reset/confirm', async ({ request }) => { calls.confirm = await request.json(); return new HttpResponse(null, { status: 204 }) }),
+    )
+    const { user } = renderApp('/login', { loggedIn: false })
+    await user.click(await screen.findByRole('link', { name: 'Забыли пароль?' }))
+    await user.type(await screen.findByLabelText('Почта'), 'masha@example.com')
+    await user.click(screen.getByRole('button', { name: 'Прислать код' }))
+    await user.type(await screen.findByLabelText('Код из письма'), '12ab34567890')  // буквы отбрасываются, остаётся 8 цифр
+    await user.type(screen.getByLabelText(/^Новый пароль/), 'brand-new-phrase-42')
+    await user.click(screen.getByRole('button', { name: 'Сменить пароль' }))
+    await waitFor(() => expect(location()).toBe('/login'))
+    expect(calls.ask).toEqual({ email: 'masha@example.com' })
+    expect(calls.confirm).toEqual({ email: 'masha@example.com', code: '12345678', password: 'brand-new-phrase-42' })
+  })
+
+  it('неверный код — сообщение сервера, остаёмся на форме', async () => {
+    server.use(
+      http.post('/api/auth/password-reset/request', () => new HttpResponse(null, { status: 204 })),
+      http.post('/api/auth/password-reset/confirm', () => HttpResponse.json({ detail: 'Код неверный, устарел или уже использован. Запросите новый' }, { status: 400 })),
+    )
+    const { user } = renderApp('/reset-password', { loggedIn: false })
+    await user.type(await screen.findByLabelText('Почта'), 'masha@example.com')
+    await user.click(screen.getByRole('button', { name: 'Прислать код' }))
+    await user.type(await screen.findByLabelText('Код из письма'), '11111111')
+    await user.type(screen.getByLabelText(/^Новый пароль/), 'brand-new-phrase-42')
+    await user.click(screen.getByRole('button', { name: 'Сменить пароль' }))
+    expect(await screen.findByText(/Код неверный/)).toBeInTheDocument()
+    expect(location()).toBe('/reset-password')
+  })
+})
+
 describe('регистрация', () => {
   it('по приглашению показывает название семьи и отправляет код', async () => {
     let body: Record<string, unknown> = {}
@@ -58,12 +93,12 @@ describe('регистрация', () => {
     expect(await screen.findByRole('heading', { name: 'Вступить в «Зимины»' })).toBeInTheDocument()
     await user.type(screen.getByLabelText('Как вас зовут'), 'Мама')
     await user.type(screen.getByLabelText('Почта'), 'mom@example.com')
-    await user.type(screen.getByLabelText(/^Пароль/), 'secret123')
+    await user.type(screen.getByLabelText(/^Пароль/), 'kapsula-secret-123')
     await user.click(screen.getByRole('checkbox', { name: /согласие на обработку/ }))
     await user.click(screen.getByRole('checkbox', { name: /пользовательское соглашение/ }))
     await user.click(screen.getByRole('button', { name: 'Создать аккаунт' }))
     await waitFor(() => expect(location()).toBe('/'))
-    expect(body).toEqual({ name: 'Мама', email: 'mom@example.com', password: 'secret123', invite_code: 'ABCD2345', consent: true })
+    expect(body).toEqual({ name: 'Мама', email: 'mom@example.com', password: 'kapsula-secret-123', invite_code: 'ABCD2345', consent: true })
   })
 
   it('неверный код приглашения подсвечивается', async () => {
@@ -109,7 +144,7 @@ describe('согласие на обработку данных', () => {
     const { user } = renderApp('/register', { loggedIn: false })
     await user.type(await screen.findByLabelText('Как вас зовут'), 'Мама')
     await user.type(screen.getByLabelText('Почта'), 'mom@example.com')
-    await user.type(screen.getByLabelText(/^Пароль/), 'secret123')
+    await user.type(screen.getByLabelText(/^Пароль/), 'kapsula-secret-123')
     expect(screen.getByRole('checkbox', { name: /согласие на обработку/ })).not.toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Создать аккаунт' }))
     expect(called).toBe(false)
@@ -158,10 +193,10 @@ describe('согласие на обработку данных', () => {
     )
     const { user } = renderApp('/', { me: { ...ME, consent_needed: true } })
     await user.click(await screen.findByRole('button', { name: 'Удалить аккаунт' }))
-    await user.type(screen.getByLabelText('Пароль для подтверждения'), 'secret123')
+    await user.type(screen.getByLabelText('Пароль для подтверждения'), 'kapsula-secret-123')
     await user.click(screen.getByRole('button', { name: 'Удалить навсегда' }))
     expect(await screen.findByRole('heading', { name: /Домашняя аптечка/ })).toBeInTheDocument()  // после выхода гость видит приветственную страницу
-    expect(body).toEqual({ password: 'secret123' })
+    expect(body).toEqual({ password: 'kapsula-secret-123' })
   })
 })
 

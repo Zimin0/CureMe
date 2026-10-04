@@ -59,7 +59,7 @@ def _remember(db: Session, med: Medicine) -> None:
         remember_product(
             db, med.gtin, name=med.name, form=med.form, dosage=med.dosage,
             active_ingredient=med.active_ingredient, manufacturer=med.manufacturer,
-            unit=med.unit, blister_size=med.blister_size,
+            unit=med.unit, blister_size=med.blister_size, family_id=med.family_id,
         )
 
 

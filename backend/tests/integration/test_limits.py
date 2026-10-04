@@ -126,12 +126,12 @@ def test_member_limit_on_register_with_invite(client, owner):
     h, _, f = owner
     fill_members(client, h, f, FREE_MAX_MEMBERS)
     r = client.post("/api/auth/register", json={
-        "email": "late@example.com", "name": "Опоздал", "password": "secret123",
+        "email": "late@example.com", "name": "Опоздал", "password": "kapsula-secret-123",
         "invite_code": invite_code(client, h, f), "consent": True,
     })
     assert r.status_code == 402
     # Аккаунт не создан: человек может зарегистрироваться позже, когда место появится.
-    assert client.post("/api/auth/login", json={"email": "late@example.com", "password": "secret123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "late@example.com", "password": "kapsula-secret-123"}).status_code == 401
 
 
 def test_admin_is_not_limited(client, owner):

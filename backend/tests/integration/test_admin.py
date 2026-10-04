@@ -77,8 +77,8 @@ def test_admin_manages_users(client):
     assert client.patch(f"/api/admin/users/{me['id']}", headers=admin, json={"is_admin": False}).status_code == 400
     assert client.patch(f"/api/admin/users/{masha['id']}", headers=admin, json={"email": "NIKITA@example.com"}).status_code == 409
 
-    client.patch(f"/api/admin/users/{masha['id']}", headers=admin, json={"password": "newpass1"})
-    assert client.post("/api/auth/login", json={"email": "masha@example.com", "password": "newpass1"}).status_code == 200
+    client.patch(f"/api/admin/users/{masha['id']}", headers=admin, json={"password": "new-pass-phrase-77"})
+    assert client.post("/api/auth/login", json={"email": "masha@example.com", "password": "new-pass-phrase-77"}).status_code == 200
 
     assert client.delete(f"/api/admin/users/{me['id']}", headers=admin).status_code == 400
     assert client.delete(f"/api/admin/users/{masha['id']}", headers=admin).status_code == 204

@@ -5,12 +5,18 @@ from sqlalchemy.orm import Session
 from .. import compression, households
 from ..db import get_db
 from ..deps import signed_in_user
-from ..email_verification import code_matches, issue_code, mark_verified, needs_verification, send_verification
+from ..email_verification import (
+    clear_reset, code_matches, issue_code, issue_reset_code, mark_verified, needs_verification, reset_code_ok,
+    send_password_reset, send_verification,
+)
 from ..legal import CONSENT_VERSION
 from ..models import User, utcnow
 from ..plans import billing_settings, grant_trial, own_families_left, plus_active
 from ..ratelimit import client_ip, limiter
-from ..schemas import AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn
+from ..schemas import (
+    MIN_ADMIN_PASSWORD, AccessOut, ConsentIn, DeleteAccountIn, FamilyBrief, LoginIn, MeOut, PasswordResetConfirmIn,
+    PasswordResetRequestIn, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn,
+)
 from ..security import burn_password_check, create_token, hash_password, verify_password
 from ..services import access_settings, debug_enabled, has_access, telegram_active
 
@@ -100,6 +106,8 @@ def update_me(body: UserUpdate, user: User = Depends(signed_in_user), db: Sessio
         user.name = body.name.strip()
     token = None
     if body.password:
+        if user.is_admin and len(body.password) < MIN_ADMIN_PASSWORD:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Администратору нужен пароль не короче {MIN_ADMIN_PASSWORD} символов")
         if not body.current_password or not verify_password(body.current_password, user.password_hash):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Текущий пароль указан неверно")
         user.password_hash = hash_password(body.password)
@@ -145,6 +153,7 @@ def resend_verification(background: BackgroundTasks,
     # Чтобы через нас нельзя было засыпать чей-то ящик письмами: раз в минуту и не больше 5 в час.
     limiter.hit(f"verify-resend-min:{user.id}", limit=1, window=60)
     limiter.hit(f"verify-resend-hour:{user.id}", limit=5, window=3600)
+    limiter.hit(f"verify-resend-day:{user.id}", limit=10, window=86400)
     code = issue_code(user)
     db.commit()
     background.add_task(send_verification, user.email, user.name, code)
@@ -164,6 +173,58 @@ def verify_email(body: VerifyEmailIn, user: User = Depends(signed_in_user), db: 
         raise HTTPException(status.HTTP_410_GONE, "Код устарел. Отправьте письмо ещё раз")
     mark_verified(user)
     grant_trial(db, user)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/logout-all", response_model=TokenOut)
+def logout_everywhere(user: User = Depends(signed_in_user), db: Session = Depends(get_db)):
+    """«Выйти на всех устройствах»: все выданные раньше токены перестают действовать, этому устройству выдаём новый."""
+    user.token_version += 1
+    db.commit()
+    return TokenOut(access_token=create_token(user.id, user.token_version), user=me_out(user, db))
+
+
+@router.post("/password-reset/request", status_code=204)
+def password_reset_request(
+    body: PasswordResetRequestIn, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)
+):
+    """Отправляет на почту код для восстановления пароля. Ответ всегда один и тот же: по нему нельзя узнать,
+    есть ли такая почта. Лимиты не дают засыпать письмами чужой ящик."""
+    email = body.email.lower()
+    limiter.hit(f"reset-ip:{client_ip(request)}", limit=10, window=3600)
+    limiter.hit(f"reset-email-hour:{email}", limit=3, window=3600)
+    limiter.hit(f"reset-email-day:{email}", limit=6, window=86400)
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
+    if user:
+        code = issue_reset_code(user)
+        db.commit()
+        background.add_task(send_password_reset, user.email, user.name, code)
+    return Response(status_code=204)
+
+
+@router.post("/password-reset/confirm", status_code=204)
+def password_reset_confirm(body: PasswordResetConfirmIn, request: Request, db: Session = Depends(get_db)):
+    """Новый пароль по коду из письма. Пароль меняется, все старые входы закрываются, а почта считается подтверждённой."""
+    email = body.email.lower()
+    limiter.hit(f"reset-confirm-ip:{client_ip(request)}", limit=20, window=900)
+    limiter.hit(f"reset-confirm-email:{email}", limit=10, window=900)
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
+    if not user:
+        burn_password_check(body.password)
+    ok = user is not None and reset_code_ok(user, body.code)
+    if not ok:
+        if user:
+            db.commit()  # неверный ввод записан в счётчик попыток
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Код неверный, устарел или уже использован. Запросите новый")
+    if user.is_admin and len(body.password) < MIN_ADMIN_PASSWORD:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Администратору нужен пароль не короче {MIN_ADMIN_PASSWORD} символов")
+    user.password_hash = hash_password(body.password)
+    user.token_version += 1  # старые входы закрываются: пароль могли знать посторонние
+    clear_reset(user)
+    if user.email_verified_at is None:
+        mark_verified(user)  # код пришёл на эту почту: владение доказано
+        grant_trial(db, user)
     db.commit()
     return Response(status_code=204)
 

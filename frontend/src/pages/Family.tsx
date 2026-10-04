@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, Family as FamilyT } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
+import { ChangePasswordButton, LogoutEverywhereButton } from '../components/AccountSecurity'
 import { Cabinets } from '../components/Cabinets'
 import { CompressSection } from '../components/PlusEnding'
 import { DeleteAccountButton } from '../components/DeleteAccount'
@@ -190,7 +191,9 @@ export function Family() {
           {me?.is_admin && <Link to="/admin" className="btn"><Shield size={16} />Панель администратора</Link>}
           {!owner && <CooldownNote />}
           {!owner && <button className="btn ghost" onClick={() => confirm(`Выйти из «${f.name}»? У вас будет своя семья и одна из созданных вами аптечек.`) && removeMember.mutate(me!.id)}>Покинуть семью</button>}
+          <ChangePasswordButton />
           <button className="btn danger" onClick={signOut}><LogOut size={16} />Выйти из аккаунта</button>
+          <LogoutEverywhereButton />
           <DeleteAccountButton />
         </div>
         <LegalLinks />

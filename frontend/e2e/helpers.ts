@@ -8,10 +8,10 @@ export interface Account { email: string; password: string; token: string; famil
 /** Быстрая регистрация через API — для тестов, где сама регистрация не главное. */
 export async function registerApi(request: APIRequestContext, name = 'Никита', invite?: string): Promise<Account> {
   const email = uniqueEmail()
-  const res = await request.post('/api/auth/register', { data: { email, name, password: 'secret123', invite_code: invite ?? null, consent: true } })
+  const res = await request.post('/api/auth/register', { data: { email, name, password: 'kapsula-secret-123', invite_code: invite ?? null, consent: true } })
   expect(res.status()).toBe(201)
   const body = await res.json()
-  return { email, password: 'secret123', token: body.access_token, familyId: body.user.families[0].id, name }
+  return { email, password: 'kapsula-secret-123', token: body.access_token, familyId: body.user.families[0].id, name }
 }
 
 /** Открывает приложение уже вошедшим (токен кладём в localStorage до загрузки страницы). */
@@ -43,7 +43,7 @@ export function randomEan13() {
 
 /** Администратор (его почта задана в CUREME_ADMIN_EMAILS в server.sh). Аккаунт общий для всех тестов. */
 export async function adminApi(request: APIRequestContext): Promise<Account> {
-  const email = 'e2e-admin@example.com', password = 'secret123'
+  const email = 'e2e-admin@example.com', password = 'kapsula-secret-123'
   await request.post('/api/auth/register', { data: { email, name: 'Админ', password, consent: true } })  // 409, если уже есть
   const res = await request.post('/api/auth/login', { data: { email, password } })
   expect(res.status()).toBe(200)

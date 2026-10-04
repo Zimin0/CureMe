@@ -39,6 +39,10 @@ class User(Base):
     # чтобы утёкшая копия базы не давала подтверждать чужие почты.
     email_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     email_token_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Восстановление пароля: хеш кода из письма, когда отправлен и сколько раз его вводили неверно (после 5 код сгорает).
+    reset_code_hash: Mapped[str | None] = mapped_column(String(64))
+    reset_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reset_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Автопродление Плюса: человек сам включил галочку при оплате. Данные карты у нас не хранятся,
     # только идентификатор сохранённого способа оплаты ЮKassa (pay_method_id).
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
@@ -481,7 +485,8 @@ class ReminderSent(Base):
 
 
 class ProductCode(Base):
-    """Общий справочник «код товара → название». Пополняется, когда кто-то сохраняет лекарство с кодом."""
+    """Общий справочник «код товара → название». Пополняется только из интернета (Open Food Facts, поиск):
+    правки людей сюда не попадают, иначе любой мог бы подменить название и дозировку для всех (см. FamilyProduct)."""
 
     __tablename__ = "product_codes"
 
@@ -496,4 +501,24 @@ class ProductCode(Base):
     pack_size: Mapped[float | None] = mapped_column(Float)          # сколько в упаковке (30 таб)
     blister_size: Mapped[int | None] = mapped_column(Integer)
     source: Mapped[str] = mapped_column(String(30), default="user")  # user | internet | openfoodfacts
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class FamilyProduct(Base):
+    """Справочник одной аптечки: что люди из неё сами вписали для кода товара. Другим аптечкам не виден."""
+
+    __tablename__ = "family_products"
+
+    family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), primary_key=True)
+    gtin: Mapped[str] = mapped_column(String(14), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    form: Mapped[str | None] = mapped_column(String(60))
+    dosage: Mapped[str | None] = mapped_column(String(60))
+    active_ingredient: Mapped[str | None] = mapped_column(String(200))
+    manufacturer: Mapped[str | None] = mapped_column(String(200))
+    title: Mapped[str | None] = mapped_column(String(300))
+    unit: Mapped[str | None] = mapped_column(String(20))
+    pack_size: Mapped[float | None] = mapped_column(Float)
+    blister_size: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(30), default="user", server_default="user")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

@@ -1,7 +1,8 @@
 """Поиск товара по коду: общий справочник → поиск в интернете → Open Food Facts.
 
-Всё найденное в интернете сразу сохраняется в справочник product_codes, так что
-повторное сканирование того же товара (в любой семье) не ходит в сеть.
+Всё найденное в интернете сразу сохраняется в общий справочник product_codes, так что
+повторное сканирование того же товара (в любой семье) не ходит в сеть. Правки людей лежат отдельно, в
+family_products, и видны только их аптечке: общий справочник нельзя испортить из своего аккаунта.
 """
 
 import logging
@@ -10,7 +11,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .models import ProductCode
+from .models import FamilyProduct, ProductCode
 from .websearch import search_barcode
 
 log = logging.getLogger(__name__)
@@ -28,19 +29,36 @@ def guess_blister_size(pack_size: float | None, unit: str | None) -> int | None:
     return n
 
 
-def remember_product(db: Session, gtin: str, source: str = "user", **fields) -> ProductCode | None:
-    """Сохраняет только «товарные» поля — ничего личного из аптечки семьи."""
+def remember_product(
+    db: Session, gtin: str, source: str = "user", family_id: int | None = None, **fields
+) -> ProductCode | FamilyProduct | None:
+    """Сохраняет только «товарные» поля — ничего личного из аптечки семьи.
+
+    Правка человека (source="user") идёт в справочник его аптечки. В общий справочник попадает только то,
+    что нашлось в интернете: оттуда его видят все, и подменить запись из аккаунта нельзя."""
     if not fields.get("name"):
         return None
-    row = db.get(ProductCode, gtin) or ProductCode(gtin=gtin)
+    if source == "user":
+        if family_id is None:
+            return None
+        row = db.get(FamilyProduct, (family_id, gtin)) or FamilyProduct(family_id=family_id, gtin=gtin)
+    else:
+        row = db.get(ProductCode, gtin) or ProductCode(gtin=gtin)
+        row.source = source
     for k in PRODUCT_FIELDS:
         if fields.get(k):
             setattr(row, k, fields[k])
-    # Правка человека важнее догадки из интернета, но не наоборот.
-    if source == "user" or row.source != "user":
-        row.source = source
     db.add(row)
     return row
+
+
+def cached_product(db: Session, gtin: str, family_id: int | None = None) -> ProductCode | FamilyProduct | None:
+    """Своя запись аптечки, иначе общий справочник. Старые записи людей в общем справочнике (source=user,
+    появились до разделения) не показываем: определить, кто их вписал, нельзя."""
+    if family_id is not None and (own := db.get(FamilyProduct, (family_id, gtin))):
+        return own
+    row = db.get(ProductCode, gtin)
+    return row if row and row.source != "user" else None
 
 
 def lookup_openfoodfacts(gtin: str) -> dict | None:
@@ -62,9 +80,11 @@ def lookup_openfoodfacts(gtin: str) -> dict | None:
     return {"name": name, "manufacturer": p.get("brands") or None} if name else None
 
 
-def find_product(db: Session, gtin: str, refresh: bool = False) -> ProductCode | None:
+def find_product(
+    db: Session, gtin: str, refresh: bool = False, family_id: int | None = None
+) -> ProductCode | FamilyProduct | None:
     """Справочник, а если там пусто (или просят обновить) — интернет с сохранением результата."""
-    cached = db.get(ProductCode, gtin)
+    cached = cached_product(db, gtin, family_id)
     if cached and not refresh:
         return cached
     if not get_settings().remote_lookup:

@@ -6,7 +6,7 @@ import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInf
 import { CategoryPicker } from '../components/CategoryPicker'
 import { ExpiryInput } from '../components/ExpiryInput'
 import { IndicationsInput } from '../components/IndicationsInput'
-import { useFamilyPath } from '../auth'
+import { useAuth, useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { PageLoader, useToast } from '../components/ui'
@@ -34,6 +34,7 @@ export function MedicineForm() {
   const { id } = useParams()
   const editing = !!id
   const fam = useFamilyPath()
+  const { familyId } = useAuth()
   const nav = useNavigate()
   const qc = useQueryClient()
   const tgOn = !!useQuery({ queryKey: ['access'], queryFn: () => api<{ closed: boolean; telegram?: boolean }>('/auth/access'), staleTime: 60_000 }).data?.telegram
@@ -83,7 +84,7 @@ export function MedicineForm() {
 
   const [packSize, setPackSize] = useState<number | null>(prefill.packSize ?? null)
   const lookup = useMutation({
-    mutationFn: () => api<ProductInfo>(`/products/${encodeURIComponent(f.gtin!.trim())}`),
+    mutationFn: () => api<ProductInfo>(`/products/${encodeURIComponent(f.gtin!.trim())}?family_id=${familyId}`),
     onSuccess: p => {
       // Заполняем только пустые поля — то, что человек уже вписал, не трогаем.
       setF(prev => ({

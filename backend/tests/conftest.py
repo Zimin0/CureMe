@@ -105,7 +105,7 @@ def client(session_factory):
     app.dependency_overrides.clear()
 
 
-def register(client, email="nikita@example.com", name="Никита", invite=None, password="secret123"):
+def register(client, email="nikita@example.com", name="Никита", invite=None, password="kapsula-secret-123"):
     r = client.post("/api/auth/register", json={"email": email, "name": name, "password": password, "invite_code": invite, "consent": True})
     assert r.status_code == 201, r.text
     data = r.json()

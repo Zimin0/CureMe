@@ -109,10 +109,10 @@ def test_scan_flow(client):
     r3 = client.post(f"/api/families/{f}/scan", headers=h, json={"raw": raw}).json()
     assert r3["duplicate_package"] is True
 
-    # другая семья получает подсказку названия из общего справочника
+    # другая семья правок этой семьи не видит: общий справочник пополняется только из интернета
     h2, u2 = register(client, "other@example.com", "Сосед")
     r4 = client.post(f"/api/families/{fid(u2)}/scan", headers=h2, json={"raw": "4601669002013"}).json()
-    assert r4["medicine"] is None and r4["product"]["name"] == "Нурофен" and r4["product"]["source"] == "user"
+    assert r4["medicine"] is None and r4["product"] is None
 
 
 def test_other_family_is_isolated(client):
