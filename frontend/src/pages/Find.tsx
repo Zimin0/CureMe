@@ -6,7 +6,7 @@ import { api, SuggestResult } from '../api'
 import { useAuth, useFamilyPath } from '../auth'
 import { Empty, MedIcon, Spinner } from '../components/ui'
 import { fmtQty, subtitle } from '../format'
-import { MEDICAL_NOTE } from '../legal'
+import { MEDICAL_NOTE_MORE, MEDICAL_NOTE_SHORT } from '../legal'
 import { useRequirePlus } from '../plan'
 
 export function Find() {
@@ -14,6 +14,7 @@ export function Find() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
   const [input, setInput] = useState(q)
+  const [noteOpen, setNoteOpen] = useState(false)
   const { me, familyId, setFamilyId } = useAuth()
   const requirePlus = useRequirePlus()
   const several = (me?.families.length ?? 0) > 1
@@ -43,7 +44,16 @@ export function Find() {
         </div>
       </div>
 
-      <div className="alert warn small"><Info size={18} style={{ flexShrink: 0 }} /><span>{MEDICAL_NOTE}</span></div>
+      <div className="alert warn small">
+        <Info size={18} style={{ flexShrink: 0 }} />
+        <span>
+          {MEDICAL_NOTE_SHORT}{' '}
+          <button type="button" className="linklike" aria-expanded={noteOpen} onClick={() => setNoteOpen(v => !v)}>
+            {noteOpen ? 'Свернуть' : 'Подробнее'}
+          </button>
+          {noteOpen && <> {MEDICAL_NOTE_MORE}</>}
+        </span>
+      </div>
 
       <form onSubmit={submit} className="row">
         <label className="search grow">
