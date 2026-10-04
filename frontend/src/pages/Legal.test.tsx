@@ -67,6 +67,14 @@ describe('юридические страницы', () => {
     expect(screen.getByText(/хранится 12 месяцев либо до удаления семьи/)).toBeInTheDocument()
   })
 
+  it('схема полок («Где лежит лекарство») названа функцией Плюса в Соглашении и оферте', async () => {
+    const { unmount } = renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/Схема полок аптечки с контейнерами и новые метки «Где лежит лекарство» доступны на тарифе «Плюс»/)).toBeInTheDocument()
+    unmount()
+    renderApp('/offer', { loggedIn: false })
+    expect(await screen.findByText(/схема полок аптечки с контейнерами и метками «Где лежит лекарство»/)).toBeInTheDocument()
+  })
+
   it('Соглашение п. 6.8: передача владения только с согласием, исключение для администрации', async () => {
     renderApp('/terms', { loggedIn: false })
     expect(await screen.findByText(/Владение передаётся только с согласия принимающего человека/)).toBeInTheDocument()
