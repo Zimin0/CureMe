@@ -46,3 +46,15 @@ it('слишком короткий запрос не отправляется',
   await waitFor(() => expect(location()).toBe('/find?q=a'))
   // обработчика /suggest нет: если бы запрос ушёл, MSW уронил бы тест
 })
+
+it('предупреждение: коротко на виду, остальное по «Подробнее»', async () => {
+  server.use(http.get('/api/conditions', () => HttpResponse.json([])))
+  const { user } = renderApp('/find')
+  expect(await screen.findByText(/Капсулка не врач и не ставит диагноз/)).toBeInTheDocument()
+  expect(screen.queryByText(/Перед приёмом прочитайте инструкцию/)).not.toBeInTheDocument()
+  const more = screen.getByRole('button', { name: 'Подробнее' })
+  expect(more).toHaveAttribute('aria-expanded', 'false')
+  await user.click(more)
+  expect(screen.getByText(/Перед приёмом прочитайте инструкцию/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Свернуть' })).toHaveAttribute('aria-expanded', 'true')
+})

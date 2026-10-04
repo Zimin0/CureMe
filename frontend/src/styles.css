@@ -361,6 +361,7 @@ a.list-row:hover { background: var(--surface-2); }
 .alert.error { background: var(--danger-soft); color: var(--danger); }
 .alert.warn { background: var(--warning-soft); color: var(--warning); }
 .alert.info { background: var(--info-soft); color: var(--info); }
+.linklike { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 .alert.ok { background: var(--success-soft); color: var(--success); }
 
 /* ---------- вход ---------- */
