@@ -127,7 +127,7 @@ p { margin: 0; }
   background: linear-gradient(145deg, #19b9a2, var(--primary-strong));
   box-shadow: 0 10px 24px -8px rgba(15, 157, 138, .7);
 }
-.bottom-nav a.scan-link { gap: 4px; }
+.bottom-nav a.scan-link { gap: 4px; overflow: visible; }
 
 @media (max-width: 380px) { .bottom-nav .scan-fab { width: 48px; height: 48px; border-radius: 16px; margin-top: -20px; } }
 

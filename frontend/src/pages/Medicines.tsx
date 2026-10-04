@@ -14,7 +14,6 @@ import { Empty, PageLoader } from '../components/ui'
 const FILTERS = [
   { id: '', label: 'Все' },
   { id: 'helps_me', label: '♥ Помогают мне' },
-  { id: 'favorites', label: '★ Избранное' },
   { id: 'attention', label: 'Требуют внимания' },
   { id: 'low', label: 'Заканчиваются' },
   { id: 'expired', label: 'Просроченные' },
@@ -65,7 +64,7 @@ export function Medicines() {
           <CabinetSelect />
           <p className="sub">{meds.data ? `${meds.data.length} в списке` : ' '}{limit('medicines') !== null && <> · <LimitCounter name="medicines" /></>}</p>
         </div>
-        <div className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <Link to="/medicines/new" className="btn primary" onClick={guard}><Plus size={18} />Добавить</Link>
           {!all && meds.data && meds.data.length > 0 && !picking && <button type="button" className="btn ghost" onClick={() => setPicking(true)}>Выбрать</button>}
           <Link to="/export" className="btn ghost"><FileDown size={18} />Экспорт</Link>
