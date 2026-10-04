@@ -75,6 +75,15 @@ describe('юридические страницы', () => {
     expect(await screen.findByText(/схема полок аптечки с контейнерами и метками «Где лежит лекарство»/)).toBeInTheDocument()
   })
 
+  it('безопасность: удаление неподтверждённых аккаунтов, код восстановления, справочник штрихкодов', async () => {
+    const { unmount } = renderApp('/privacy', { loggedIn: false })
+    expect(await screen.findByText(/не подтверждён в течение семи дней после регистрации, и связанные с ней данные удаляются автоматически/)).toBeInTheDocument()
+    expect(screen.getByText(/Код для восстановления пароля \(восемь цифр\) действует тридцать минут/)).toBeInTheDocument()
+    unmount()
+    renderApp('/terms', { loggedIn: false })
+    expect(await screen.findByText(/в общий справочник Сервиса не попадают/)).toBeInTheDocument()
+  })
+
   it('Соглашение п. 6.8: передача владения только с согласием, исключение для администрации', async () => {
     renderApp('/terms', { loggedIn: false })
     expect(await screen.findByText(/Владение передаётся только с согласия принимающего человека/)).toBeInTheDocument()
