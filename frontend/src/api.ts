@@ -82,6 +82,9 @@ export interface MedicineFields {
   gtin: string | null
 }
 
+export interface Shelf { id: string; name: string; x: number; y: number; w: number; h: number }
+export interface ShelfPlan { shelves: Shelf[]; height: number }
+
 export interface Medicine extends MedicineFields {
   id: number
   family_id?: number | null    // только в поиске по всем аптечкам (Плюс)
@@ -94,6 +97,9 @@ export interface Medicine extends MedicineFields {
   personal_note: string
   helps_members: string[]
   photo_url: string | null
+  place_x?: number | null  // где лежит: круг на схеме полок, доли 0..1
+  place_y?: number | null
+  place_r?: number | null
   created_at: string
   updated_at: string
 }

@@ -46,6 +46,7 @@ def _merge_into(db: Session, src: Medicine, dst: Medicine, dst_family_id: int) -
 
 def _relocate(db: Session, med: Medicine, dst_family_id: int) -> None:
     med.family_id = dst_family_id
+    med.place_x = med.place_y = med.place_r = None  # схема полок у каждой аптечки своя
     db.execute(update(Intake).where(Intake.medicine_id == med.id).values(family_id=dst_family_id))
     db.execute(update(Schedule).where(Schedule.medicine_id == med.id).values(family_id=dst_family_id))
 

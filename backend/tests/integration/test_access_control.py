@@ -19,6 +19,8 @@ FAMILY_ENDPOINTS = [
     ("POST", "/api/families/{f}/owner-transfer", {"user_id": 0}),
     ("POST", "/api/families/{f}/owner-request", None),
     ("DELETE", "/api/families/{f}/members/{u}", None),
+    ("GET", "/api/families/{f}/shelf-plan", None),
+    ("PUT", "/api/families/{f}/shelf-plan", {"shelves": []}),
     ("GET", "/api/families/{f}/categories", None),
     ("GET", "/api/families/{f}/medicines", None),
     ("POST", "/api/families/{f}/medicines", {"name": "X"}),
