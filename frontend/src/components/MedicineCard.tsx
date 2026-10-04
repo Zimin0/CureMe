@@ -7,8 +7,8 @@ import { MiniPlace } from './ShelfMap'
 import { MedIcon, StatusBadge } from './ui'
 
 /** showCabinet — в поиске по всем аптечкам: подписываем, из какой аптечка карточка, и по клику открываем её. */
-export function MedicineCard({ m, showCabinet = false }: { m: Medicine; showCabinet?: boolean }) {
-  return showCabinet ? <CabinetCard m={m} /> : <Card m={m} />
+export function MedicineCard({ m, showCabinet = false, hidePlace = false }: { m: Medicine; showCabinet?: boolean; hidePlace?: boolean }) {
+  return showCabinet ? <CabinetCard m={m} /> : <Card m={m} hidePlace={hidePlace} />
 }
 
 function CabinetCard({ m }: { m: Medicine }) {
@@ -16,7 +16,17 @@ function CabinetCard({ m }: { m: Medicine }) {
   return <Card m={m} cabinet onOpen={() => { if (m.family_id && m.family_id !== familyId) setFamilyId(m.family_id) }} />
 }
 
-function Card({ m, cabinet = false, onOpen }: { m: Medicine; cabinet?: boolean; onOpen?: () => void }) {
+/** Один тег за раз: просрочено, потом закончилось, потом дни до срока, потом «заканчивается». */
+function CardTag({ m }: { m: Medicine }) {
+  const s = m.stock
+  if (s.status === 'expired') return <span className="badge expired">Истёк срок годности</span>
+  if (s.status === 'out') return <span className="badge out">Закончилось</span>
+  if (s.days_left !== null) return <span className={`badge ${s.days_left <= 30 ? 'expiring' : ''}`}>{daysText(s.days_left)}</span>
+  if (s.status === 'low') return <StatusBadge stock={s} />
+  return null
+}
+
+function Card({ m, cabinet = false, hidePlace = false, onOpen }: { m: Medicine; cabinet?: boolean; hidePlace?: boolean; onOpen?: () => void }) {
   const s = m.stock
   return (
     <Link to={`/medicines/${m.id}`} className="med-card" onClick={onOpen}>
@@ -30,12 +40,9 @@ function Card({ m, cabinet = false, onOpen }: { m: Medicine; cabinet?: boolean; 
         <div className="meta ellipsis">{subtitle(m) || m.categories.map(c => c.name).join(', ') || 'Без категории'}</div>
         <div className="tags">
           {cabinet && m.family_name && <span className="badge accent">{m.family_name}</span>}
-          {s.status !== 'ok' && <StatusBadge stock={s} />}
-          {s.days_left !== null && s.status !== 'expired' && (
-            <span className={`badge ${s.days_left <= 30 ? 'expiring' : ''}`}>{daysText(s.days_left)}</span>
-          )}
+          <CardTag m={m} />
         </div>
-        {!cabinet && <MiniPlace m={m} />}
+        {!cabinet && !hidePlace && <MiniPlace m={m} />}
       </div>
       <div className="side">
         <div className="qty">{fmtQty(s.total)}<small>{m.unit}</small></div>
