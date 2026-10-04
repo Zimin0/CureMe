@@ -53,7 +53,7 @@ export function Layout() {
         {showUpsell && (
           <NavLink to="/plus" className="btn primary side-plus"><Sparkles size={18} />Подключить Плюс</NavLink>
         )}
-        {isPlus && plan?.plus_active && (
+        {me?.plus_active && plan?.plus_active && (
           <NavLink to="/plus" className="side-plus-card">
             <b><Sparkles size={16} /> Капсулка Плюс</b>
             <span>{planLabel(plan)}</span>
