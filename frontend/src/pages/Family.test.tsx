@@ -26,7 +26,7 @@ it('владелец видит одноразовую ссылку со сро�
   const { user } = renderApp('/family')
   expect(await screen.findByText(/\/join\/ABCD2345$/)).toBeInTheDocument()
   expect(screen.getByText(/Ссылка-приглашение · действует до/)).toBeInTheDocument()
-  expect(screen.getByText(/сработает один раз и действует 24 часа/)).toBeInTheDocument()
+  expect(screen.getByText(/Она одноразовая и будет действовать 24 часа/)).toBeInTheDocument()
   window.confirm = () => true
   await user.click(screen.getByTitle('Создать новую ссылку'))
   expect(await screen.findByText(/\/join\/NEWCODE9$/)).toBeInTheDocument()
