@@ -582,7 +582,7 @@ function DebugTab() {
 }
 
 // ---------- тарифы ----------
-type Billing = { enabled: boolean; price_month: number | null; price_year: number | null; trial_days: number }
+type Billing = { enabled: boolean; price_month: number | null; price_year: number | null; trial_days: number; plus_theme?: boolean }
 
 const planText = (f: { plan: PlanName; plus_until: string | null; plus_active: boolean }) =>
   f.plus_active ? (f.plus_until ? `Плюс до ${fmtDate(f.plus_until)}` : 'Плюс бессрочно')
@@ -612,7 +612,8 @@ function PlansTab() {
       const priceChanged = sent.price_month !== billing.data?.price_month || sent.price_year !== billing.data?.price_year
       qc.setQueryData(['admin', 'billing'], b)
       qc.invalidateQueries({ queryKey: ['plan'] })
-      toast(trialChanged ? 'Пробный срок сохранён' : priceChanged ? 'Стоимость сохранена'
+      toast(sent.plus_theme !== billing.data?.plus_theme ? (b.plus_theme === false ? 'Сиреневый вид Плюса выключен' : 'Сиреневый вид Плюса включён')
+        : trialChanged ? 'Пробный срок сохранён' : priceChanged ? 'Стоимость сохранена'
         : b.enabled ? 'Платная версия включена' : 'Платная версия выключена: всем доступно всё')
     },
     onError: (e: Error) => toast(e.message, 'error'),
@@ -635,6 +636,14 @@ function PlansTab() {
         <span>
           <b>Платная версия включена</b><br />
           <span className="muted small">Пока выключено, всем доступны все функции Плюса. Включите, когда будут готовы оплата и оферта.</span>
+        </span>
+      </label>
+      <label className="check card" style={{ padding: 16 }}>
+        <input type="checkbox" checked={billing.data.plus_theme !== false} disabled={save.isPending}
+          onChange={e => save.mutate({ ...billing.data!, plus_theme: e.target.checked })} />
+        <span>
+          <b>Сиреневый вид для людей с Плюсом</b><br />
+          <span className="muted small">Включено: у кого есть Плюс (платный или пробный), интерфейс сиреневый, внизу меню на ПК карточка «Капсулка Плюс». Выключите, чтобы у всех снова был прежний зелёный вид.</span>
         </span>
       </label>
       <CompressionSwitch />

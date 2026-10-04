@@ -28,7 +28,7 @@ export function Layout() {
   const onHistory = useLocation().pathname.startsWith('/history')
   const { me, familyId, setFamilyId, signOut } = useAuth()
   const { plan } = usePlan()
-  const isPlus = !!me?.plus_active
+  const isPlus = !!me?.plus_active && plan?.plus_theme !== false
   // Сиреневая тема у тех, у кого есть Плюс (платный или пробный): класс на body переопределяет цвета в styles.css.
   useEffect(() => {
     document.body.classList.toggle('plus-theme', isPlus)

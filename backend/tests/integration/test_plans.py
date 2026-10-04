@@ -208,9 +208,9 @@ def test_plus_feature_dependency_returns_402_with_header(client, admin, session_
 def test_admin_sets_plus_price_and_family_sees_it(client, admin):
     h, f = admin
     assert client.get(f"/api/families/{f}/plan", headers=h).json()["price_month"] is None
-    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "price_month": 149, "price_year": 990, "trial_days": 0})
+    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "price_month": 149, "price_year": 990, "trial_days": 0, "plus_theme": True})
     assert r.status_code == 200
-    assert client.get("/api/admin/billing", headers=h).json() == {"enabled": False, "price_month": 149, "price_year": 990, "trial_days": 0}
+    assert client.get("/api/admin/billing", headers=h).json() == {"enabled": False, "price_month": 149, "price_year": 990, "trial_days": 0, "plus_theme": True}
     p = client.get(f"/api/families/{f}/plan", headers=h).json()
     assert (p["price_month"], p["price_year"]) == (149, 990)
     # переключатель не стирает цену, если фронтенд прислал её обратно; пустая цена убирается
@@ -277,3 +277,14 @@ def test_free_members_limit_switches_at_new_terms_date(monkeypatch):
     assert REAL_NEW_TERMS_FROM == datetime(2026, 10, 12, 21, 0, tzinfo=timezone.utc)  # 13 октября 00:00 МСК, как в Соглашении
     assert plans.free_members_limit(REAL_NEW_TERMS_FROM) == 3  # настройка теста: новая редакция уже действует
     assert plans.OLD_FREE_MEMBERS == 4
+
+
+def test_plus_theme_switch_is_on_by_default_and_admin_can_turn_it_off(client, admin):
+    h, f = admin
+    assert client.get("/api/admin/billing", headers=h).json()["plus_theme"] is True
+    assert client.get(f"/api/families/{f}/plan", headers=h).json()["plus_theme"] is True
+    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "trial_days": 0, "plus_theme": False})
+    assert r.status_code == 200 and r.json()["plus_theme"] is False
+    assert client.get(f"/api/families/{f}/plan", headers=h).json()["plus_theme"] is False
+    r = client.put("/api/admin/billing", headers=h, json={"enabled": False, "trial_days": 0, "plus_theme": True})
+    assert client.get(f"/api/families/{f}/plan", headers=h).json()["plus_theme"] is True
