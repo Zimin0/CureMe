@@ -46,8 +46,8 @@ export function ShelfMap({ plan, place, width = '100%', onPoint, onShelfDown, se
           {labels && s.name && <text x={s.x + 0.012} y={s.y + 0.04} fontSize={0.032} fill="var(--muted, #6b7a76)" style={{ pointerEvents: 'none', userSelect: 'none' }}>{s.name}</text>}
         </g>
       ))}
-      {place && <circle cx={place.x} cy={place.y} r={place.r} fill="rgba(229,57,53,.25)" stroke="#e53935" strokeWidth={0.008} style={{ pointerEvents: 'none' }} />}
-      {place && <circle cx={place.x} cy={place.y} r={0.008} fill="#e53935" style={{ pointerEvents: 'none' }} />}
+      {place && <circle cx={place.x} cy={place.y} r={place.r} fill="rgba(15,157,138,.25)" strokeWidth={0.008} style={{ stroke: 'var(--primary, #0f9d8a)', pointerEvents: 'none' }} />}
+      {place && <circle cx={place.x} cy={place.y} r={0.008} style={{ fill: 'var(--primary, #0f9d8a)', pointerEvents: 'none' }} />}
     </svg>
   )
 }
