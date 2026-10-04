@@ -25,6 +25,14 @@ export function Plus() {
 
   return (
     <div className="page stack" style={{ maxWidth: 720 }}>
+      <div className="plus-hero">
+        <Sparkles size={34} />
+        <div>
+          <h1>{plan.plus_active ? 'Капсулка Плюс оформлена!' : 'Оформите Капсулку Плюс'}</h1>
+          <p>Одна подписка на семью: платит владелец семьи, Плюс действует на всех её людей и все аптечки, и пользуются все.</p>
+        </div>
+      </div>
+
       <section className="card flush plus-list">
         <div style={{ padding: '18px 18px 6px' }}><h2>Что входит в Плюс</h2></div>
         {plan.features.map(f => (
@@ -56,14 +64,6 @@ export function Plus() {
           Сканирование упаковок, сроки годности, остатки, фото, подбор «Что есть дома от…» и приглашения родных всегда бесплатны.
         </p>
       </section>
-
-      <div className="plus-hero">
-        <Sparkles size={34} />
-        <div>
-          <h1>Капсулка Плюс</h1>
-          <p>Одна подписка на семью: платит владелец семьи, Плюс действует на всех её людей и все аптечки, и пользуются все.</p>
-        </div>
-      </div>
 
       <section className="card stack">
         <div className="row between">
