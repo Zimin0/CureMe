@@ -81,7 +81,7 @@ export function History() {
           <p className="sub">Кто, когда и сколько принял. Нажатия за одну минуту сложены в одну запись.</p>
         </div>
         <button type="button" className={`btn ${report ? 'primary' : 'ghost'}`} aria-expanded={report} onClick={() => setReport(v => !v)}>
-          <Stethoscope size={18} />Для врача
+          <Stethoscope size={18} />Выгрузить
         </button>
       </div>
 
