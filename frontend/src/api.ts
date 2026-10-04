@@ -33,6 +33,7 @@ export interface Plan {
   plus_until: string | null
   plus_active: boolean       // Плюс оплачен и не истёк
   billing_enabled: boolean   // платная версия включена администратором
+  plus_theme?: boolean       // сиреневый вид у людей с Плюсом (админка «Тарифы»); по умолчанию включён
   price_month?: number | null  // стоимость Плюса для аккаунта, ₽ (настраивает админ); null — не показывать
   price_year?: number | null
   owner_name?: string | null  // чей Плюс: владелец семьи

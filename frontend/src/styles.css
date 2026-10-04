@@ -652,6 +652,30 @@ a.intake-med { color: var(--primary); }
   .lp-plus-cta .lp-btn { width: 100%; }
 }
 
+/* Сиреневая тема для пользователей с Плюсом (класс plus-theme ставит Layout). */
+body.plus-theme {
+  --primary: #7048e8;
+  --primary-strong: #5b36c9;
+  --primary-soft: #efeaff;
+  --on-primary: #ffffff;
+}
+body.plus-theme .btn.primary { box-shadow: 0 6px 16px -8px rgba(112, 72, 232, .8); }
+body.plus-theme .scan-fab { background: linear-gradient(145deg, #8b6be0, var(--primary-strong)); box-shadow: 0 10px 24px -8px rgba(112, 72, 232, .7); }
+@media (prefers-color-scheme: dark) {
+  body.plus-theme {
+    --primary: #a58bff;
+    --primary-strong: #bfaaff;
+    --primary-soft: #251d45;
+    --on-primary: #150d33;
+  }
+}
+.side-plus-card {
+  display: flex; flex-direction: column; gap: 2px; margin: 0 6px 8px; padding: 12px 14px; border-radius: 14px;
+  background: linear-gradient(135deg, #8b6be0, #5b3fb5); color: #fff; text-decoration: none; font-size: 13px;
+}
+.side-plus-card b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.side-plus-card span { opacity: .88; }
+
 .intake-tabs { margin-bottom: 14px; max-width: 360px; }
 .intake-tabs a { display: grid; place-items: center; height: 38px; border-radius: 11px; font-weight: 700; color: var(--muted); text-decoration: none; }
 .intake-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }

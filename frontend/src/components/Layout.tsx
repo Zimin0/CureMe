@@ -1,7 +1,8 @@
+import { useEffect } from 'react'
 import { CalendarClock, History, House, LogOut, LucideIcon, Pill, ScanLine, Shield, Sparkles, Stethoscope, Users } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
-import { usePlan } from '../plan'
+import { planLabel, usePlan } from '../plan'
 import { cabinetLabel, FrozenNotice, PlusEndingBanner } from './PlusEnding'
 import { TermsNotice } from './TermsNotice'
 
@@ -27,6 +28,12 @@ export function Layout() {
   const onHistory = useLocation().pathname.startsWith('/history')
   const { me, familyId, setFamilyId, signOut } = useAuth()
   const { plan } = usePlan()
+  const isPlus = !!me?.plus_active && plan?.plus_theme !== false
+  // Сиреневая тема у тех, у кого есть Плюс (платный или пробный): класс на body переопределяет цвета в styles.css.
+  useEffect(() => {
+    document.body.classList.toggle('plus-theme', isPlus)
+    return () => document.body.classList.remove('plus-theme')
+  }, [isPlus])
   const showUpsell = !!plan && plan.billing_enabled && !plan.plus_active
   return (
     <div className="app">
@@ -45,6 +52,12 @@ export function Layout() {
         <div className="spacer" />
         {showUpsell && (
           <NavLink to="/plus" className="btn primary side-plus"><Sparkles size={18} />Подключить Плюс</NavLink>
+        )}
+        {isPlus && plan?.plus_active && (
+          <NavLink to="/plus" className="side-plus-card">
+            <b><Sparkles size={16} /> Капсулка Плюс</b>
+            <span>{planLabel(plan)}</span>
+          </NavLink>
         )}
         {me && me.families.length > 1 && (
           <label className="family-switch small">

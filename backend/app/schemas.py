@@ -306,6 +306,8 @@ class BillingSettings(BaseModel):
     price_year: int | None = Field(default=None, ge=1, le=1_000_000)
     # Сколько дней Плюса дарим при первом подтверждении почты; 0 — пробный период выключен.
     trial_days: int = Field(default=5, ge=0, le=90)
+    # Сиреневый вид интерфейса у пользователей с Плюсом; выключено — у всех прежний зелёный.
+    plus_theme: bool = True
 
 
 class AdminPlanIn(BaseModel):
@@ -326,6 +328,7 @@ class PlanOut(BaseModel):
     plus_until: datetime | None        # до какого момента Плюс; пусто — бессрочно
     plus_active: bool                  # Плюс оплачен и не истёк
     billing_enabled: bool              # платная версия включена администратором
+    plus_theme: bool = True            # у людей с Плюсом интерфейс сиреневый (переключатель в админке «Тарифы»)
     price_month: int | None = None     # стоимость Плюса в рублях за месяц / за год (настраивает админ)
     price_year: int | None = None
     has_plus: bool                     # семье доступно всё из Плюса (Плюс или платная версия выключена)

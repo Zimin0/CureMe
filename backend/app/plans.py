@@ -101,7 +101,7 @@ def billing_settings(db: Session) -> BillingSettings:
     value = (row.value if row else None) or {}
     return BillingSettings(
         enabled=bool(value.get("enabled")), price_month=value.get("price_month"), price_year=value.get("price_year"),
-        trial_days=value.get("trial_days", DEFAULT_TRIAL_DAYS),
+        trial_days=value.get("trial_days", DEFAULT_TRIAL_DAYS), plus_theme=bool(value.get("plus_theme", True)),
     )
 
 
@@ -282,6 +282,7 @@ def plan_out(db: Session, family: Family) -> PlanOut:
         plus_active=active,
         owner_name=owner.name if owner else None,
         billing_enabled=enabled,
+        plus_theme=billing.plus_theme,
         price_month=billing.price_month,
         price_year=billing.price_year,
         has_plus=plus,
