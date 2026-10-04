@@ -443,11 +443,31 @@ class MedicineUpdate(BaseModel):
     min_quantity: float | None = Field(default=None, ge=0, le=1_000_000)
     blister_size: int | None = Field(default=None, ge=1, le=1000)
     gtin: str | None = Field(default=None, max_length=512)
+    # Где лежит: круг на схеме полок (доли 0..1). null во всех трёх — «убрать метку».
+    place_x: float | None = Field(default=None, ge=0, le=1)
+    place_y: float | None = Field(default=None, ge=0, le=1)
+    place_r: float | None = Field(default=None, ge=0.01, le=0.5)
 
     @model_validator(mode="before")
     @classmethod
     def _legacy(cls, data):
         return _legacy_category_id(data)
+
+
+class Shelf(BaseModel):
+    id: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9_-]+$")
+    name: str = Field(default="", max_length=60)
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    w: float = Field(gt=0, le=1)
+    h: float = Field(gt=0, le=1)
+
+
+class ShelfPlan(BaseModel):
+    """Схема аптечки: прямоугольники полок и ящиков в долях от 0 до 1 (ширина и высота схемы)."""
+
+    shelves: list[Shelf] = Field(default_factory=list, max_length=30)
+    height: float = Field(default=1.0, gt=0, le=3)  # высота схемы в долях ширины
 
 
 class MarkIn(BaseModel):
@@ -475,6 +495,9 @@ class MedicineOut(MedicineBase):
     personal_note: str
     helps_members: list[str]     # кому ещё из семьи помогает
     photo_url: str | None
+    place_x: float | None = None
+    place_y: float | None = None
+    place_r: float | None = None
     created_at: datetime
     updated_at: datetime
     # Заполняются только в поиске по всем аптечкам семьи (R05): из какой аптечки лекарство.

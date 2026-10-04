@@ -180,6 +180,7 @@ class Family(Base):
     household_id: Mapped[int | None] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"), index=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     status: Mapped[str] = mapped_column(String(16), default="active", server_default="active")  # active | frozen
+    shelf_plan: Mapped[str | None] = mapped_column(Text)  # JSON: схема полок аптечки, см. schemas.ShelfPlan
 
     household: Mapped["Household | None"] = relationship(back_populates="cabinets")
     memberships: Mapped[list["Membership"]] = relationship(back_populates="family", cascade="all, delete-orphan")
@@ -242,6 +243,10 @@ class Medicine(Base):
     blister_size: Mapped[int | None] = mapped_column(Integer)      # таблеток в одном блистере
     gtin: Mapped[str | None] = mapped_column(String(14), index=True)
     photo: Mapped[str | None] = mapped_column(String(64))           # имя файла в media_dir
+    # Где лежит: круг на схеме полок аптечки, доли от 0 до 1 (центр x, y и радиус по ширине схемы).
+    place_x: Mapped[float | None] = mapped_column(Float)
+    place_y: Mapped[float | None] = mapped_column(Float)
+    place_r: Mapped[float | None] = mapped_column(Float)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

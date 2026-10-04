@@ -6,6 +6,7 @@ import { api, Intake, MedicineDetail as Detail, Package, PackageInput, uploadFil
 import { ExpiryInput } from '../components/ExpiryInput'
 import { CommentSheet, IntakeList } from '../components/IntakeList'
 import { useFamilyPath } from '../auth'
+import { PlaceSheet, PlanEditor, ShelfMap, shelfAt, usePlan } from '../components/ShelfMap'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
 import { Empty, MedIcon, PageLoader, Sheet, StatusBadge, useToast } from '../components/ui'
@@ -33,6 +34,10 @@ export function MedicineDetail() {
   const [dose, setDose] = useState(1)
   const [photoOpen, setPhotoOpen] = useState(false)
   const [commentOpen, setCommentOpen] = useState(false)
+  const [placeOpen, setPlaceOpen] = useState(false)
+  const [planOpen, setPlanOpen] = useState(false)
+  const hasPlace = m?.place_x != null && m?.place_y != null && m?.place_r != null
+  const plan = usePlan(hasPlace)
 
   const onSaved = (d: Detail, msg?: string) => {
     qc.setQueryData(key, d)
@@ -88,6 +93,8 @@ export function MedicineDetail() {
 
   return (
     <div className="page">
+      {placeOpen && <PlaceSheet m={m} onClose={() => setPlaceOpen(false)} onSaved={d => onSaved(d, 'Место сохранено')} onEditPlan={() => { setPlaceOpen(false); setPlanOpen(true) }} />}
+      {planOpen && <PlanEditor onClose={() => { setPlanOpen(false); setPlaceOpen(true) }} />}
       <div className="row between">
         <button className="btn ghost sm" onClick={() => nav(-1)}><ArrowLeft size={16} />Назад</button>
         <div className="row" style={{ gap: 8 }}>
@@ -152,6 +159,19 @@ export function MedicineDetail() {
               </button>
             </div>
             <p className="faint small" style={{ marginTop: 8 }}>Списываем из упаковки, у которой срок кончается раньше</p>
+          </section>
+
+          <section className="card">
+            <div className="card-head">
+              <h2>Где лежит</h2>
+              <button className="btn sm ghost" onClick={() => setPlaceOpen(true)}><MapPin size={16} />{hasPlace ? 'Изменить' : 'Отметить'}</button>
+            </div>
+            {hasPlace && plan.data ? (
+              <>
+                <ShelfMap plan={plan.data} place={{ x: m.place_x!, y: m.place_y!, r: m.place_r! }} />
+                {shelfAt(plan.data, m.place_x!, m.place_y!)?.name && <p className="small muted" style={{ marginTop: 6 }}>{shelfAt(plan.data, m.place_x!, m.place_y!)!.name}</p>}
+              </>
+            ) : <p className="muted small">Отметьте на схеме аптечки, где лежит это лекарство.</p>}
           </section>
 
           <section className="card">

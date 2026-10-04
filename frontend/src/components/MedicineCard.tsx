@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { Medicine } from '../api'
 import { useAuth } from '../auth'
 import { daysText, fmtQty, subtitle } from '../format'
+import { MiniPlace } from './ShelfMap'
 import { MedIcon, StatusBadge } from './ui'
 
 /** showCabinet — в поиске по всем аптечкам: подписываем, из какой аптечка карточка, и по клику открываем её. */
@@ -34,6 +35,7 @@ function Card({ m, cabinet = false, onOpen }: { m: Medicine; cabinet?: boolean; 
             <span className={`badge ${s.days_left <= 30 ? 'expiring' : ''}`}>{daysText(s.days_left)}</span>
           )}
         </div>
+        {!cabinet && <MiniPlace m={m} />}
       </div>
       <div className="side">
         <div className="qty">{fmtQty(s.total)}<small>{m.unit}</small></div>

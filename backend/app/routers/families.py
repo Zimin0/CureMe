@@ -1,13 +1,15 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from .. import cabinet_ops, compression, households
 from ..db import get_db
-from ..deps import current_user, family_membership, family_owner
+from ..deps import current_user, family_membership, family_owner, get_family as family_dep
 from ..models import Family, Membership, OwnerTransfer, User
 from ..plans import plan_out
 from ..ratelimit import client_ip, limiter
-from ..schemas import CompressIn, FamilyIn, MoveOut, SplitIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut
+from ..schemas import CompressIn, FamilyIn, MoveOut, SplitIn, FamilyOut, InviteInfo, JoinIn, MemberOut, OwnerOfferIn, OwnerTransferOut, PlanOut, ShelfPlan
 
 router = APIRouter(prefix="/api", tags=["families"])
 
@@ -200,3 +202,19 @@ def join(body: JoinIn, request: Request, user: User = Depends(current_user), db:
     db.commit()
     fam = households.cabinets_of(user.household)[0]
     return family_out(fam, user.household_role, db, viewer_id=user.id)
+
+
+@router.get("/families/{family_id}/shelf-plan", response_model=ShelfPlan)
+def get_shelf_plan(fam: Family = Depends(family_dep)):
+    """Схема полок аптечки: на ней у лекарств отмечено, где они лежат. Видят все участники."""
+    return ShelfPlan.model_validate_json(fam.shelf_plan) if fam.shelf_plan else ShelfPlan()
+
+
+@router.put("/families/{family_id}/shelf-plan", response_model=ShelfPlan)
+def put_shelf_plan(body: ShelfPlan, fam: Family = Depends(family_dep), db: Session = Depends(get_db)):
+    """Сохраняет схему целиком. Менять может любой участник аптечки, как и сами лекарства."""
+    if len({s.id for s in body.shelves}) != len(body.shelves):
+        raise HTTPException(400, "Повторяются идентификаторы полок")
+    fam.shelf_plan = body.model_dump_json()
+    db.commit()
+    return body
