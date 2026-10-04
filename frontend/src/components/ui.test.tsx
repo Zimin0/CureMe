@@ -26,7 +26,7 @@ describe('MedicineCard', () => {
 
   it('просрочка: бейдж есть, «ещё N дней» нет', () => {
     card(medicine({ stock: { total: 0, expired_quantity: 5, package_count: 2, nearest_expiry: null, days_left: -3, status: 'expired' } }))
-    expect(screen.getByText('Есть просрочка')).toHaveClass('badge', 'expired')
+    expect(screen.getByText('Истёк срок годности')).toHaveClass('badge', 'expired')
     expect(screen.queryByText(/просрочено 3/)).not.toBeInTheDocument()
     expect(screen.getByText('2 уп.')).toBeInTheDocument()
   })
@@ -34,6 +34,12 @@ describe('MedicineCard', () => {
   it('скоро истекает — жёлтый бейдж срока', () => {
     card(medicine({ stock: { total: 5, expired_quantity: 0, package_count: 1, nearest_expiry: null, days_left: 7, status: 'expiring' } }))
     expect(screen.getByText('ещё 7 дней')).toHaveClass('expiring')
+  })
+
+  it('закончилось: один тег, срока нет', () => {
+    card(medicine({ stock: { total: 0, expired_quantity: 0, package_count: 1, nearest_expiry: '2027-01-01', days_left: 5, status: 'out' } }))
+    expect(screen.getByText('Закончилось')).toHaveClass('badge', 'out')
+    expect(screen.queryByText(/ещё 5/)).not.toBeInTheDocument()
   })
 
   it('без формы и категории — «Без категории»', () => {
