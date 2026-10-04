@@ -62,3 +62,18 @@ def test_plan_and_offer_pages_indexable(path):
 def test_plus_not_disallowed_but_in_sitemap(client):
     assert "Disallow: /plus" not in client.get("/robots.txt").text
     assert "/plus" in client.get("/sitemap.xml").text
+
+
+def test_home_faq_in_jsonld_and_text_and_landing():
+    import json
+    import re
+    from pathlib import Path
+
+    out = seo.render_index(TEMPLATE, "/", BASE)
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', out, flags=re.S)
+    faq = next(json.loads(b) for b in blocks if '"FAQPage"' in b)
+    assert len(faq["mainEntity"]) == len(seo.FAQ) >= 3
+    assert "<h2>Частые вопросы</h2>" in out
+    landing = (Path(__file__).resolve().parents[3] / "frontend/src/pages/Landing.tsx").read_text(encoding="utf-8")
+    for q, a in seo.FAQ:  # текст на странице и для поисковика не расходится
+        assert q in landing and a in landing
