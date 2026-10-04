@@ -6,6 +6,8 @@ import { api, PayStatus } from '../api'
 import { fmtDate } from '../format'
 import { useToast } from './ui'
 
+const PAYMENTS_VISIBLE = 3
+
 export const usePayStatus = (poll = false) => useQuery({
   queryKey: ['payments', 'me'], queryFn: () => api<PayStatus>('/payments/me'),
   refetchInterval: poll ? 2500 : false,
@@ -51,6 +53,13 @@ export function PayBox() {
   const shownPayments = s.payments.filter(p => p.status !== 'pending' || String(p.id) === returned)
   const price = period === 'month' ? s.price_month : s.price_year
   const canPay = s.can_pay && !!price
+
+  const renderPayment = (p: (typeof shownPayments)[number]) => (
+    <div key={p.id} className="row between small">
+      <span>{fmtDate(p.paid_at ?? p.created_at)}, {rub(p.amount)} за {PERIOD[p.period]}{p.recurring ? ' (автопродление)' : ''}</span>
+      <span>{STATUS[p.status]}{p.receipt_url && <> · <a href={p.receipt_url} target="_blank" rel="noreferrer noopener">чек</a></>}</span>
+    </div>
+  )
 
   return (
     <section className="card stack" aria-label="Оплата">
@@ -108,12 +117,13 @@ export function PayBox() {
       {shownPayments.length > 0 && (
         <div className="stack">
           <h3>Ваши оплаты</h3>
-          {shownPayments.map(p => (
-            <div key={p.id} className="row between small">
-              <span>{fmtDate(p.paid_at ?? p.created_at)}, {rub(p.amount)} за {PERIOD[p.period]}{p.recurring ? ' (автопродление)' : ''}</span>
-              <span>{STATUS[p.status]}{p.receipt_url && <> · <a href={p.receipt_url} target="_blank" rel="noreferrer noopener">чек</a></>}</span>
-            </div>
-          ))}
+          {shownPayments.slice(0, PAYMENTS_VISIBLE).map(renderPayment)}
+          {shownPayments.length > PAYMENTS_VISIBLE && (
+            <details className="stack">
+              <summary className="small">Ещё {shownPayments.length - PAYMENTS_VISIBLE}</summary>
+              {shownPayments.slice(PAYMENTS_VISIBLE).map(renderPayment)}
+            </details>
+          )}
         </div>
       )}
     </section>
