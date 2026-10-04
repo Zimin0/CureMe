@@ -28,6 +28,9 @@ export function Layout() {
             <Icon size={20} />{label}
           </NavLink>
         ))}
+        {!showUpsell && (
+          <NavLink to="/plus" className="side-link"><Sparkles size={20} />Плюс</NavLink>
+        )}
         {me?.is_admin && (
           <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
         )}
