@@ -156,8 +156,14 @@ def update_medicine(
         _set_categories(db, med, data.pop("category_ids") or [])
     if "gtin" in data:
         data["gtin"] = _normalize_gtin(data["gtin"])
+    if any(k.startswith("place_") for k in data):
+        # Метка целиком: либо все три числа, либо ни одного.
+        vals = [data.get(k, getattr(med, k)) for k in ("place_x", "place_y", "place_r")]
+        if any(v is None for v in vals) and not all(v is None for v in vals):
+            for k in ("place_x", "place_y", "place_r"):
+                data[k] = None
     for k, v in data.items():
-        setattr(med, k, v if v is not None or k in ("min_quantity", "blister_size", "gtin") else getattr(med, k))
+        setattr(med, k, v if v is not None or k in ("min_quantity", "blister_size", "gtin", "place_x", "place_y", "place_r") else getattr(med, k))
     _remember(db, med)
     db.commit()
     return _detail(db, fam, medicine_id, user)

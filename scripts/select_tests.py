@@ -52,7 +52,8 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "tests": [
             "integration/test_families.py", "integration/test_api.py", "integration/test_access_control.py",
             "integration/test_plans.py", "integration/test_trial.py", "integration/test_invites.py",
-            "integration/test_owner_transfer.py", "integration/test_plus_end.py", "integration/test_cabinet_ops.py", "integration/test_switch_rules.py"],
+            "integration/test_owner_transfer.py", "integration/test_plus_end.py", "integration/test_cabinet_ops.py", "integration/test_switch_rules.py",
+            "integration/test_shelf_plan.py"],
     },
     "Семья и аптечки (состав, лимиты, тариф семьи)": {
         "sources": ["households.py", "compression.py", "cabinet_ops.py"],
@@ -67,7 +68,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     "Лекарства, упаковки, остатки": {
         "sources": ["routers/medicines.py", "services.py"],
         "tests": [
-            "unit/test_services.py", "integration/test_medicines.py", "integration/test_api.py",
+            "unit/test_services.py", "integration/test_medicines.py", "integration/test_shelf_plan.py", "integration/test_api.py",
             "integration/test_categories.py", "integration/test_intakes.py", "integration/test_access_control.py", "integration/test_cabinet_ops.py"],
     },
     "История приёма лекарств": {
