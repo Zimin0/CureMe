@@ -38,7 +38,7 @@ function setup() {
 
 async function openReport() {
   const r = renderApp('/history')
-  await r.user.click(await screen.findByRole('button', { name: 'Для врача' }))
+  await r.user.click(await screen.findByRole('button', { name: 'Выгрузить' }))
   return r
 }
 
@@ -78,14 +78,14 @@ it('свой период: кнопки выключены, пока начал�
   expect(screen.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
 })
 
-it('без Плюса: блок заблокирован, баннер открывает шторку, ничего не скачивается', async () => {
+it('без Плюса: только баннер, периодов и кнопок PDF/Excel нет, баннер открывает шторку', async () => {
   const { clicks } = setup()
   server.use(http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false, billing_enabled: true }))))
   const { user } = await openReport()
   expect(await screen.findByRole('button', { name: /Доступно в Плюсе/ })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /^Excel$/ })).toBeDisabled()
-  expect(screen.getByRole('button', { name: /^PDF$/ })).toBeDisabled()
-  expect(screen.getByRole('tab', { name: 'Год' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: /^Excel$/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /^PDF$/ })).toBeNull()
+  expect(screen.queryByRole('tab', { name: 'Год' })).toBeNull()
   await user.click(screen.getByRole('button', { name: /Доступно в Плюсе/ }))
   expect(await screen.findByText('Доступно в Капсулке Плюс')).toBeInTheDocument()
   expect(clicks).toEqual([])

@@ -64,7 +64,8 @@ export function DoctorReport() {
           onClick={() => openPlus('export_pdf')} text="PDF и Excel с историей приёма и сводкой по лекарствам доступны в Капсулке Плюс." />
       )}
 
-      <fieldset className="locked-block" disabled={!available('export_pdf')}>
+      {available('export_pdf') && (
+      <fieldset className="locked-block">
         {members.length > 1 && (
           <label className="field"><span>Чья история</span>
             <select className="input" value={who ?? ''} onChange={e => setMember(Number(e.target.value))}>
@@ -99,6 +100,7 @@ export function DoctorReport() {
         </div>
         <p className="small faint">Выписка составлена по вашим отметкам в приложении и не является медицинским документом.</p>
       </fieldset>
+      )}
     </section>
   )
 }
