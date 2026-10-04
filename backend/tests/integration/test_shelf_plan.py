@@ -40,3 +40,20 @@ def test_box_kind(client, owner):
     assert [s["kind"] for s in out["shelves"]] == ["shelf", "box"]
     bad = {"shelves": [{"id": "a", "kind": "drawer", "x": 0, "y": 0, "w": 1, "h": 1}]}
     assert client.put(url, headers=h, json=bad).status_code == 422
+
+
+
+def test_plus_only_when_billing_on(client, owner):
+    from tests.integration.test_cabinet_ops import enable_billing
+
+    h, _, f = owner
+    med = client.post(f"/api/families/{f}/medicines", headers=h, json={"name": "Х"}).json()
+    mu = f"/api/families/{f}/medicines/{med['id']}"
+    enable_billing(client, h)
+    r = client.put(f"/api/families/{f}/shelf-plan", headers=h, json={"shelves": []})
+    assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "shelf_plan"
+    r = client.patch(mu, headers=h, json={"place_x": 0.4, "place_y": 0.2, "place_r": 0.08})
+    assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "shelf_plan"
+    # убрать метку можно и без Плюса, схему смотреть тоже
+    assert client.patch(mu, headers=h, json={"place_x": None, "place_y": None, "place_r": None}).status_code == 200
+    assert client.get(f"/api/families/{f}/shelf-plan", headers=h).status_code == 200
