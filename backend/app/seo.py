@@ -20,6 +20,20 @@ _FEATURES = [
     ("Что есть дома от…", "Введите, что беспокоит, и посмотрите, что из ваших лекарств указано в инструкции для такого случая."),
 ]
 
+# Частые вопросы главной. Тот же текст показан на странице (Landing.tsx): держите их в одном виде.
+FAQ = [
+    ("Как вести учёт домашней аптечки?",
+     "Добавьте лекарства: наведите камеру на код упаковки или введите название. Капсулка сохранит срок годности, серию и остаток, а вся аптечка будет в одном списке."),
+    ("Как не пропустить срок годности лекарств?",
+     "В списке сразу видно, что скоро испортится, а что уже просрочено. В Капсулке Плюс ещё и придёт письмо, когда подходит срок или лекарство заканчивается."),
+    ("Можно ли вести одну аптечку на всю семью?",
+     "Да. Пригласите родных по ссылке: все видят общую аптечку со своих телефонов, а избранные лекарства у каждого свои."),
+    ("Нужно ли устанавливать приложение?",
+     "Нет, Капсулка работает в браузере на телефоне и компьютере. Её можно добавить на главный экран, и она будет открываться как приложение."),
+    ("Капсулка заменяет консультацию врача?",
+     "Нет. Капсулка помогает вести учёт лекарств. Перед применением читайте инструкцию и советуйтесь со специалистом."),
+]
+
 # Публичные страницы: путь -> (title, description, приоритет для sitemap)
 PAGES = {
     "/": (
@@ -88,13 +102,27 @@ def _json_ld(base: str) -> str:
     return json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
 
 
+def _faq_json_ld() -> str:
+    data = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "inLanguage": "ru",
+        "mainEntity": [
+            {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in FAQ
+        ],
+    }
+    return json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+
+
 def _prerender_home() -> str:
     items = "".join(f"<li><h3>{html.escape(t)}</h3><p>{html.escape(d)}</p></li>" for t, d in _FEATURES)
+    faq = "".join(f"<h3>{html.escape(q)}</h3><p>{html.escape(a)}</p>" for q, a in FAQ)
     return (
         "<main><h1>Домашняя аптечка, в которой всё под контролем</h1>"
         "<p>Капсулка помнит, какие лекарства есть у вас дома, когда истекает срок и сколько осталось. "
         "Вся семья смотрит в одну аптечку с телефона.</p>"
         f"<h2>Что умеет Капсулка</h2><ul>{items}</ul>"
+        f"<h2>Частые вопросы</h2>{faq}"
         "<p>Капсулка помогает вести учёт лекарств и не заменяет консультацию врача.</p></main>"
     )
 
@@ -140,6 +168,7 @@ def render_index(template: str, path: str, base: str, verification: dict[str, st
             if code:
                 parts.append(f'<meta name="{name}" content="{html.escape(code, quote=True)}" />')
         parts.append(f'<script type="application/ld+json">{_json_ld(base)}</script>')
+        parts.append(f'<script type="application/ld+json">{_faq_json_ld()}</script>')
     out = _sub_head(template, "\n    ".join(parts))
     if path == "/":
         out = out.replace('<div id="root"></div>', f'<div id="root">{_prerender_home()}</div>', 1)
