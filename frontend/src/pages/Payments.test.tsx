@@ -149,6 +149,18 @@ describe('админ-страница «Оплаты и чеки»', () => {
     await waitFor(() => expect(body).toEqual({ url: 'https://lknpd.nalog.ru/x/print', send_email: true }))
   })
 
+  it('для ожидающей оплаты есть кнопка «Проверить в ЮKassa»', async () => {
+    let called = false
+    server.use(
+      http.get('/api/admin/payments', () => HttpResponse.json([{ ...PAYMENT, status: 'pending', paid_at: null }])),
+      http.post('/api/admin/payments/11/sync', () => { called = true; return HttpResponse.json(PAYMENT) }),
+    )
+    const { user } = renderApp('/admin/payments', { me: ADMIN })
+    await user.click(await screen.findByRole('tab', { name: /Все оплаты/ }))
+    await user.click(await screen.findByRole('button', { name: 'Проверить в ЮKassa' }))
+    await waitFor(() => expect(called).toBe(true))
+  })
+
   it('вкладка «Все оплаты» показывает и оформленные', async () => {
     server.use(http.get('/api/admin/payments', () => HttpResponse.json([{ ...PAYMENT, receipt_url: 'https://x.example/a', receipt_sent_at: '2026-10-02T10:00:00Z' }])))
     const { user } = renderApp('/admin/payments', { me: ADMIN })
