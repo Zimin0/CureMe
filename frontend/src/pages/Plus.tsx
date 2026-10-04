@@ -25,33 +25,6 @@ export function Plus() {
 
   return (
     <div className="page stack" style={{ maxWidth: 720 }}>
-      <div className="plus-hero">
-        <Sparkles size={34} />
-        <div>
-          <h1>Капсулка Плюс</h1>
-          <p>Одна подписка на семью: платит владелец семьи, Плюс действует на всех её людей и все аптечки, и пользуются все.</p>
-        </div>
-      </div>
-
-      <section className="card stack">
-        <div className="row between">
-          <h2>Ваша семья</h2>
-          <span className={`badge ${plan.plus_active ? 'plus' : ''}`}>{planLabel(plan)}</span>
-        </div>
-        {priceText(plan) && (
-          <>
-            <p>Стоимость Плюса: <b>{priceText(plan)}</b>.</p>
-            <p className="muted small">{PRICE_NOTE}</p>
-          </>
-        )}
-        {!plan.billing_enabled && <p className="muted small">Платная версия пока не включена, поэтому все функции Плюса доступны бесплатно.</p>}
-        {plan.billing_enabled && !plan.plus_active && !pay.data?.enabled && (
-          <p className="muted small">Оплата появится скоро. Пока Плюс включает администратор.</p>
-        )}
-      </section>
-
-      <PayBox />
-
       <section className="card flush plus-list">
         <div style={{ padding: '18px 18px 6px' }}><h2>Что входит в Плюс</h2></div>
         {plan.features.map(f => (
@@ -83,6 +56,33 @@ export function Plus() {
           Сканирование упаковок, сроки годности, остатки, фото, подбор «Что есть дома от…» и приглашения родных всегда бесплатны.
         </p>
       </section>
+
+      <div className="plus-hero">
+        <Sparkles size={34} />
+        <div>
+          <h1>Капсулка Плюс</h1>
+          <p>Одна подписка на семью: платит владелец семьи, Плюс действует на всех её людей и все аптечки, и пользуются все.</p>
+        </div>
+      </div>
+
+      <section className="card stack">
+        <div className="row between">
+          <h2>Ваша семья</h2>
+          <span className={`badge ${plan.plus_active ? 'plus' : ''}`}>{planLabel(plan)}</span>
+        </div>
+        {priceText(plan) && (
+          <>
+            <p>Стоимость Плюса: <b>{priceText(plan)}</b>.</p>
+            <p className="muted small">{PRICE_NOTE}</p>
+          </>
+        )}
+        {!plan.billing_enabled && <p className="muted small">Платная версия пока не включена, поэтому все функции Плюса доступны бесплатно.</p>}
+        {plan.billing_enabled && !plan.plus_active && !pay.data?.enabled && (
+          <p className="muted small">Оплата появится скоро. Пока Плюс включает администратор.</p>
+        )}
+      </section>
+
+      <PayBox />
 
       <PayTerms />
       <SellerInfo />
