@@ -95,7 +95,7 @@ export function Home() {
             </div>
           ) : (
             <div className="med-list" style={{ gridTemplateColumns: '1fr' }}>
-              {personal.slice(0, 6).map(m => <MedicineCard key={m.id} m={m} />)}
+              {personal.slice(0, 6).map(m => <MedicineCard key={m.id} m={m} hidePlace />)}
             </div>
           )}
         </section>
