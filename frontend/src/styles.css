@@ -673,8 +673,9 @@ body.plus-theme .hero .btn.white { color: #5b3fb5; }
 }
 .side-plus-card {
   display: flex; flex-direction: column; gap: 2px; margin: 0 6px 8px; padding: 12px 14px; border-radius: 14px;
-  background: linear-gradient(135deg, #8b6be0, #5b3fb5); color: #fff; text-decoration: none; font-size: 13px;
+  background: linear-gradient(135deg, #19b9a2, #0b7f70); color: #fff; text-decoration: none; font-size: 13px;
 }
+body.plus-theme .side-plus-card { background: linear-gradient(135deg, #8b6be0, #5b3fb5); }
 .side-plus-card b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 .side-plus-card span { opacity: .88; }
 
