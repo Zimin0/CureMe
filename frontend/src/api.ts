@@ -82,7 +82,7 @@ export interface MedicineFields {
   gtin: string | null
 }
 
-export interface Shelf { id: string; name: string; x: number; y: number; w: number; h: number }
+export interface Shelf { id: string; name: string; kind?: 'shelf' | 'box'; x: number; y: number; w: number; h: number }
 export interface ShelfPlan { shelves: Shelf[]; height: number }
 
 export interface Medicine extends MedicineFields {

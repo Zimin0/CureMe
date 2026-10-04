@@ -30,3 +30,13 @@ def test_plan_validation_and_access(client, owner):
     assert client.put(url, headers=h, json={"shelves": [{"id": "a", "x": 0, "y": 0, "w": 0, "h": 1}]}).status_code == 422
     other, _ = register(client, "stranger@example.com")
     assert client.get(url, headers=other).status_code in (403, 404)
+
+
+def test_box_kind(client, owner):
+    h, _, f = owner
+    url = f"/api/families/{f}/shelf-plan"
+    plan = {"shelves": [{"id": "a", "x": 0, "y": 0, "w": 1, "h": 0.5}, {"id": "b", "name": "Таблетки", "kind": "box", "x": 0.1, "y": 0.1, "w": 0.3, "h": 0.2}]}
+    out = client.put(url, headers=h, json=plan).json()
+    assert [s["kind"] for s in out["shelves"]] == ["shelf", "box"]
+    bad = {"shelves": [{"id": "a", "kind": "drawer", "x": 0, "y": 0, "w": 1, "h": 1}]}
+    assert client.put(url, headers=h, json=bad).status_code == 422
