@@ -28,7 +28,8 @@ export function Layout() {
   const onHistory = useLocation().pathname.startsWith('/history')
   const { me, familyId, setFamilyId, signOut } = useAuth()
   const { plan } = usePlan()
-  const isPlus = !!me?.plus_active && plan?.plus_theme !== false
+  // Пока тариф не загрузился, остаётся зелёный по умолчанию: иначе при выключенном сиреневом виде цвет мигает.
+  const isPlus = !!me?.plus_active && !!plan && plan.plus_theme !== false
   // Сиреневая тема у тех, у кого есть Плюс (платный или пробный): класс на body переопределяет цвета в styles.css.
   useEffect(() => {
     document.body.classList.toggle('plus-theme', isPlus)
