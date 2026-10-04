@@ -2,7 +2,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 
-from typing import Annotated
+from typing import Literal, Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
@@ -457,6 +457,7 @@ class MedicineUpdate(BaseModel):
 class Shelf(BaseModel):
     id: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(default="", max_length=60)
+    kind: Literal["shelf", "box"] = "shelf"  # полка или контейнер, который стоит на полке
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
     w: float = Field(gt=0, le=1)

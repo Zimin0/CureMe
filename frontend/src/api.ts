@@ -25,7 +25,7 @@ export interface AdminFamily { id: number; name: string; created_at: string; med
 // --- тарифы: backend/app/plans.py ---
 export type PlanName = 'free' | 'plus'
 /** Функции Плюса. Ключи совпадают с FEATURES на бэкенде. */
-export type PlusFeature = 'reminders' | 'full_history' | 'export_pdf' | 'cabinets' | 'schedule' | 'search_all' | 'no_limits'
+export type PlusFeature = 'reminders' | 'full_history' | 'export_pdf' | 'cabinets' | 'schedule' | 'search_all' | 'shelf_plan' | 'no_limits'
 export type LimitName = 'members' | 'medicines' | 'own_families' | 'history_days'
 export interface PlanFeature { key: PlusFeature; title: string; description: string; available: boolean }
 export interface Plan {
@@ -82,7 +82,7 @@ export interface MedicineFields {
   gtin: string | null
 }
 
-export interface Shelf { id: string; name: string; x: number; y: number; w: number; h: number }
+export interface Shelf { id: string; name: string; kind?: 'shelf' | 'box'; x: number; y: number; w: number; h: number }
 export interface ShelfPlan { shelves: Shelf[]; height: number }
 
 export interface Medicine extends MedicineFields {
