@@ -8,6 +8,7 @@ import { useAuth } from '../auth'
 import { DeleteAccountButton } from '../components/DeleteAccount'
 import { PageLoader, useToast } from '../components/ui'
 import { OPERATOR } from '../legal'
+import { safeNext } from '../redirect'
 import { LegalLinks } from './Legal'
 
 type TokenOut = { access_token: string; user: Me }
@@ -55,7 +56,7 @@ export function Login() {
   const [password, setPassword] = useState('')
   const m = useMutation({
     mutationFn: () => api<TokenOut>('/auth/login', { body: { email, password } }),
-    onSuccess: d => { signIn(d.access_token, d.user); nav(params.get('next') ?? '/') },
+    onSuccess: d => { signIn(d.access_token, d.user); nav(safeNext(params.get('next'))) },
   })
   const submit = (e: FormEvent) => { e.preventDefault(); m.mutate() }
   return (

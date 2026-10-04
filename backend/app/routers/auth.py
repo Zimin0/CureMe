@@ -100,6 +100,8 @@ def update_me(body: UserUpdate, user: User = Depends(signed_in_user), db: Sessio
         user.name = body.name.strip()
     token = None
     if body.password:
+        # С украденным токеном нельзя подбирать текущий пароль, чтобы сменить его и забрать аккаунт насовсем.
+        limiter.hit(f"change-password:{user.id}", limit=5, window=900)
         if not body.current_password or not verify_password(body.current_password, user.password_hash):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Текущий пароль указан неверно")
         user.password_hash = hash_password(body.password)

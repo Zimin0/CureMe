@@ -1,4 +1,6 @@
 """Оплата Плюса: создание платежа, уведомления ЮKassa, автопродление. Логика — в payments.py."""
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8,9 +10,13 @@ from ..db import get_db
 from ..deps import current_user
 from ..models import Payment, User
 from ..plans import PLUS, plus_active
+from ..ratelimit import client_ip, limiter
 from ..schemas import PayIn, PayStarted, PayStatus, PaymentBrief
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
+# Номер платежа или возврата ЮKassa (UUID). Он подставляется в адрес запроса к ЮKassa с нашим секретным ключом,
+# поэтому из уведомления берём только безопасные символы: ни «/», ни «?», ни «..».
+YK_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _status(db: Session, user: User) -> PayStatus:
@@ -39,6 +45,8 @@ def my_payments(user: User = Depends(current_user), db: Session = Depends(get_db
 
 @router.post("", response_model=PayStarted, status_code=201)
 def start(body: PayIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    # Каждый запрос создаёт платёж в ЮKassa: не даём засыпать магазин и базу пустыми платежами.
+    limiter.hit(f"pay-start:{user.id}", limit=10, window=600)
     if not payments.payments_enabled(db):
         raise HTTPException(409, "Оплата пока недоступна")
     if body.auto_renew and not payments.recurring_enabled():
@@ -65,11 +73,15 @@ async def webhook(request: Request, db: Session = Depends(get_db)):
     """HTTP-уведомление ЮKassa. Телу не верим: берём id и сами спрашиваем платёж у ЮKassa."""
     if not payments.configured():
         raise HTTPException(404)
+    # Адрес открыт всем, а каждое уведомление ведёт к запросу в ЮKassa: без ограничения его можно использовать как насос.
+    limiter.hit(f"yk-webhook:{client_ip(request)}", limit=120, window=60)
     try:
         body = await request.json()
         obj = body["object"]
         yk_id = obj["payment_id"] if str(body.get("event", "")).startswith("refund.") else obj["id"]
     except (ValueError, KeyError, TypeError):
+        raise HTTPException(400, "Неверное уведомление")
+    if not isinstance(yk_id, str) or not YK_ID.fullmatch(yk_id):
         raise HTTPException(400, "Неверное уведомление")
     try:
         payments.sync_payment(db, str(yk_id))

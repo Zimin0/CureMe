@@ -248,6 +248,11 @@ def render_xlsx(r: Report) -> bytes:
             cell.font, cell.fill = bold, fill
         for row in rows:
             ws.append(row)
+        # openpyxl считает текст, начинающийся с «=», формулой, а название лекарства может написать кто угодно.
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
         for col, fmt in (formats or {}).items():
             for (cell,) in ws.iter_rows(min_row=5, min_col=col, max_col=col):
                 cell.number_format = fmt

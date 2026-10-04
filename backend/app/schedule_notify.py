@@ -87,7 +87,8 @@ def token_for(contact: TrustedContact) -> str:
 
 def contact_by_token(db: Session, token: str) -> TrustedContact | None:
     head, _, _ = token.partition(".")
-    contact = db.get(TrustedContact, int(head)) if head.isdigit() else None
+    # isdigit() пропускает и «²», и цифры других алфавитов: int() на них падает; а число длиннее int4 роняет Postgres.
+    contact = db.get(TrustedContact, int(head)) if head.isascii() and head.isdigit() and len(head) <= 9 else None
     return contact if contact and hmac.compare_digest(token_for(contact), token) else None
 
 

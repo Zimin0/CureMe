@@ -6,6 +6,7 @@ import pytest
 from app import mailer, payments
 from app.config import get_settings
 from app.models import Household, Payment, User
+from app.ratelimit import limiter
 from tests.conftest import check_household_invariants, fid, hand_over, invite_of, register
 
 
@@ -638,3 +639,34 @@ def test_autorenew_hidden_and_refused_until_shop_has_autopayments(client, shop, 
     assert pay(client, h, auto_renew=True).status_code == 409
     assert yk.calls == []  # до ЮKassa не дошли: не ловим 403
     assert pay(client, h, auto_renew=False).status_code == 201
+
+
+@pytest.mark.parametrize("bad", ["../refunds", "a/b", "a?b=1", "a#b", "a%2fb", "x" * 65, "", "a b", 12345, None, ["a"]])
+def test_webhook_rejects_ids_that_are_not_plain_yookassa_ids(client, shop, yk, bad):
+    """Номер из уведомления подставляется в адрес запроса к ЮKassa с нашим ключом: слэши и вопросительные знаки в нём недопустимы."""
+    before = len(yk.calls)
+    r = client.post("/api/payments/yookassa/webhook", json={"event": "payment.succeeded", "object": {"id": bad}})
+    assert r.status_code == 400
+    assert len(yk.calls) == before  # к ЮKassa с таким номером не обращались
+
+
+def test_webhook_is_throttled_per_address(client, shop, yk, monkeypatch):
+    """Адрес уведомлений открыт всем, а каждое уведомление ведёт к запросу в ЮKassa: больше 120 в минуту с адреса не берём."""
+    monkeypatch.setattr(get_settings(), "rate_limit", True)
+    limiter.reset()
+    try:
+        codes = [client.post("/api/payments/yookassa/webhook", json={"nonsense": 1}).status_code for _ in range(121)]
+    finally:
+        limiter.reset()
+    assert codes[:120] == [400] * 120 and codes[120] == 429
+
+
+def test_starting_payments_is_throttled_per_user(client, shop, yk, monkeypatch):
+    h, _ = shop
+    monkeypatch.setattr(get_settings(), "rate_limit", True)
+    limiter.reset()
+    try:
+        codes = [pay(client, h).status_code for _ in range(11)]
+    finally:
+        limiter.reset()
+    assert 429 not in codes[:10] and codes[10] == 429
