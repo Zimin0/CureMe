@@ -459,7 +459,8 @@ class NotificationPrefs(Base):
     # Когда человек дал отдельное согласие на трансграничную передачу данных в Telegram (ст. 12 152-ФЗ).
     telegram_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notify_low: Mapped[bool] = mapped_column(Boolean, default=True)      # «скоро закончится»
-    notify_expiry: Mapped[bool] = mapped_column(Boolean, default=True)   # «истекает срок» и «срок истёк»
+    notify_expiry: Mapped[bool] = mapped_column(Boolean, default=True)   # «скоро истечёт срок»
+    notify_expired: Mapped[bool] = mapped_column(Boolean, default=True)  # «срок уже истёк»
     expiry_days: Mapped[int] = mapped_column(Integer, default=30)        # за сколько дней предупреждать о сроке
 
 

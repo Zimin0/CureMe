@@ -107,7 +107,7 @@ export function Reminders() {
       </label>
       <label className="check">
         <input type="checkbox" checked={p.notify_expiry} onChange={e => set({ notify_expiry: e.target.checked })} />
-        <span>Истекает срок годности</span>
+        <span>Скоро истечёт срок годности</span>
       </label>
       {p.notify_expiry && (
         <label className="field"><span>Предупредить за</span>
@@ -116,6 +116,10 @@ export function Reminders() {
           </select>
         </label>
       )}
+      <label className="check">
+        <input type="checkbox" checked={p.notify_expired} onChange={e => set({ notify_expired: e.target.checked })} />
+        <span>Срок годности уже истёк</span>
+      </label>
       {anyChannel && (
         <button className="btn ghost" disabled={test.isPending} onClick={() => test.mutate()}>Прислать пробное напоминание</button>
       )}
