@@ -1,7 +1,12 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Ключи-заготовки из кода и docker-compose: с ними токены входа может подделать любой, кто прочитал репозиторий.
+INSECURE_SECRETS = {"dev-only-secret-change-me-in-production-please", "please-change-me-to-a-long-random-string"}
 
 
 class Settings(BaseSettings):
@@ -9,6 +14,8 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./cureme.db"
     secret_key: str = "dev-only-secret-change-me-in-production-please"
+    # На сервере включено (docker-compose.prod.yml): без настоящего секретного ключа приложение не запускается.
+    require_secure_secret: bool = False
     token_ttl_days: int = 30
     # Сколько дней до окончания срока считаем «скоро истекает».
     expiring_soon_days: int = 30
@@ -67,6 +74,15 @@ class Settings(BaseSettings):
     telegram_bot_username: str = ""
     # Сколько минут действует ссылка привязки Telegram.
     telegram_link_ttl_minutes: int = 60
+
+    @model_validator(mode="after")
+    def _secret_is_real(self):
+        if self.require_secure_secret and (self.secret_key in INSECURE_SECRETS or len(self.secret_key) < 32):
+            raise ValueError(
+                "CUREME_SECRET_KEY не задан или слишком простой: впишите в .env случайную строку от 32 символов "
+                "(openssl rand -hex 32)"
+            )
+        return self
 
     @property
     def yookassa_enabled(self) -> bool:

@@ -1,8 +1,9 @@
 """Проверки из аудита безопасности: пароли, отзыв токенов, лимиты попыток, заголовки."""
 
 import pytest
+from pydantic import ValidationError
 
-from app.config import get_settings
+from app.config import INSECURE_SECRETS, Settings, get_settings
 from app.ratelimit import limiter
 from tests.conftest import register
 
@@ -223,3 +224,47 @@ def test_security_headers(client):
     csp = r.headers["Content-Security-Policy"]
     assert "default-src 'self'" in csp and "frame-ancestors 'none'" in csp and "'unsafe-eval'" not in csp
     assert r.headers["Cache-Control"] == "no-store"
+
+
+# --- второй аудит (04.10.2026) ---
+def test_password_change_cannot_be_used_to_guess_the_current_password(client, rate_limited):
+    """С украденным токеном нельзя подбирать текущий пароль, чтобы сменить его и забрать аккаунт."""
+    h, _ = register(client)
+    codes = [client.patch("/api/auth/me", headers=h, json={"password": "kapsula-new-pass-4567", "current_password": f"wrong-guess-{i}"}).status_code
+             for i in range(6)]
+    assert codes[:5] == [400] * 5 and codes[5] == 429
+    assert login(client).status_code == 200  # пароль остался прежним
+
+
+@pytest.mark.parametrize("name", [
+    "Иван\nСрочно", "Ив\rан", "Иван\u202eкод", "Ив\u2028ан", "Зайдите на https://evil.example", "www.evil.example", "evil.ru",
+    "Мама, kapsulka-win.com", "   ",
+])
+def test_person_name_cannot_carry_links_or_line_breaks(client, name):
+    """Имя уходит в письма незнакомым людям (доверенный человек): ссылок и переводов строк в нём быть не должно."""
+    reg = client.post("/api/auth/register", json={"email": "a@example.com", "name": name, "password": "secret123", "consent": True})
+    assert reg.status_code == 422
+    h, _ = register(client, email="b@example.com")
+    assert client.patch("/api/auth/me", headers=h, json={"name": name}).status_code == 422
+
+
+@pytest.mark.parametrize("name", ["Никита", "Мама Н.", "Баба Валя (дача)", "Иван-Пётр", "Dr. Who", "O'Brien", "Анна 2"])
+def test_ordinary_names_still_pass(client, name):
+    h, user = register(client, name=name)
+    assert user["name"] == name
+
+
+def test_default_secret_key_is_refused_when_required():
+    """На сервере включено CUREME_REQUIRE_SECURE_SECRET: заготовку из репозитория вместо ключа приложение не примет."""
+    for bad in (*INSECURE_SECRETS, "short-key", ""):
+        with pytest.raises(ValidationError):
+            Settings(secret_key=bad, require_secure_secret=True, _env_file=None)
+    assert Settings(secret_key="x" * 64, require_secure_secret=True, _env_file=None).secret_key == "x" * 64
+    assert Settings(secret_key="dev-only-secret-change-me-in-production-please", _env_file=None)  # без флага (разработка) можно
+
+
+def test_csp_allows_no_third_party_hosts(client):
+    csp = client.get("/api/health").headers["Content-Security-Policy"]
+    directives = dict(d.strip().split(" ", 1) for d in csp.split(";") if " " in d.strip())
+    assert directives["frame-src"] == "'none'"
+    assert "http" not in csp  # ни одного чужого адреса и ни одного «https:»: оплата ЮKassa идёт переходом, а не встроенной формой

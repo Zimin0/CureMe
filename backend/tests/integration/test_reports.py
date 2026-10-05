@@ -124,3 +124,19 @@ def test_plus_only_when_billing_on(client, fam):
     until = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
     grant_plus(client, h, f, until=until)
     assert client.get(f"/api/families/{f}/report.pdf", headers=h).status_code == 200
+
+
+def test_xlsx_does_not_turn_medicine_names_into_formulas(client, fam):
+    """Название лекарства пишет любой человек семьи: в Excel оно должно остаться текстом, а не формулой."""
+    h, f = fam["h"], fam["f"]
+    evil = client.post(f"/api/families/{f}/medicines", headers=h, json={
+        "name": "=HYPERLINK(\"http://evil.example\",\"клик\")", "unit": "таб", "packages": [{"quantity": 5}]}).json()
+    client.post(f"/api/families/{f}/medicines/{evil['id']}/consume", headers=h, json={"amount": 1, "comment": "=1+1"})
+    wb = xlsx(client, h, f)
+    seen = 0
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                assert cell.data_type != "f", f"формула в {ws.title}!{cell.coordinate}: {cell.value!r}"
+                seen += isinstance(cell.value, str) and cell.value.startswith("=")
+    assert seen >= 3  # название в «Сводке» и «Журнале», комментарий в «Журнале»: текст сохранён, но это текст

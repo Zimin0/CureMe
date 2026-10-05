@@ -19,7 +19,7 @@ from ..deps import current_user, get_family
 from ..deps import family_membership
 from ..models import Family, Intake, Medicine, Membership, User
 from ..schemas import MedicineDetail
-from ..services import load_medicines, medicine_out, member_names, stock_of
+from ..services import load_medicines, medicine_out, member_names, spreadsheet_safe, stock_of
 
 router = APIRouter(prefix="/api", tags=["files"])
 
@@ -141,7 +141,7 @@ def export_data(fmt: str, m: Membership = Depends(family_membership), db: Sessio
                     x.contraindications, x.notes, x.unit, x.gtin or "", "; ".join(c.name for c in x.categories)]
             for p in x.packages or [None]:
                 tail = ["", "", "", "", ""] if p is None else [p.quantity, p.expiry_date or "", p.opened_at or "", p.batch or "", p.location or ""]
-                out.writerow(head + tail)
+                out.writerow([spreadsheet_safe(c) for c in head + tail])
         body, media, ext = "\ufeff" + buf.getvalue(), "text/csv; charset=utf-8", "csv"  # BOM: Excel открывает кириллицу правильно
     name = f"Аптечка {fam.name} {today:%d.%m.%Y}.{ext}"
     return Response(body, media_type=media, headers=_attachment(name, f"kapsulka-aptechka-{today:%Y-%m-%d}.{ext}"))

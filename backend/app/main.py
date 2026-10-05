@@ -38,14 +38,15 @@ app.add_middleware(
 # Content Security Policy: браузер выполняет только наши скрипты, так что даже если в название
 # лекарства подсунут <script>, он не запустится и не утащит токен входа.
 # wasm-unsafe-eval и blob: нужны сканеру штрихкодов (zxing-wasm) и распознаванию срока (tesseract).
-# yookassa.ru и yoomoney.ru: запас от времён встроенного виджета ЮKassa (сейчас оплата идёт переходом на страницу ЮKassa).
+# Оплата идёт переходом на страницу ЮKassa целиком (сайт её не встраивает), поэтому скриптов, фреймов и запросов
+# к ЮKassa страница не загружает и в политике их нет: каждый разрешённый чужой адрес был бы лишней лазейкой для XSS.
 CSP = "; ".join([
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' blob: https://yookassa.ru",
+    "script-src 'self' 'wasm-unsafe-eval' blob:",
     "worker-src 'self' blob:",
-    "connect-src 'self' data: blob: https://yookassa.ru https://*.yookassa.ru https://yoomoney.ru https://*.yoomoney.ru",
-    "img-src 'self' data: blob: https://yookassa.ru https://*.yookassa.ru https://yoomoney.ru https://*.yoomoney.ru",
-    "frame-src https://yookassa.ru https://*.yookassa.ru https://yoomoney.ru https://*.yoomoney.ru https:",
+    "connect-src 'self' data: blob:",
+    "img-src 'self' data: blob:",
+    "frame-src 'none'",
     "media-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",

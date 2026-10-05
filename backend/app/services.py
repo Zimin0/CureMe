@@ -90,6 +90,18 @@ def set_indication_hints(db: Session, hints: list[str]) -> list[str]:
     return hints
 
 
+FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def spreadsheet_safe(value):
+    """Текст для CSV, который Excel и Google Таблицы приняли бы за формулу, получает апостроф впереди.
+
+    Название лекарства или заметку может написать любой человек семьи; без этого «=HYPERLINK(...)» в названии
+    выполнилась бы у того, кто откроет выгрузку в Excel (CSV injection). Числа и даты не трогаем.
+    """
+    return "'" + value if isinstance(value, str) and value.startswith(FORMULA_START) else value
+
+
 def stock_of(med: Medicine, today: date | None = None) -> StockOut:
     today = today or date.today()
     soon = get_settings().expiring_soon_days

@@ -25,3 +25,20 @@ test('CSP включена и не ломает сканер и распозна
 
   expect(violations).toEqual([])
 })
+
+// Открытый редирект: после входа ссылка вида /login?next=/\evil.example/ уводила на чужой сайт, потому что
+// React Router принимает «/\» за начало чужого адреса и делает полный переход. Нужен настоящий Chromium.
+test('после входа ?next= не уводит на чужой сайт', async ({ page, request }) => {
+  const acc = await registerApi(request)
+  const evil: string[] = []
+  await page.route(/^https?:\/\/evil\.example/, route => { evil.push(route.request().url()); return route.fulfill({ body: 'evil' }) })
+
+  await page.goto('/login?next=' + encodeURIComponent('/\\evil.example/phish'))
+  await page.getByLabel('Почта').fill(acc.email)
+  await page.getByLabel('Пароль').fill(acc.password)
+  await page.getByRole('button', { name: 'Войти' }).click()
+
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(acc.name)  // вошли и остались на нашем сайте
+  expect(new URL(page.url()).hostname).toBe('localhost')
+  expect(evil).toEqual([])
+})
