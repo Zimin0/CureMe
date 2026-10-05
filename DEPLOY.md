@@ -200,6 +200,51 @@ CUREME_YOOKASSA_SECRET_KEY=<секретный ключ>
 5. Возврат (пропорционально неиспользованному сроку) делается в личном кабинете ЮKassa; уведомление `refund.succeeded`
    пометит оплату возвращённой и отключит автопродление, срок Плюса при необходимости сократите в «Тарифы».
 
+## 10. Тестовый стенд dev-kapsulka.ru
+
+Копия сайта для проверки изменений до прода. Живёт на том же сервере, но отдельно: свои контейнеры, своя база, свой `.env`
+в `/opt/cureme-staging`. Своего Caddy у стенда нет: HTTPS, пароль и запрет индексации даёт Caddy прода (`deploy/Caddyfile`).
+Почта, оплата ЮKassa и Telegram на стенде выключены (`docker-compose.staging.yml`), чтобы он не писал людям и не брал деньги.
+Лимиты памяти: приложение 350 МБ, база 200 МБ, чтобы не мешать проду на сервере с 2 ГБ.
+
+**DNS** (уже сделано): записи `A @` и `A www` у dev-kapsulka.ru указывают на 158.255.7.113. Проверка: `nslookup dev-kapsulka.ru`.
+
+**Один раз на сервере** (после слияния этого PR в `main` и успешного деплоя прода):
+
+```bash
+# 1. пароль на вход: придумайте пароль и получите его хеш (спросит пароль дважды; сам пароль никуда не записывается)
+cd /opt/cureme
+docker run --rm -it caddy:2-alpine caddy hash-password
+
+# 2. впишите хеш в .env ОДИНАРНЫМИ кавычками (внутри хеша есть знаки $, без кавычек Docker их испортит)
+nano .env
+#   STAGING_AUTH_USER=nikita
+#   STAGING_AUTH_HASH='$2a$14$...весь хеш...'
+
+# 3. примените: Caddy перечитает настройки и сам получит сертификат для dev-kapsulka.ru
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --pull never
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+Пока `STAGING_AUTH_HASH` не задан, стенд закрыт для всех: в `.env` по умолчанию стоит хеш пароля, которого никто не знает.
+
+**Запуск стенда:** любой push в ветку `develop` (или Actions → Deploy staging → Run workflow) собирает образ и привозит его
+в `/opt/cureme-staging`. Ветка `develop` должна существовать на GitHub. Секреты `SSH_PRIVATE_KEY` и `SSH_KNOWN_HOSTS` те же, что у прода.
+
+**Проверка:** откройте https://dev-kapsulka.ru, браузер спросит логин и пароль. Версия приложения: `https://dev-kapsulka.ru/api/version`.
+
+**Команды на сервере** (всегда с `-p cureme-staging`, иначе заденете прод):
+
+```bash
+cd /opt/cureme-staging
+docker compose -p cureme-staging -f docker-compose.yml -f docker-compose.staging.yml ps
+docker compose -p cureme-staging -f docker-compose.yml -f docker-compose.staging.yml logs --tail 50 app
+# стереть стенд вместе с его базой (прод не затрагивается)
+docker compose -p cureme-staging -f docker-compose.yml -f docker-compose.staging.yml down -v
+```
+
+Бэкап базы стенда не нужен: это тестовые данные. Данные прода в стенд не копируйте: в них персональные данные пользователей (152-ФЗ).
+
 ## Поиск (SEO)
 
 Сайт отдаёт `/robots.txt` и `/sitemap.xml`, у публичных страниц есть мета-теги и canonical на основной домен; www и зеркала перенаправляются на него (Caddy).

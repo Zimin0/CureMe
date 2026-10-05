@@ -105,7 +105,11 @@ jobs:
               sqlite3.connect(src).backup(sqlite3.connect(dst)); print('SQLite backup:', dst)
           "
           fi
+          # общая сеть, по которой Caddy ходит к тестовому стенду dev-kapsulka.ru (docker-compose.staging.yml)
+          docker network inspect cureme-edge >/dev/null 2>&1 || docker network create cureme-edge
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --pull never --remove-orphans
+          # Caddyfile подключён файлом, compose его правки не замечает: перечитываем без простоя (не критично, если не вышло)
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
           for i in $(seq 1 60); do
             if docker compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" 2>/dev/null; then
               echo "CureMe is up"; docker image prune -f >/dev/null; exit 0
