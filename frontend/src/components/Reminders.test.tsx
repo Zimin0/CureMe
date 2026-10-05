@@ -10,7 +10,7 @@ function prefs(over: Partial<NotificationPrefs> = {}): NotificationPrefs {
   return {
     available: true, email: 'nikita@example.com', email_possible: true, telegram_possible: true, telegram_bot: 'kapsulka_bot',
     email_enabled: false, telegram_enabled: false, telegram_connected: false, telegram_name: null,
-    notify_low: true, notify_expiry: true, expiry_days: 30, ...over,
+    notify_low: true, notify_expiry: true, notify_expired: true, expiry_days: 30, ...over,
   }
 }
 

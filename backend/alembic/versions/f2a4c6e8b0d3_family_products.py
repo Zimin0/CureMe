@@ -1,7 +1,7 @@
 """family_products и восстановление пароля: правки людей в справочнике товаров только внутри аптечки, код сброса пароля
 
 Revision ID: f2a4c6e8b0d3
-Revises: a4e6c8b0d2f4
+Revises: b5d7f9a1c3e6
 Create Date: 2026-10-04 19:00:00
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'f2a4c6e8b0d3'
-down_revision: Union[str, Sequence[str], None] = 'a4e6c8b0d2f4'
+down_revision: Union[str, Sequence[str], None] = 'b5d7f9a1c3e6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
