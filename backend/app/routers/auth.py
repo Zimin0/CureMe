@@ -111,6 +111,8 @@ def update_me(body: UserUpdate, user: User = Depends(signed_in_user), db: Sessio
         user.name = body.name.strip()
     token = None
     if body.password:
+        # С украденным токеном нельзя подбирать текущий пароль, чтобы сменить его и забрать аккаунт насовсем.
+        limiter.hit(f"change-password:{user.id}", limit=5, window=900)
         if user.is_admin and len(body.password) < MIN_ADMIN_PASSWORD:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Администратору нужен пароль не короче {MIN_ADMIN_PASSWORD} символов")
         if not body.current_password or not verify_password(body.current_password, user.password_hash):

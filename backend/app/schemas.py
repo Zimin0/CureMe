@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from datetime import date, datetime
 
 from typing import Literal, Annotated
@@ -44,6 +46,26 @@ NewPassword = Annotated[str, Field(min_length=MIN_PASSWORD, max_length=128), Aft
 AnyPassword = Annotated[str, Field(min_length=1, max_length=128)]
 
 
+# Имя человека попадает в письма незнакомым людям («доверенный человек») и в жёлтые плашки других семей.
+# Ссылку в нём не пропускаем: иначе наша почта работала бы на рассылку чужих ссылок.
+_LINK_IN_NAME = re.compile(r"(?i)(https?://|www\.|\w\.(?:ru|com|net|org|info|xyz|top|site|online|su|рф|me|io|cc|ly)\b)")
+_BIDI = set("\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
+
+
+def _plain_name(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError("Укажите имя")
+    if any(unicodedata.category(c) in ("Cc", "Zl", "Zp") or c in _BIDI for c in value):
+        raise ValueError("В имени не должно быть переводов строки и управляющих символов")
+    if _LINK_IN_NAME.search(value):
+        raise ValueError("В имени не должно быть ссылки или адреса сайта")
+    return value
+
+
+PersonName = Annotated[str, Field(min_length=1, max_length=100), AfterValidator(_plain_name)]
+
+
 class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,7 +73,7 @@ class ORM(BaseModel):
 # --- аккаунты и семьи ---
 class RegisterIn(BaseModel):
     email: EmailStr
-    name: str = Field(min_length=1, max_length=100)
+    name: PersonName
     password: NewPassword
     invite_code: str | None = Field(default=None, max_length=32)
     consent: bool = False  # галочка «даю согласие на обработку персональных данных»
@@ -158,7 +180,7 @@ class TokenOut(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
+    name: PersonName | None = None
     password: NewPassword | None = None
     # Чтобы сменить пароль, нужен текущий: иначе украденный токен позволил бы захватить аккаунт навсегда.
     current_password: AnyPassword | None = None
@@ -810,7 +832,7 @@ class SchedulePrefsIn(BaseModel):
 
 
 class TrustedIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: PersonName
     email: EmailStr
     # Человек подтверждает, что сообщил доверенному и тот не против: почта третьего лица — его ответственность.
     attest: bool

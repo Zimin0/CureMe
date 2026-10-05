@@ -1,0 +1,23 @@
+# Dependabot раз в неделю проверяет зависимости и сам открывает pull request с обновлением, если вышла
+# версия с исправлением уязвимости. Мы не ставим версии бэкенда жёстко (requirements.txt с «>=»), поэтому
+# для Python это в первую очередь напоминание вовремя обновить нижнюю границу.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    # Мажорные обновления (React Router 7, Vite 6) ломают код: их делаем вручную, отдельным pull request.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: pip
+    directory: /backend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

