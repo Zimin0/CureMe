@@ -229,7 +229,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T caddy ca
 Пока `STAGING_AUTH_HASH` не задан, стенд закрыт для всех: в `.env` по умолчанию стоит хеш пароля, которого никто не знает.
 
 **Запуск стенда:** любой push в ветку `develop` (или Actions → Deploy staging → Run workflow) собирает образ и привозит его
-в `/opt/cureme-staging`. Ветка `develop` должна существовать на GitHub. Секреты `SSH_PRIVATE_KEY` и `SSH_KNOWN_HOSTS` те же, что у прода.
+в `/opt/cureme-staging`. Файл `deploy-staging.yml` должен лежать в самой ветке `develop`: после слияния в main влейте main в develop (`git checkout develop && git pull && git merge origin/main && git push`), этот push запустит первый деплой. Ветку `develop` не пересоздавайте. Секреты `SSH_PRIVATE_KEY` и `SSH_KNOWN_HOSTS` те же, что у прода.
 
 **Проверка:** откройте https://dev-kapsulka.ru, браузер спросит логин и пароль. Версия приложения: `https://dev-kapsulka.ru/api/version`.
 
