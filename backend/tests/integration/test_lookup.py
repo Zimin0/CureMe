@@ -10,8 +10,8 @@ import httpx
 import pytest
 
 from app import lookup
-from app.lookup import find_product, lookup_openfoodfacts, remember_product
-from app.models import ProductCode
+from app.lookup import cached_product, find_product, lookup_openfoodfacts, remember_product
+from app.models import Family, FamilyProduct, ProductCode
 from app.websearch import WebProduct
 
 GTIN = "04601669002013"
@@ -25,36 +25,57 @@ def online(monkeypatch):
 
 
 def test_remember_requires_name(db):
-    assert remember_product(db, GTIN, name=None) is None
-    assert db.get(ProductCode, GTIN) is None
+    assert remember_product(db, GTIN, name=None, family_id=1) is None
+    assert db.get(FamilyProduct, (1, GTIN)) is None
 
 
 def test_remember_keeps_only_product_fields(db):
-    remember_product(db, GTIN, name="Нурофен", dosage="200 мг", notes="личная заметка", unit=None)
+    fam = _family(db)
+    remember_product(db, GTIN, family_id=fam, name="Нурофен", dosage="200 мг", notes="личная заметка", unit=None)
     db.commit()
-    row = db.get(ProductCode, GTIN)
+    row = db.get(FamilyProduct, (fam, GTIN))
     assert (row.name, row.dosage, row.unit, row.source) == ("Нурофен", "200 мг", None, "user")
     assert not hasattr(row, "notes")
 
 
-def test_user_edit_beats_internet_but_not_vice_versa(db):
+def _family(db, name="Семья"):
+    f = Family(name=name, invite_code=name)
+    db.add(f)
+    db.commit()
+    return f.id
+
+
+def test_user_edit_never_reaches_shared_directory(db):
+    """Правка человека лежит в справочнике его аптечки, общий справочник не меняется, чужие аптечки её не видят."""
+    mine, other = _family(db, "мои"), _family(db, "чужие")
     remember_product(db, GTIN, source="internet", name="Нурофен", title="Нурофен таблетки №10")
+    remember_product(db, GTIN, family_id=mine, name="Яд", dosage="999 мг")
     db.commit()
-    remember_product(db, GTIN, source="user", name="Нурофен Экспресс")
+    shared = db.get(ProductCode, GTIN)
+    assert (shared.name, shared.source) == ("Нурофен", "internet") and shared.dosage is None
+    assert cached_product(db, GTIN, mine).name == "Яд"
+    assert cached_product(db, GTIN, other).name == "Нурофен"
+    assert cached_product(db, GTIN).name == "Нурофен"
+
+
+def test_user_edit_without_family_is_dropped(db):
+    assert remember_product(db, GTIN, name="Яд") is None
+    assert db.get(ProductCode, GTIN) is None
+
+
+def test_legacy_user_rows_in_shared_directory_are_ignored(db):
+    db.add(ProductCode(gtin=GTIN, name="Старая правка человека", source="user"))
     db.commit()
-    assert db.get(ProductCode, GTIN).source == "user"
-    remember_product(db, GTIN, source="internet", name="Нурофен таб")
-    db.commit()
-    row = db.get(ProductCode, GTIN)
-    assert row.source == "user" and row.title == "Нурофен таблетки №10"
+    assert cached_product(db, GTIN) is None
 
 
 def test_offline_returns_only_cache(db, monkeypatch):
     monkeypatch.setattr(lookup, "search_barcode", lambda ean: pytest.fail("сеть выключена"))
-    assert find_product(db, GTIN) is None
-    remember_product(db, GTIN, name="Нурофен")
+    fam = _family(db)
+    assert find_product(db, GTIN, family_id=fam) is None
+    remember_product(db, GTIN, family_id=fam, name="Нурофен")
     db.commit()
-    assert find_product(db, GTIN, refresh=True).name == "Нурофен"
+    assert find_product(db, GTIN, refresh=True, family_id=fam).name == "Нурофен"
 
 
 def test_web_result_is_saved_with_blister_guess(db, online, monkeypatch):

@@ -15,10 +15,10 @@ def test_register_returns_token_and_creates_own_family(client):
 
 
 @pytest.mark.parametrize("body", [
-    {"email": "bad", "name": "A", "password": "secret123"},
-    {"email": "a@example.com", "name": "", "password": "secret123"},
+    {"email": "bad", "name": "A", "password": "kapsula-secret-123"},
+    {"email": "a@example.com", "name": "", "password": "kapsula-secret-123"},
     {"email": "a@example.com", "name": "A", "password": "12345"},
-    {"email": "a@example.com", "name": "A" * 101, "password": "secret123"},
+    {"email": "a@example.com", "name": "A" * 101, "password": "kapsula-secret-123"},
     {"email": "a@example.com", "name": "A"},
 ])
 def test_register_validation(client, body):
@@ -27,15 +27,15 @@ def test_register_validation(client, body):
 
 def test_duplicate_email_is_case_insensitive(client):
     register(client, email="a@example.com")
-    r = client.post("/api/auth/register", json={"email": "A@EXAMPLE.COM", "name": "B", "password": "secret123", "consent": True})
+    r = client.post("/api/auth/register", json={"email": "A@EXAMPLE.COM", "name": "B", "password": "kapsula-secret-123", "consent": True})
     assert r.status_code == 409
 
 
 def test_register_with_unknown_invite(client):
-    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "secret123", "invite_code": "NOPE1234", "consent": True})
+    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "kapsula-secret-123", "invite_code": "NOPE1234", "consent": True})
     assert r.status_code == 400
     # аккаунт при этом не создан
-    assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "secret123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "kapsula-secret-123"}).status_code == 401
 
 
 def test_register_with_lowercase_invite_joins_family(client):
@@ -47,14 +47,14 @@ def test_register_with_lowercase_invite_joins_family(client):
 
 def test_login(client):
     register(client)
-    ok = client.post("/api/auth/login", json={"email": "NIKITA@example.com", "password": "secret123"})
+    ok = client.post("/api/auth/login", json={"email": "NIKITA@example.com", "password": "kapsula-secret-123"})
     assert ok.status_code == 200 and ok.json()["token_type"] == "bearer"
     assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {ok.json()['access_token']}"}).status_code == 200
 
 
 @pytest.mark.parametrize("email, password", [
     ("nikita@example.com", "wrong-pass"),
-    ("nobody@example.com", "secret123"),
+    ("nobody@example.com", "kapsula-secret-123"),
 ])
 def test_login_wrong_credentials(client, email, password):
     register(client)
@@ -76,10 +76,10 @@ def test_me_requires_valid_token(client, headers):
 
 def test_update_profile_and_password(client):
     h, _ = register(client)
-    r = client.patch("/api/auth/me", headers=h, json={"name": "  Никита З.  ", "password": "newpass1", "current_password": "secret123"})
+    r = client.patch("/api/auth/me", headers=h, json={"name": "  Никита З.  ", "password": "new-pass-phrase-77", "current_password": "kapsula-secret-123"})
     assert r.status_code == 200 and r.json()["name"] == "Никита З."
-    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "secret123"}).status_code == 401
-    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "newpass1"}).status_code == 200
+    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "kapsula-secret-123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "new-pass-phrase-77"}).status_code == 200
 
 
 def test_update_profile_validation(client):
@@ -96,10 +96,10 @@ def test_health_and_conditions_are_public(client):
 
 # --- согласие на обработку персональных данных и удаление аккаунта (152-ФЗ) ---
 def test_register_requires_consent(client):
-    body = {"email": "a@example.com", "name": "A", "password": "secret123"}
+    body = {"email": "a@example.com", "name": "A", "password": "kapsula-secret-123"}
     assert client.post("/api/auth/register", json=body).status_code == 422
     assert client.post("/api/auth/register", json={**body, "consent": False}).status_code == 422
-    assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "secret123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "kapsula-secret-123"}).status_code == 401
 
 
 def test_register_stores_consent(client, db):
@@ -136,9 +136,9 @@ def test_delete_account_removes_user_and_own_family(client):
     h, u = register(client)
     fam = u["families"][0]["id"]
     client.post(f"/api/families/{fam}/medicines", json={"name": "Нурофен"}, headers=h)
-    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
+    assert client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=h).status_code == 204
     assert client.get("/api/auth/me", headers=h).status_code == 401
-    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "secret123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "nikita@example.com", "password": "kapsula-secret-123"}).status_code == 401
     # почта освободилась, а новый аккаунт начинает с пустой аптечки
     h2, u2 = register(client)
     assert client.get(f"/api/families/{u2['families'][0]['id']}/medicines", headers=h2).json() == []
@@ -151,9 +151,9 @@ def test_delete_account_keeps_shared_family_for_others(client):
     h2, mom = register(client, "mom@example.com", "Мама", invite=code)
     client.post(f"/api/families/{fam}/medicines", json={"name": "Нурофен"}, headers=h)
     # владелец при других людях сначала передаёт владение (R22-T3), потом удаляет аккаунт
-    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 409
+    assert client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=h).status_code == 409
     hand_over(client, h, fam, mom["id"], h2)
-    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h).status_code == 204
+    assert client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=h).status_code == 204
     left = client.get(f"/api/families/{fam}", headers=h2).json()
     assert [m["name"] for m in left["members"]] == ["Мама"] and left["members"][0]["role"] == "owner"
     assert [m["name"] for m in client.get(f"/api/families/{fam}/medicines", headers=h2).json()] == ["Нурофен"]

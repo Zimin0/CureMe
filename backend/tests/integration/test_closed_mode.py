@@ -34,18 +34,18 @@ def test_closed_mode_blocks_others_but_keeps_their_rights(client):
     assert client.get("/api/admin/access", headers=other_h).status_code == 403
 
     # но вход, согласие и удаление аккаунта работают — это права по 152-ФЗ
-    login = client.post("/api/auth/login", json={"email": "other@example.com", "password": "secret123"})
+    login = client.post("/api/auth/login", json={"email": "other@example.com", "password": "kapsula-secret-123"})
     assert login.status_code == 200 and login.json()["user"]["access_blocked"] is True
     assert client.post("/api/auth/consent", json={"consent": True}, headers=other_h).status_code == 200
-    assert client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=other_h).status_code == 204
+    assert client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=other_h).status_code == 204
 
 
 def test_closed_mode_stops_registration(client):
     admin_h, _ = register(client)
     close_site(client, admin_h)
-    r = client.post("/api/auth/register", json={"email": "new@example.com", "name": "Н", "password": "secret123", "consent": True})
+    r = client.post("/api/auth/register", json={"email": "new@example.com", "name": "Н", "password": "kapsula-secret-123", "consent": True})
     assert r.status_code == 403
-    assert client.post("/api/auth/login", json={"email": "new@example.com", "password": "secret123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "new@example.com", "password": "kapsula-secret-123"}).status_code == 401
 
 
 def test_reopening_restores_access(client):

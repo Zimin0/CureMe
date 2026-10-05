@@ -18,6 +18,7 @@ from ..schemas import (
     CategoryOut, CompressionSettingsIO, FamilyBrief, FamilyIn, HouseholdEventOut, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
+from ..schemas import MIN_ADMIN_PASSWORD
 from ..plans import PLUS, billing_settings, plus_active, set_billing_settings
 from ..security import hash_password
 from ..services import access_settings, debug_enabled, indication_hints, set_access_settings, set_debug_enabled, set_indication_hints, set_telegram_switch, telegram_switch_on
@@ -146,6 +147,8 @@ def update_user(user_id: int, body: AdminUserUpdate, me: User = Depends(admin_us
     if body.is_admin is not None:
         u.is_admin = body.is_admin
     if body.password:
+        if u.is_admin and len(body.password) < MIN_ADMIN_PASSWORD:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Администратору нужен пароль не короче {MIN_ADMIN_PASSWORD} символов")
         u.password_hash = hash_password(body.password)
         u.token_version += 1  # человека выкинет со всех устройств: войти можно только с новым паролем
     db.commit()

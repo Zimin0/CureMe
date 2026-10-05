@@ -5,7 +5,7 @@ import { api } from './api'
 import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
-import { ClosedGate, ConsentGate, Join, Login, Register, VerifyGate } from './pages/Auth'
+import { ClosedGate, ConsentGate, Join, Login, Register, ResetPassword, VerifyGate } from './pages/Auth'
 import { Consent, Offer, Privacy, ShareConsent, TelegramConsent, Terms, TrustedConsent } from './pages/Legal'
 import { Export } from './pages/Export'
 import { Admin } from './pages/Admin'
@@ -59,6 +59,7 @@ export default function App() {
     <DebugBar />
     <Routes>
       <Route path="/login" element={me ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/reset-password" element={me ? <Navigate to="/" replace /> : <ResetPassword />} />
       <Route path="/register" element={me ? <Navigate to="/" replace /> : <Register />} />
       <Route path="/join/:code" element={<Join />} />
       <Route path="/trusted" element={<Trusted />} />

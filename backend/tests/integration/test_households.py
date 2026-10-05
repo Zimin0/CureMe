@@ -52,7 +52,7 @@ def counts(session_factory):
         return {m.__name__: db.scalar(select(func.count()).select_from(m)) for m in (Household, Family, User)}
 
 
-def delete_account(client, h, password="secret123"):
+def delete_account(client, h, password="kapsula-secret-123"):
     return client.request("DELETE", "/api/auth/me", json={"password": password}, headers=h)
 
 
@@ -102,7 +102,7 @@ def test_r02_t1_fourth_person_does_not_join_free_family(client, session_factory)
     for i in range(2):
         join_family(client, h, f, f"Родной {i}", f"r{i}@example.com")
     r = client.post("/api/auth/register", json={
-        "email": "late@example.com", "name": "Четвёртый", "password": "secret123",
+        "email": "late@example.com", "name": "Четвёртый", "password": "kapsula-secret-123",
         "invite_code": code_of(client, h, f), "consent": True,
     })
     assert r.status_code == 402 and r.headers[PLUS_HEADER] == "no_limits"
@@ -119,7 +119,7 @@ def test_r02_t2_plus_fifth_person_joins_sixth_does_not(client, session_factory):
     for i in range(4):
         join_family(client, h, f, f"Родной {i}", f"r{i}@example.com")
     r = client.post("/api/auth/register", json={
-        "email": "late@example.com", "name": "Шестой", "password": "secret123",
+        "email": "late@example.com", "name": "Шестой", "password": "kapsula-secret-123",
         "invite_code": code_of(client, h, f), "consent": True,
     })
     assert r.status_code == 409
@@ -527,7 +527,7 @@ def test_bc03_free_family_grows_to_three_people_and_three_cabinets(client, sessi
         assert client.post("/api/families", headers=h, json={"name": name}).status_code == 201
     assert client.post("/api/families", headers=h, json={"name": "Лишняя"}).status_code == 402
     r = client.post("/api/auth/register", json={
-        "email": "d@example.com", "name": "Четвёртый", "password": "secret123",
+        "email": "d@example.com", "name": "Четвёртый", "password": "kapsula-secret-123",
         "invite_code": code_of(client, h, f), "consent": True,
     })
     assert r.status_code == 402

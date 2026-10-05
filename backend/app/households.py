@@ -258,6 +258,35 @@ def release_unverified(db: Session, now: datetime | None = None) -> int:
     return freed
 
 
+UNVERIFIED_ACCOUNT_TTL = timedelta(days=7)  # аккаунт без подтверждённой почты живёт не дольше недели
+
+
+def purge_unverified_accounts(db: Session, now: datetime | None = None) -> int:
+    """Удаляет аккаунты, не подтвердившие почту за 7 дней: так нельзя занять чужую почту надолго и копить мусор.
+
+    Подтвердить почту без письма нельзя, поэтому такой человек ничего не вносил (в аптечку не пускают), а его
+    данные это почта, имя и хеш пароля. Администраторов не трогаем. Работает, только если подтверждение почты включено.
+    """
+    from .email_verification import needs_verification  # здесь, чтобы не зациклить импорты
+
+    now = now or datetime.now(timezone.utc)
+    removed = 0
+    stale = db.scalars(select(User).where(
+        User.email_verified_at.is_(None), User.is_admin.is_(False), User.created_at < now - UNVERIFIED_ACCOUNT_TTL))
+    for user in list(stale):
+        if not needs_verification(user):
+            continue
+        try:
+            delete_account(db, user, admin=True)
+        except HTTPException:
+            db.rollback()
+            continue
+        db.delete(user)
+        db.commit()
+        removed += 1
+    return removed
+
+
 def purge_old_invites(db: Session, now: datetime | None = None) -> int:
     """Удаляет приглашения, срок которых истёк больше 30 дней назад: использованные, отозванные и просроченные.
 
