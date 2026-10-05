@@ -41,7 +41,11 @@ www.{$CUREME_DOMAIN} {$CUREME_OLD_DOMAIN} {
 	request_body {
 		max_size 10MB
 	}
-	basic_auth {
+	# Браузер шлёт сохранённый пароль basic-auth в заголовке Authorization, но после входа приложение шлёт туда
+	# свой токен (Bearer). Он перекрывает пароль, Caddy отвечал 401 и окно пароля появлялось снова и снова.
+	# Поэтому запросы /api/ с Bearer пропускаем: приложение само проверяет токен, а страницы и файлы стенда закрыты паролем.
+	@guard expression "!({http.request.uri.path}.startsWith('/api/') && {http.request.header.Authorization}.startsWith('Bearer '))"
+	basic_auth @guard {
 		{$STAGING_AUTH_USER:staging} {$STAGING_AUTH_HASH}
 	}
 	header {
