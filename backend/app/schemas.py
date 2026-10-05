@@ -22,8 +22,26 @@ def _password_bytes(value: str) -> str:
     return value
 
 
-# Новый пароль: от 8 символов и не длиннее, чем умеет bcrypt.
-NewPassword = Annotated[str, Field(min_length=8, max_length=128), AfterValidator(_password_bytes)]
+# Самые частые пароли и «клавиатурные» ряды: их подбирают первыми, поэтому и длинным (12+) такие не принимаем.
+COMMON_PASSWORDS = {
+    "123456789012", "1234567890123", "qwertyuiop12", "qwertyuiopas", "qwerty123456", "password1234", "password12345",
+    "123456123456", "111111111111", "000000000000", "йцукенгшщзхъ", "qwertyqwerty", "1q2w3e4r5t6y", "iloveyou1234",
+    "zxcvbnm12345", "asdfghjkl123", "kapsulka1234", "kapsulka12345",
+}
+MIN_PASSWORD = 12
+MIN_ADMIN_PASSWORD = 16
+
+
+def _strong_password(value: str) -> str:
+    _password_bytes(value)
+    if value.isdigit() or len(set(value)) < 4 or value.lower() in COMMON_PASSWORDS:
+        raise ValueError("Слишком простой пароль: придумайте фразу из нескольких слов, не меньше 12 символов")
+    return value
+
+
+# Новый пароль: от 12 символов, не из одних цифр и не из частых, и не длиннее, чем умеет bcrypt.
+# Администраторам при смене нужно не меньше 16 символов (проверяется там, где пароль меняют).
+NewPassword = Annotated[str, Field(min_length=MIN_PASSWORD, max_length=128), AfterValidator(_strong_password)]
 # Старые пароли бывали и по 6 символов, поэтому при входе длину снизу не проверяем.
 AnyPassword = Annotated[str, Field(min_length=1, max_length=128)]
 
@@ -59,6 +77,16 @@ class RegisterIn(BaseModel):
     password: NewPassword
     invite_code: str | None = Field(default=None, max_length=32)
     consent: bool = False  # галочка «даю согласие на обработку персональных данных»
+
+
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=8, max_length=8, pattern=r"^\d{8}$")
+    password: NewPassword
 
 
 class ConsentIn(BaseModel):
@@ -623,6 +651,7 @@ class NotificationPrefsOut(BaseModel):
     telegram_name: str | None
     notify_low: bool
     notify_expiry: bool
+    notify_expired: bool
     expiry_days: int
 
 
@@ -631,6 +660,7 @@ class NotificationPrefsIn(BaseModel):
     telegram_enabled: bool | None = None
     notify_low: bool | None = None
     notify_expiry: bool | None = None
+    notify_expired: bool | None = None
     expiry_days: int | None = Field(default=None, ge=1, le=180)
 
     @model_validator(mode="after")

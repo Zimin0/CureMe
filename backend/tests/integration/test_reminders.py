@@ -71,7 +71,7 @@ def test_defaults_before_setup(client):
     p = client.get("/api/notifications", headers=h).json()
     assert p["available"] is True  # платная версия выключена — доступно всем
     assert p["email_enabled"] is False and p["telegram_enabled"] is False
-    assert p["notify_low"] is True and p["notify_expiry"] is True and p["expiry_days"] == 30
+    assert p["notify_low"] is True and p["notify_expiry"] is True and p["notify_expired"] is True and p["expiry_days"] == 30
     assert p["email_possible"] is False and p["telegram_possible"] is False  # на сайте ни почты, ни бота
 
 
@@ -163,6 +163,21 @@ def test_kinds_and_days_follow_settings(client, db, home, outbox):
     assert remind(db, u["id"]) == 0  # о запасах не просили, а до срока ещё 10 дней > 7
     client.put("/api/notifications", headers=h, json={"expiry_days": 14})
     assert remind(db, u["id"]) == 1 and "Парацетамол" in text_of(outbox[-1])
+
+
+def test_expiring_and_expired_are_separate_checkboxes(client, db, home, outbox):
+    h, u, f = home
+    add(client, h, f, "Парацетамол", 10, expiry=TODAY + timedelta(days=2))
+    add(client, h, f, "Анальгин", 10, expiry=TODAY - timedelta(days=1))
+    r = client.put("/api/notifications", headers=h, json={"notify_expired": False})
+    assert r.json()["notify_expired"] is False
+    assert remind(db, u["id"]) == 1  # только «скоро истечёт»
+    body = text_of(outbox[-1])
+    assert "Парацетамол" in body and "Анальгин" not in body
+    client.put("/api/notifications", headers=h, json={"notify_expired": True, "notify_expiry": False})
+    assert remind(db, u["id"]) == 1  # теперь только «уже истёк»
+    body = text_of(outbox[-1])
+    assert "Анальгин" in body and "Парацетамол" not in body
 
 
 def test_no_threshold_no_low_reminder(client, db, home, outbox):
@@ -376,7 +391,7 @@ def test_account_deletion_removes_settings(client, db, home):
     h, u, f = home
     add(client, h, f, "Нурофен", 3, min_quantity=5)
     remind(db, u["id"])
-    r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "secret123"})
+    r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "kapsula-secret-123"})
     assert r.status_code == 204
     db.expire_all()
     assert db.query(NotificationPrefs).count() == 0 and db.query(ReminderSent).count() == 0
@@ -423,6 +438,19 @@ def test_debug_mode_skips_12h_delay(client, db, home, outbox):
     assert "Лоратадин" in text_of(outbox[0])
 
 
+def test_expired_goes_only_into_daily_digest(client, db, home, outbox):
+    """Срок истёк после правки даты — письма сразу нет, даже в режиме отладки; придёт в сводке."""
+    from app.services import set_debug_enabled
+    h, u, f = home
+    set_debug_enabled(db, True)
+    add(client, h, f, "Лоратадин", 4, expiry=date.today() - timedelta(days=1))
+    db.expire_all()
+    assert reminders.run_family(db, f) == 0 and outbox == []
+    assert reminders.remind_users(db, [u["id"]], kinds=reminders.NOT_DAILY) == 0
+    assert reminders.run_daily(db) == 1
+    assert "Лоратадин" in text_of(outbox[-1])
+
+
 def test_nudge_user_without_background_thread_is_noop():
     reminders.nudge_user(1)
     assert reminders._queue.empty()
@@ -442,11 +470,11 @@ def test_enabling_email_queues_immediate_check(client, outbox, monkeypatch):
 
 
 def test_worker_processes_user_item(client, db, home, outbox, monkeypatch):
-    """Фоновый поток берёт из очереди и человека: письмо с уже давним поводом уходит сразу."""
+    """Фоновый поток берёт из очереди и человека: письмо с уже давним поводом (скорый срок) уходит сразу."""
     import threading
 
     h, u, f = home
-    add(client, h, f, "Лоратадин", 4, expiry=date.today() - timedelta(days=3))
+    add(client, h, f, "Лоратадин", 4, expiry=date.today() + timedelta(days=3))
     db.expire_all()
     # упаковка «не новая»: сдвигаем добавление в прошлое
     from app.models import Package

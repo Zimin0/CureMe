@@ -72,9 +72,58 @@ export function Login() {
         </label>
         {m.error && <div className="alert error">{m.error.message}</div>}
         <button className="btn primary block" disabled={m.isPending}>{m.isPending ? 'Входим…' : 'Войти'}</button>
+        <Link className="muted small" style={{ textAlign: 'center' }} to="/reset-password">Забыли пароль?</Link>
       </form>
       {!closed && <div className="divider">нет аккаунта?</div>}
       {!closed && <Link className="btn ghost block" to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}>Зарегистрироваться</Link>}
+    </AuthShell>
+  )
+}
+
+/** Восстановление пароля: сначала почта, потом код из письма и новый пароль. В письме нет ссылки, только код. */
+export function ResetPassword() {
+  const nav = useNavigate()
+  const toast = useToast()
+  const [email, setEmail] = useState('')
+  const [step, setStep] = useState<'ask' | 'confirm'>('ask')
+  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
+  const ask = useMutation({
+    mutationFn: () => api('/auth/password-reset/request', { body: { email } }),
+    onSuccess: () => setStep('confirm'),
+  })
+  const confirm = useMutation({
+    mutationFn: () => api('/auth/password-reset/confirm', { body: { email, code, password } }),
+    onSuccess: () => { toast('Пароль изменён, войдите с новым'); nav('/login') },
+  })
+  return (
+    <AuthShell title="Восстановление пароля" sub={step === 'ask' ? 'Пришлём код на почту' : 'Введите код из письма и новый пароль'}>
+      {step === 'ask' ? (
+        <form className="stack" onSubmit={e => { e.preventDefault(); ask.mutate() }}>
+          <label className="field"><span>Почта</span>
+            <input className="input" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} />
+          </label>
+          {ask.error && <div className="alert error">{ask.error.message}</div>}
+          <button className="btn primary block" disabled={ask.isPending}>{ask.isPending ? 'Отправляем…' : 'Прислать код'}</button>
+        </form>
+      ) : (
+        <form className="stack" onSubmit={e => { e.preventDefault(); confirm.mutate() }}>
+          <div className="alert info"><MailCheck size={18} style={{ flexShrink: 0 }} /><span>Если аккаунт с почтой <b>{email}</b> есть, мы отправили на неё код. Он действует 30 минут. Проверьте папку «Спам».</span></div>
+          <label className="field"><span>Код из письма</span>
+            <input value={code} inputMode="numeric" autoComplete="one-time-code" maxLength={8} placeholder="00000000"
+              style={{ fontSize: 24, letterSpacing: 6, textAlign: 'center' }}
+              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+          </label>
+          <label className="field"><span>Новый пароль</span>
+            <input className="input" type="password" required minLength={12} autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} />
+            <span className="hint">Не короче 12 символов (администратору 16). Лучше фраза из нескольких слов</span>
+          </label>
+          {confirm.error && <div className="alert error">{confirm.error.message}</div>}
+          <button className="btn primary block" disabled={code.length !== 8 || confirm.isPending}>{confirm.isPending ? 'Меняем…' : 'Сменить пароль'}</button>
+          <button type="button" className="btn ghost block" onClick={() => { setStep('ask'); setCode('') }}>Отправить код ещё раз</button>
+        </form>
+      )}
+      <Link className="btn ghost block" to="/login">Назад ко входу</Link>
     </AuthShell>
   )
 }
@@ -123,8 +172,8 @@ function RegisterForm() {
           <input className="input" type="email" required autoComplete="email" value={form.email} onChange={set('email')} />
         </label>
         <label className="field"><span>Пароль</span>
-          <input className="input" type="password" required minLength={8} autoComplete="new-password" value={form.password} onChange={set('password')} />
-          <span className="hint">Не короче 8 символов</span>
+          <input className="input" type="password" required minLength={12} autoComplete="new-password" value={form.password} onChange={set('password')} />
+          <span className="hint">Не короче 12 символов. Лучше фраза из нескольких слов: её легко помнить и трудно подобрать</span>
         </label>
         <label className="field"><span>Код приглашения в семью</span>
           <input className="input" value={form.invite_code} onChange={set('invite_code')} placeholder="Необязательно" style={{ textTransform: 'uppercase' }} />

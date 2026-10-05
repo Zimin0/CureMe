@@ -117,6 +117,7 @@ export interface NotificationPrefs {
   telegram_name: string | null
   notify_low: boolean
   notify_expiry: boolean
+  notify_expired: boolean
   expiry_days: number
 }
 

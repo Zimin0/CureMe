@@ -14,7 +14,7 @@ def events(session_factory):
 
 
 def delete_account(client, h):
-    return client.request("DELETE", "/api/auth/me", json={"password": "secret123"}, headers=h)
+    return client.request("DELETE", "/api/auth/me", json={"password": "kapsula-secret-123"}, headers=h)
 
 
 def test_r27_t1_no_names_in_journal_details(client, owner, session_factory):

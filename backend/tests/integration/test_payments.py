@@ -547,7 +547,7 @@ def test_r21_t2_nothing_is_charged_after_the_owner_deleted_the_account(client, s
     succeed(client, yk, payment_method={"saved": True, "id": "pm-1"})
     hand_over(client, h, fid(owner), mom["id"], hm)
     assert user_row(session_factory, owner["id"]).auto_renew is False
-    assert client.request("DELETE", "/api/auth/me", headers=h, json={"password": "secret123"}).status_code == 204
+    assert client.request("DELETE", "/api/auth/me", headers=h, json={"password": "kapsula-secret-123"}).status_code == 204
     with session_factory() as db:
         due = datetime.now(timezone.utc) - timedelta(minutes=1)
         house = db.get(User, mom["id"]).household

@@ -1,14 +1,15 @@
 """Главная, подбор по болезни и сканирование."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..codes import display_code, parse_code
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user, get_family
-from ..lookup import find_product
-from ..models import Family, ProductCode, User
+from ..lookup import cached_product, find_product
+from ..models import Family, Membership, User
 from ..ratelimit import limiter
 from ..schemas import OverviewOut, ProductInfo, ScanIn, ScanOut, SuggestionOut, SuggestOut
 from ..search import best_match, expand_query
@@ -134,7 +135,7 @@ def scan(body: ScanIn, fam: Family = Depends(get_family), user: User = Depends(c
     duplicate = bool(parsed.serial and find_package_by_serial(db, fam.id, parsed.gtin, parsed.serial))
 
     # Для уже известного лекарства в сеть не ходим — хватит справочника (там размер блистера).
-    row = db.get(ProductCode, parsed.gtin) if medicine else find_product(db, parsed.gtin)
+    row = cached_product(db, parsed.gtin, fam.id) if medicine else find_product(db, parsed.gtin, family_id=fam.id)
     db.commit()
     product = ProductInfo.model_validate(row) if row else None
 
@@ -145,13 +146,20 @@ def scan(body: ScanIn, fam: Family = Depends(get_family), user: User = Depends(c
 
 
 @router.get("/products/{code}", response_model=ProductInfo)
-def product(code: str, refresh: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    """Поиск товара по штрихкоду (кнопка «Найти по коду» в форме)."""
+def product(
+    code: str, refresh: bool = False, family_id: int | None = None,
+    user: User = Depends(current_user), db: Session = Depends(get_db),
+):
+    """Поиск товара по штрихкоду (кнопка «Найти по коду» в форме). С family_id сначала смотрит записи этой аптечки."""
     limiter.hit(f"lookup:{user.id}", limit=60, window=60)
+    if family_id is not None and not db.scalar(
+        select(Membership.id).where(Membership.family_id == family_id, Membership.user_id == user.id)
+    ):
+        raise HTTPException(404, "Семья не найдена")
     parsed = parse_code(code)
     if not parsed.gtin:
         raise HTTPException(422, "Это не похоже на штрихкод")
-    row = find_product(db, parsed.gtin, refresh=refresh)
+    row = find_product(db, parsed.gtin, refresh=refresh, family_id=family_id)
     db.commit()
     if not row:
         raise HTTPException(404, "В интернете ничего не нашлось по этому коду. Впишите название вручную.")

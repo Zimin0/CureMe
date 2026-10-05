@@ -17,7 +17,7 @@ def rate_limited(monkeypatch):
     limiter.reset()
 
 
-def login(client, email="nikita@example.com", password="secret123"):
+def login(client, email="nikita@example.com", password="kapsula-secret-123"):
     return client.post("/api/auth/login", json={"email": email, "password": password})
 
 
@@ -35,9 +35,49 @@ def test_login_with_too_long_password_is_just_wrong_password(client):
     assert login(client, password="я" * 100).status_code == 401
 
 
-def test_new_password_needs_8_characters(client):
-    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "1234567", "consent": True})
+@pytest.mark.parametrize("password", [
+    "1234567", "abcdefgh123",          # короче 12
+    "123456789012", "555555555555",    # одни цифры
+    "aaaaaaaaaaaa", "abababababab",    # почти один символ
+    "qwertyuiop12", "Password12345",   # из списка частых
+])
+def test_weak_new_password_is_refused(client, password):
+    r = client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": password, "consent": True})
     assert r.status_code == 422
+
+
+def test_passphrase_is_accepted(client):
+    register(client, "a@example.com", "A", password="синий слон ест яблоко")
+
+
+def test_admin_password_needs_16_characters(client):
+    h, _ = register(client)  # первый аккаунт — администратор
+    cur = "kapsula-secret-123"
+    r = client.patch("/api/auth/me", headers=h, json={"password": "twelve-chars1", "current_password": cur})
+    assert r.status_code == 422 and "16" in r.text
+    assert client.patch("/api/auth/me", headers=h, json={"password": "sixteen-chars-ok1", "current_password": cur}).status_code == 200
+
+
+def test_member_password_needs_only_12_and_admin_panel_follows_the_same_rule(client):
+    admin, _ = register(client, "admin@example.com", "Админ")
+    h2, u2 = register(client, "masha@example.com", "Маша")
+    assert client.patch("/api/auth/me", headers=h2, json={"password": "twelve-chars1", "current_password": "kapsula-secret-123"}).status_code == 200
+    ids = {u["email"]: u["id"] for u in client.get("/api/admin/users", headers=admin).json()}
+    assert client.patch(f"/api/admin/users/{ids['admin@example.com']}", headers=admin, json={"password": "twelve-chars1"}).status_code == 422
+    assert client.patch(f"/api/admin/users/{ids['masha@example.com']}", headers=admin, json={"password": "twelve-chars2"}).status_code == 200
+
+
+# --- «Выйти на всех устройствах» ---
+def test_logout_everywhere_kills_other_tokens_but_keeps_this_device(client):
+    h, _ = register(client)
+    other = {"Authorization": "Bearer " + login(client).json()["access_token"]}  # второе устройство
+    r = client.post("/api/auth/logout-all", headers=h)
+    assert r.status_code == 200
+    new = {"Authorization": "Bearer " + r.json()["access_token"]}
+    assert client.get("/api/auth/me", headers=h).status_code == 401
+    assert client.get("/api/auth/me", headers=other).status_code == 401
+    assert client.get("/api/auth/me", headers=new).status_code == 200
+    assert login(client).status_code == 200  # пароль прежний
 
 
 def test_old_short_password_still_logs_in(client, db):
@@ -60,8 +100,8 @@ def test_unknown_email_and_wrong_password_look_the_same(client):
 # --- смена пароля и отзыв токенов ---
 def test_password_change_requires_current_password(client):
     h, _ = register(client)
-    assert client.patch("/api/auth/me", headers=h, json={"password": "newpass12"}).status_code == 400
-    r = client.patch("/api/auth/me", headers=h, json={"password": "newpass12", "current_password": "wrong"})
+    assert client.patch("/api/auth/me", headers=h, json={"password": "new-pass-phrase-77"}).status_code == 400
+    r = client.patch("/api/auth/me", headers=h, json={"password": "new-pass-phrase-77", "current_password": "wrong"})
     assert r.status_code == 400
     assert login(client).status_code == 200  # пароль не поменялся
 
@@ -69,13 +109,13 @@ def test_password_change_requires_current_password(client):
 def test_password_change_logs_out_other_devices(client):
     phone, _ = register(client)
     laptop = {"Authorization": f"Bearer {login(client).json()['access_token']}"}
-    r = client.patch("/api/auth/me", headers=laptop, json={"password": "newpass12", "current_password": "secret123"})
+    r = client.patch("/api/auth/me", headers=laptop, json={"password": "new-pass-phrase-77", "current_password": "kapsula-secret-123"})
     assert r.status_code == 200
     fresh = {"Authorization": f"Bearer {r.json()['access_token']}"}
     assert client.get("/api/auth/me", headers=phone).status_code == 401
     assert client.get("/api/auth/me", headers=laptop).status_code == 401
     assert client.get("/api/auth/me", headers=fresh).status_code == 200
-    assert login(client, password="newpass12").status_code == 200
+    assert login(client, password="new-pass-phrase-77").status_code == 200
 
 
 def test_name_change_keeps_the_session(client):
@@ -88,10 +128,10 @@ def test_name_change_keeps_the_session(client):
 def test_admin_password_reset_logs_the_user_out(client):
     admin, _ = register(client, email="admin@example.com")
     masha, user = register(client, email="masha@example.com", name="Маша")
-    r = client.patch(f"/api/admin/users/{user['id']}", headers=admin, json={"password": "newpass12"})
+    r = client.patch(f"/api/admin/users/{user['id']}", headers=admin, json={"password": "new-pass-phrase-77"})
     assert r.status_code == 200
     assert client.get("/api/auth/me", headers=masha).status_code == 401
-    assert login(client, email="masha@example.com", password="newpass12").status_code == 200
+    assert login(client, email="masha@example.com", password="new-pass-phrase-77").status_code == 200
 
 
 # --- лимиты попыток ---
@@ -116,7 +156,7 @@ def test_login_limit_per_email_survives_changing_ip(client, rate_limited):
 
 def test_registration_is_throttled(client, rate_limited):
     codes = [
-        client.post("/api/auth/register", json={"email": f"u{i}@example.com", "name": "U", "password": "secret123", "consent": True}).status_code
+        client.post("/api/auth/register", json={"email": f"u{i}@example.com", "name": "U", "password": "kapsula-secret-123", "consent": True}).status_code
         for i in range(11)
     ]
     assert codes[:10] == [201] * 10 and codes[10] == 429
@@ -190,7 +230,7 @@ def test_security_headers(client):
 def test_password_change_cannot_be_used_to_guess_the_current_password(client, rate_limited):
     """С украденным токеном нельзя подбирать текущий пароль, чтобы сменить его и забрать аккаунт."""
     h, _ = register(client)
-    codes = [client.patch("/api/auth/me", headers=h, json={"password": "newpass12", "current_password": f"guess-{i}"}).status_code
+    codes = [client.patch("/api/auth/me", headers=h, json={"password": "kapsula-new-456", "current_password": f"guess-{i}"}).status_code
              for i in range(6)]
     assert codes[:5] == [400] * 5 and codes[5] == 429
     assert login(client).status_code == 200  # пароль остался прежним

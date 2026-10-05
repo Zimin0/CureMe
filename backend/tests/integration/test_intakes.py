@@ -146,7 +146,7 @@ def test_paging_and_account_deletion(client, db, owner, med):
     rest = history(client, h, f, before=first[0]["taken_at"])
     assert [i["user_name"] for i in rest] == ["Никита"]
     # удалил аккаунт — его история приёма удаляется вместе с ним
-    r = client.request("DELETE", "/api/auth/me", headers=h_mom, json={"password": "secret123"})
+    r = client.request("DELETE", "/api/auth/me", headers=h_mom, json={"password": "kapsula-secret-123"})
     assert r.status_code == 204, r.text
     assert [i["user_name"] for i in history(client, h, f)] == ["Никита"]
 

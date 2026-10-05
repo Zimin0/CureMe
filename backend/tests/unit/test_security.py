@@ -10,14 +10,14 @@ from app.security import ALGORITHM, create_token, decode_token, hash_password, n
 
 
 def test_password_hash_roundtrip():
-    h = hash_password("secret123")
-    assert h != "secret123" and h.startswith("$2")
-    assert verify_password("secret123", h)
+    h = hash_password("kapsula-secret-123")
+    assert h != "kapsula-secret-123" and h.startswith("$2")
+    assert verify_password("kapsula-secret-123", h)
     assert not verify_password("Secret123", h)
 
 
 def test_same_password_gets_different_salt():
-    assert hash_password("secret123") != hash_password("secret123")
+    assert hash_password("kapsula-secret-123") != hash_password("kapsula-secret-123")
 
 
 def test_unicode_password():

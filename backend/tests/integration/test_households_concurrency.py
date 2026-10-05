@@ -67,7 +67,7 @@ def test_r04_t7_two_registrations_with_one_code_let_one_through(client, session_
     f = fid(u)
     code = invite_of(client, h, f)
     signup = lambda email: (lambda c: c.post("/api/auth/register", json={  # noqa: E731
-        "email": email, "name": "Новый", "password": "secret123", "invite_code": code, "consent": True}))
+        "email": email, "name": "Новый", "password": "kapsula-secret-123", "invite_code": code, "consent": True}))
     assert race([signup("a@example.com"), signup("b@example.com")]) == [201, 400]
     assert len(client.get(f"/api/families/{f}", headers=h).json()["members"]) == 2
     check_household_invariants(session_factory)

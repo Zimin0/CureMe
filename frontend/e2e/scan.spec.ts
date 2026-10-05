@@ -34,3 +34,24 @@ test('неверный код показывает ошибку', async ({ page,
   await page.getByRole('button', { name: 'Найти', exact: true }).click()
   await expect(page.getByText(/Не получилось распознать код/)).toBeVisible()
 })
+
+// Сохранённые фотографии кодов: проходим путь «загрузить фото → распознать в браузере → форма лекарства»
+// на настоящем Chromium с wasm-декодером. Картинки сделаны один раз (см. e2e/fixtures/README.md).
+test('фото штрихкода EAN-13 распознаётся и открывает форму нового лекарства', async ({ page, request }) => {
+  const acc = await registerApi(request)
+  await loginAs(page, acc, '/scan')
+  await page.locator('input[type=file]').first().setInputFiles('e2e/fixtures/ean13.png')
+  const sheet = page.getByRole('dialog', { name: 'Новое лекарство' })
+  await expect(sheet.getByText('Код 4601669002013')).toBeVisible({ timeout: 20_000 })
+})
+
+test('фото DataMatrix читает серию и подставляет срок годности', async ({ page, request }) => {
+  const acc = await registerApi(request)
+  await loginAs(page, acc, '/scan')
+  await page.locator('input[type=file]').first().setInputFiles('e2e/fixtures/datamatrix.png')
+  const sheet = page.getByRole('dialog', { name: 'Новое лекарство' })
+  await expect(sheet).toBeVisible({ timeout: 20_000 })
+  await expect(sheet.getByText('Код 4601669002013')).toBeVisible()
+  await expect(sheet.getByText('Серия AB1234')).toBeVisible()
+  await expect(sheet.getByText(/Взято из кода на упаковке: 31 мая 2027/)).toBeVisible()
+})

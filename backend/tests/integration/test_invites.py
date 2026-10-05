@@ -14,7 +14,7 @@ def enable_billing(client, h):
 
 
 def register_raw(client, code, email="late@example.com"):
-    return client.post("/api/auth/register", json={"email": email, "name": "Поздний", "password": "secret123",
+    return client.post("/api/auth/register", json={"email": email, "name": "Поздний", "password": "kapsula-secret-123",
                                                     "invite_code": code, "consent": True})
 
 

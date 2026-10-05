@@ -313,7 +313,7 @@ def test_remove_trusted_deletes_data(client, setup, db):
 def test_deleting_account_deletes_contact(client, setup, db):
     h, u, *_ = setup
     add_trusted(client, h)
-    r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "secret123"})
+    r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "kapsula-secret-123"})
     assert r.status_code == 204, r.text
     db.expire_all()
     assert db.scalar(select(TrustedContact)) is None

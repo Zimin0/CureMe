@@ -11,8 +11,8 @@
 напомним снова. Все новые поводы собираются в одно сообщение: одно письмо и одно сообщение
 в Telegram в день, а не по штуке на лекарство. Про просрочку и скорый срок пишем только в
 ежедневной сводке (после «Принял(а)» — лишь про остаток), а про упаковку, добавленную менее
-12 часов назад, молчим до следующей сводки. В режиме отладки (админка) этих ограничений нет:
-сообщение уходит сразу после добавления упаковки.
+12 часов назад, молчим до следующей сводки. В режиме отладки (админка) про скорый срок сообщаем сразу
+после добавления упаковки, а про уже истёкший — всё равно только в ежедневной сводке.
 
 Когда проверяем:
 - раз в день в CUREME_REMINDERS_HOUR по Москве — все семьи;
@@ -46,6 +46,7 @@ log = logging.getLogger("cureme.reminders")
 MSK = timezone(timedelta(hours=3))  # в Москве нет перехода на летнее время
 LAST_RUN = "reminders_last_run"
 NEW_PACKAGE_DELAY = timedelta(hours=12)  # про срок только что добавленной упаковки молчим первые 12 часов
+NOT_DAILY = {"low", "expiring"}  # «срок уже истёк» шлём только в ежедневной сводке, никогда сразу после правки
 QUIET_FROM = 22  # после 22:00 по Москве пропущенную ежедневную рассылку не догоняем, ждём утра
 
 
@@ -106,7 +107,7 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
         if prefs.notify_low and med.min_quantity is not None and stock.total <= med.min_quantity:
             left = "закончилось" if stock.total <= 0 else f"осталось {_fmt_qty(stock.total)} {med.unit}"
             out.append(Reason("low", med.id, f"{med.name}{where}: {left}", (2, med.name)))
-        if not prefs.notify_expiry:
+        if not (prefs.notify_expiry or prefs.notify_expired):
             continue
         for p in med.packages:
             if p.quantity <= 0 or not p.expiry_date or (not debug and _is_fresh(p, now)):
@@ -114,8 +115,9 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
             d = (p.expiry_date - today).days
             until = p.expiry_date.strftime("%d.%m.%Y")
             if d < 0:
-                out.append(Reason("expired", p.id, f"{med.name}{where}: срок истёк {until}", (0, p.expiry_date, med.name)))
-            elif d <= prefs.expiry_days:
+                if prefs.notify_expired:
+                    out.append(Reason("expired", p.id, f"{med.name}{where}: срок истёк {until}", (0, p.expiry_date, med.name)))
+            elif prefs.notify_expiry and d <= prefs.expiry_days:
                 when = "сегодня последний день" if d == 0 else f"годен до {until}, осталось {_days(d)}"
                 out.append(Reason("expiring", p.id, f"{med.name}{where}: {when}", (1, p.expiry_date, med.name)))
     return out
@@ -219,7 +221,7 @@ def run_daily(db: Session) -> int:
 def run_family(db: Session, family_id: int) -> int:
     ids = db.scalars(select(Membership.user_id).where(Membership.family_id == family_id)).all()
     # сроки годности — только в ежедневной сводке, а в режиме отладки сразу
-    return remind_users(db, ids, kinds=None if debug_enabled(db) else {"low"})
+    return remind_users(db, ids, kinds=NOT_DAILY if debug_enabled(db) else {"low"})
 
 
 # --- фоновый поток ---
@@ -290,10 +292,12 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                     db.rollback()
                 try:
                     from .households import (  # здесь же: households → plans → reminders
-                        expire_owner_transfers, purge_old_events, purge_old_invites, purge_old_transfers, release_unverified,
+                        expire_owner_transfers, purge_old_events, purge_old_invites, purge_old_transfers, purge_unverified_accounts,
+                        release_unverified,
                     )
                     release_unverified(db)  # вступившие по приглашению без подтверждённой почты за сутки освобождают место
                     expire_owner_transfers(db)  # предложения передать владение без ответа за сутки отменяются
+                    purge_unverified_accounts(db)  # аккаунты без подтверждённой почты за 7 дней удаляются
                     purge_old_invites(db)  # записи старых приглашений хранятся 30 дней после срока
                     purge_old_transfers(db)  # и записи о предложениях передать владение
                     purge_old_events(db)  # журнал семьи хранится 12 месяцев
@@ -320,7 +324,7 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                 for what, pk in items:
                     try:
                         if what == "user":
-                            remind_users(db, [pk])
+                            remind_users(db, [pk], kinds=NOT_DAILY)
                         elif db.get(Family, pk):
                             run_family(db, pk)
                     except Exception:  # noqa: BLE001
