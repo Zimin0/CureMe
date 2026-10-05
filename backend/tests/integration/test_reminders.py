@@ -438,6 +438,19 @@ def test_debug_mode_skips_12h_delay(client, db, home, outbox):
     assert "Лоратадин" in text_of(outbox[0])
 
 
+def test_expired_goes_only_into_daily_digest(client, db, home, outbox):
+    """Срок истёк после правки даты — письма сразу нет, даже в режиме отладки; придёт в сводке."""
+    from app.services import set_debug_enabled
+    h, u, f = home
+    set_debug_enabled(db, True)
+    add(client, h, f, "Лоратадин", 4, expiry=date.today() - timedelta(days=1))
+    db.expire_all()
+    assert reminders.run_family(db, f) == 0 and outbox == []
+    assert reminders.remind_users(db, [u["id"]], kinds=reminders.NOT_DAILY) == 0
+    assert reminders.run_daily(db) == 1
+    assert "Лоратадин" in text_of(outbox[-1])
+
+
 def test_nudge_user_without_background_thread_is_noop():
     reminders.nudge_user(1)
     assert reminders._queue.empty()
@@ -457,11 +470,11 @@ def test_enabling_email_queues_immediate_check(client, outbox, monkeypatch):
 
 
 def test_worker_processes_user_item(client, db, home, outbox, monkeypatch):
-    """Фоновый поток берёт из очереди и человека: письмо с уже давним поводом уходит сразу."""
+    """Фоновый поток берёт из очереди и человека: письмо с уже давним поводом (скорый срок) уходит сразу."""
     import threading
 
     h, u, f = home
-    add(client, h, f, "Лоратадин", 4, expiry=date.today() - timedelta(days=3))
+    add(client, h, f, "Лоратадин", 4, expiry=date.today() + timedelta(days=3))
     db.expire_all()
     # упаковка «не новая»: сдвигаем добавление в прошлое
     from app.models import Package

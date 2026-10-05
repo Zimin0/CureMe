@@ -11,8 +11,8 @@
 напомним снова. Все новые поводы собираются в одно сообщение: одно письмо и одно сообщение
 в Telegram в день, а не по штуке на лекарство. Про просрочку и скорый срок пишем только в
 ежедневной сводке (после «Принял(а)» — лишь про остаток), а про упаковку, добавленную менее
-12 часов назад, молчим до следующей сводки. В режиме отладки (админка) этих ограничений нет:
-сообщение уходит сразу после добавления упаковки.
+12 часов назад, молчим до следующей сводки. В режиме отладки (админка) про скорый срок сообщаем сразу
+после добавления упаковки, а про уже истёкший — всё равно только в ежедневной сводке.
 
 Когда проверяем:
 - раз в день в CUREME_REMINDERS_HOUR по Москве — все семьи;
@@ -46,6 +46,7 @@ log = logging.getLogger("cureme.reminders")
 MSK = timezone(timedelta(hours=3))  # в Москве нет перехода на летнее время
 LAST_RUN = "reminders_last_run"
 NEW_PACKAGE_DELAY = timedelta(hours=12)  # про срок только что добавленной упаковки молчим первые 12 часов
+NOT_DAILY = {"low", "expiring"}  # «срок уже истёк» шлём только в ежедневной сводке, никогда сразу после правки
 QUIET_FROM = 22  # после 22:00 по Москве пропущенную ежедневную рассылку не догоняем, ждём утра
 
 
@@ -220,7 +221,7 @@ def run_daily(db: Session) -> int:
 def run_family(db: Session, family_id: int) -> int:
     ids = db.scalars(select(Membership.user_id).where(Membership.family_id == family_id)).all()
     # сроки годности — только в ежедневной сводке, а в режиме отладки сразу
-    return remind_users(db, ids, kinds=None if debug_enabled(db) else {"low"})
+    return remind_users(db, ids, kinds=NOT_DAILY if debug_enabled(db) else {"low"})
 
 
 # --- фоновый поток ---
@@ -321,7 +322,7 @@ def work_forever(session_factory, stop: threading.Event) -> None:
                 for what, pk in items:
                     try:
                         if what == "user":
-                            remind_users(db, [pk])
+                            remind_users(db, [pk], kinds=NOT_DAILY)
                         elif db.get(Family, pk):
                             run_family(db, pk)
                     except Exception:  # noqa: BLE001
