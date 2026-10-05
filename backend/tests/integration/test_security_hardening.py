@@ -230,7 +230,7 @@ def test_security_headers(client):
 def test_password_change_cannot_be_used_to_guess_the_current_password(client, rate_limited):
     """С украденным токеном нельзя подбирать текущий пароль, чтобы сменить его и забрать аккаунт."""
     h, _ = register(client)
-    codes = [client.patch("/api/auth/me", headers=h, json={"password": "kapsula-new-456", "current_password": f"guess-{i}"}).status_code
+    codes = [client.patch("/api/auth/me", headers=h, json={"password": "kapsula-new-pass-4567", "current_password": f"wrong-guess-{i}"}).status_code
              for i in range(6)]
     assert codes[:5] == [400] * 5 and codes[5] == 429
     assert login(client).status_code == 200  # пароль остался прежним
