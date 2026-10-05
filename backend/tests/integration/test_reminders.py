@@ -71,7 +71,7 @@ def test_defaults_before_setup(client):
     p = client.get("/api/notifications", headers=h).json()
     assert p["available"] is True  # платная версия выключена — доступно всем
     assert p["email_enabled"] is False and p["telegram_enabled"] is False
-    assert p["notify_low"] is True and p["notify_expiry"] is True and p["expiry_days"] == 30
+    assert p["notify_low"] is True and p["notify_expiry"] is True and p["notify_expired"] is True and p["expiry_days"] == 30
     assert p["email_possible"] is False and p["telegram_possible"] is False  # на сайте ни почты, ни бота
 
 
@@ -163,6 +163,21 @@ def test_kinds_and_days_follow_settings(client, db, home, outbox):
     assert remind(db, u["id"]) == 0  # о запасах не просили, а до срока ещё 10 дней > 7
     client.put("/api/notifications", headers=h, json={"expiry_days": 14})
     assert remind(db, u["id"]) == 1 and "Парацетамол" in text_of(outbox[-1])
+
+
+def test_expiring_and_expired_are_separate_checkboxes(client, db, home, outbox):
+    h, u, f = home
+    add(client, h, f, "Парацетамол", 10, expiry=TODAY + timedelta(days=2))
+    add(client, h, f, "Анальгин", 10, expiry=TODAY - timedelta(days=1))
+    r = client.put("/api/notifications", headers=h, json={"notify_expired": False})
+    assert r.json()["notify_expired"] is False
+    assert remind(db, u["id"]) == 1  # только «скоро истечёт»
+    body = text_of(outbox[-1])
+    assert "Парацетамол" in body and "Анальгин" not in body
+    client.put("/api/notifications", headers=h, json={"notify_expired": True, "notify_expiry": False})
+    assert remind(db, u["id"]) == 1  # теперь только «уже истёк»
+    body = text_of(outbox[-1])
+    assert "Анальгин" in body and "Парацетамол" not in body
 
 
 def test_no_threshold_no_low_reminder(client, db, home, outbox):
