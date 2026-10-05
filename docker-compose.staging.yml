@@ -1,0 +1,42 @@
+# Тестовый стенд dev-kapsulka.ru: второй, независимый стек на том же сервере.
+# Запуск (в /opt/cureme-staging):
+#   docker compose -p cureme-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --no-build --pull never
+# Здесь нет своего Caddy: HTTPS и пароль даёт Caddy основного стека (deploy/Caddyfile), он ходит к staging-app
+# по общей сети cureme-edge. Свои тома и своя база (проект cureme-staging), с продом ничего не делится.
+# Память урезана, чтобы не мешать проду на сервере с 2 ГБ.
+services:
+  app:
+    image: cureme-app:staging
+    ports: !reset []
+    expose: ["8000"]
+    networks:
+      default: {}
+      edge:
+        aliases: [staging-app]
+    mem_limit: 350m
+    environment:
+      FORWARDED_ALLOW_IPS: "*"
+      CUREME_PUBLIC_URL: https://${STAGING_DOMAIN:-dev-kapsulka.ru}
+      # Почта, оплата и Telegram выключены: стенд не пишет живым людям и не берёт деньги.
+      # Письма не уходят, подтверждение почты на стенде отключено (как на проде без SMTP).
+      CUREME_SMTP_HOST: ""
+      CUREME_YOOKASSA_SHOP_ID: ""
+      CUREME_YOOKASSA_SECRET_KEY: ""
+      CUREME_YOOKASSA_RECURRING: "false"
+      CUREME_TELEGRAM_BOT_TOKEN: ""
+      CUREME_YANDEX_VERIFICATION: ""
+      CUREME_GOOGLE_VERIFICATION: ""
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  db:
+    mem_limit: 200m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  edge:
+    name: cureme-edge
+    external: true
