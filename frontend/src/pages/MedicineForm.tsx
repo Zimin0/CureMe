@@ -2,15 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, Category, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
+import { api, Category, Medicine, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { ExpiryInput } from '../components/ExpiryInput'
 import { IndicationsInput } from '../components/IndicationsInput'
 import { useAuth, useFamilyPath } from '../auth'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { QuantityInput } from '../components/QuantityInput'
-import { PageLoader, useToast } from '../components/ui'
-import { fmtQty } from '../format'
+import { MedIcon, PageLoader, Sheet, useToast } from '../components/ui'
+import { fmtQty, subtitle } from '../format'
 import { useLimitReached } from '../limits'
 import { LimitCounter } from '../plan'
 
@@ -28,6 +28,15 @@ export interface ScanPrefill {
 const EMPTY: MedicineFields = {
   name: '', category_ids: [], form: null, dosage: null, active_ingredient: null, manufacturer: null,
   indications: '', contraindications: '', notes: '', unit: 'шт', min_quantity: null, blister_size: null, gtin: null,
+}
+
+const normName = (v: string | null | undefined) => (v ?? '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
+const normDose = (v: string | null | undefined) => (v ?? '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, '')
+
+/** Карточки той же аптечки с тем же названием и дозировкой: кандидаты на «такая же упаковка». */
+export function sameMedicines(list: Medicine[], f: Pick<MedicineFields, 'name' | 'dosage'>): Medicine[] {
+  const n = normName(f.name)
+  return n ? list.filter(m => normName(m.name) === n && normDose(m.dosage) === normDose(f.dosage)) : []
 }
 
 export function MedicineForm() {
@@ -82,6 +91,29 @@ export function MedicineForm() {
     },
   })
 
+  // Такое лекарство уже есть: спрашиваем, та же ли это упаковка (тот же дизайн), прежде чем заводить новую карточку.
+  const [same, setSame] = useState<Medicine[] | null>(null)
+  const check = useMutation({
+    mutationFn: async () => sameMedicines(await api<Medicine[]>(fam('/medicines')), f),
+    onSuccess: found => (found.length ? setSame(found) : save.mutate()),
+    onError: () => save.mutate(),  // не смогли проверить — просто добавляем как раньше
+  })
+  const join = useMutation({
+    mutationFn: async (target: Medicine) => {
+      let m = await api<MedicineDetail>(fam(`/medicines/${target.id}/packages`), { body: pkg })
+      if (photo && !target.photo_url) m = await uploadFile<MedicineDetail>(fam(`/medicines/${m.id}/photo`), photo)
+      return m
+    },
+    onSuccess: m => {
+      qc.invalidateQueries({ queryKey: ['medicines'] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
+      qc.setQueryData(['medicine', fam(''), String(m.id)], m)
+      toast(`Пачка добавлена к «${m.name}»`)
+      nav(`/medicines/${m.id}`, { replace: true })
+    },
+    onError: (e: Error) => { setSame(null); toast(e.message, 'error') },
+  })
+
   const [packSize, setPackSize] = useState<number | null>(prefill.packSize ?? null)
   const lookup = useMutation({
     mutationFn: () => api<ProductInfo>(`/products/${encodeURIComponent(f.gtin!.trim())}?family_id=${familyId}`),
@@ -110,7 +142,11 @@ export function MedicineForm() {
   })
 
   if (editing && existing.isLoading) return <PageLoader />
-  const submit = (e: FormEvent) => { e.preventDefault(); save.mutate() }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (editing || pkg.quantity <= 0) save.mutate()
+    else check.mutate()
+  }
 
   return (
     <div className="page" style={{ maxWidth: 760 }}>
@@ -223,9 +259,28 @@ export function MedicineForm() {
         </section>
 
         {save.error && <div className="alert error">{save.error.message}</div>}
+        {same && (
+          <Sheet title="Такая упаковка уже есть?" onClose={() => setSame(null)}>
+            <div className="stack">
+              <p className="muted">«{f.name}» уже лежит в аптечке. Если упаковка выглядит так же, добавим пачку в ту же карточку.</p>
+              {same.map(m => (
+                <button key={m.id} type="button" className="med-card" disabled={join.isPending} onClick={() => join.mutate(m)}>
+                  <MedIcon category={m.category} photo={m.photo_url} />
+                  <div className="grow">
+                    <span className="name">{m.name}</span>
+                    <div className="meta">{subtitle(m)} · {fmtQty(m.stock.total)} {m.unit}</div>
+                    <div className="meta"><b>Такая же упаковка: добавить пачку</b></div>
+                  </div>
+                </button>
+              ))}
+              <button type="button" className="btn" disabled={join.isPending || save.isPending}
+                onClick={() => { setSame(null); save.mutate() }}>Нет, другая упаковка: новая карточка</button>
+            </div>
+          </Sheet>
+        )}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="btn ghost" onClick={() => nav(-1)}>Отмена</button>
-          <button className="btn primary" disabled={save.isPending}>{save.isPending ? 'Сохраняем…' : editing ? 'Сохранить' : 'Добавить в аптечку'}</button>
+          <button className="btn primary" disabled={save.isPending || check.isPending}>{save.isPending ? 'Сохраняем…' : editing ? 'Сохранить' : 'Добавить в аптечку'}</button>
         </div>
       </form>
     </div>
