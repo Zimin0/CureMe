@@ -4,6 +4,11 @@ services:
   app:
     ports: !reset []
     expose: ["8000"]
+    # Уникальное имя для Caddy: сервис стенда тоже зовётся `app` и сидит в общей сети cureme-edge,
+    # поэтому по имени `app` Docker отдавал Caddy то прод, то стенд с пустой базой.
+    networks:
+      default:
+        aliases: [prod-app]
     environment:
       # Настоящий адрес посетителя приходит от Caddy в X-Forwarded-For (нужен для лимитов попыток входа).
       # Доверять заголовку безопасно: порт 8000 наружу не открыт, до приложения доходит только Caddy.
@@ -53,10 +58,23 @@ services:
     environment:
       CUREME_DOMAIN: ${CUREME_DOMAIN:?укажите домен в .env}
       CUREME_OLD_DOMAIN: ${CUREME_OLD_DOMAIN:-}
+      # Тестовый стенд (deploy/Caddyfile). Хеш по умолчанию принадлежит случайному паролю, который никто не знает: без своего хеша стенд закрыт.
+      STAGING_DOMAIN: ${STAGING_DOMAIN:-dev-kapsulka.ru}
+      STAGING_AUTH_USER: ${STAGING_AUTH_USER:-staging}
+      STAGING_AUTH_HASH: ${STAGING_AUTH_HASH:-$$2b$$10$$uaxkX1Ug8/ZVVncJNBdWyO5qBLQ82BitlFhdJou/jjmoWo1g4LCMW}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    networks:
+      default: {}
+      edge: {}
+
+networks:
+  # общая сеть: по ней Caddy ходит к тестовому стенду (docker-compose.staging.yml)
+  edge:
+    name: cureme-edge
+    external: true
 
 volumes:
   caddy-data:

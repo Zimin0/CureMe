@@ -22,11 +22,39 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
 	}
-	reverse_proxy app:8000
+	# prod-app, а не app: имя `app` есть и у стенда в общей сети (см. docker-compose.prod.yml)
+	reverse_proxy prod-app:8000
 }
 
 # www и дополнительные адреса из CUREME_OLD_DOMAIN (старый sslip.io, kapsulka.online) навсегда перенаправляем на основной домен,
 # чтобы у приложения был один адрес: вход и установка на телефон привязаны к адресу сайта.
 www.{$CUREME_DOMAIN} {$CUREME_OLD_DOMAIN} {
 	redir https://{$CUREME_DOMAIN}{uri} permanent
+}
+
+# Тестовый стенд (staging): та же машина, но свой стек приложения и своя база (docker-compose.staging.yml).
+# Закрыт паролем и от поисковиков.
+# Переменные приходят из docker-compose.prod.yml; пока STAGING_AUTH_HASH не задан в .env, там стоит хеш
+# случайного пароля, который никто не знает: стенд закрыт для всех, а на прод это никак не влияет.
+{$STAGING_DOMAIN:dev-kapsulka.ru} {
+	encode zstd gzip
+	request_body {
+		max_size 10MB
+	}
+	# Браузер шлёт сохранённый пароль basic-auth в заголовке Authorization, но после входа приложение шлёт туда
+	# свой токен (Bearer). Он перекрывает пароль, Caddy отвечал 401 и окно пароля появлялось снова и снова.
+	# Поэтому запросы /api/ с Bearer пропускаем: приложение само проверяет токен, а страницы и файлы стенда закрыты паролем.
+	@guard expression "!({http.request.uri.path}.startsWith('/api/') && {http.request.header.Authorization}.startsWith('Bearer '))"
+	basic_auth @guard {
+		{$STAGING_AUTH_USER:staging} {$STAGING_AUTH_HASH}
+	}
+	header {
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		-Server
+	}
+	reverse_proxy staging-app:8000
+}
+
+www.{$STAGING_DOMAIN:dev-kapsulka.ru} {
+	redir https://{$STAGING_DOMAIN:dev-kapsulka.ru}{uri} permanent
 }
