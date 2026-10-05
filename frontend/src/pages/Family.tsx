@@ -157,7 +157,6 @@ export function Family() {
               <>
                 <div className="invite-box">
                   <div>
-                    <div className="small muted">Ссылка-приглашение{f.invite_expires_at && ` · действует до ${fmtDateTime(f.invite_expires_at)}`}</div>
                     <div className="invite-link">{link}</div>
                   </div>
                   <div className="row" style={{ gap: 8 }}>

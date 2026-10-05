@@ -4,11 +4,18 @@ services:
   app:
     ports: !reset []
     expose: ["8000"]
+    # Уникальное имя для Caddy: сервис стенда тоже зовётся `app` и сидит в общей сети cureme-edge,
+    # поэтому по имени `app` Docker отдавал Caddy то прод, то стенд с пустой базой.
+    networks:
+      default:
+        aliases: [prod-app]
     environment:
       # Настоящий адрес посетителя приходит от Caddy в X-Forwarded-For (нужен для лимитов попыток входа).
       # Доверять заголовку безопасно: порт 8000 наружу не открыт, до приложения доходит только Caddy.
       FORWARDED_ALLOW_IPS: "*"
       CUREME_API_DOCS: "false"
+      # Заготовки секретного ключа из репозитория на сервере недопустимы: приложение откажется запускаться.
+      CUREME_REQUIRE_SECURE_SECRET: "true"
       # Ссылки в письмах ведут на основной домен, а не на тот, что пришёл в заголовке Host.
       CUREME_PUBLIC_URL: https://${CUREME_DOMAIN}
       # Коды подтверждения сайта в Яндекс Вебмастере и Google Search Console (DEPLOY.md, раздел «Поиск»). Пусто — тега нет.

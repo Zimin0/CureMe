@@ -199,7 +199,10 @@ def test_bad_token_is_404(client, setup, db):
     h, *_ = setup
     add_trusted(client, h)
     token = confirm_token(db)
-    for bad in ("x" * 12, "1.deadbeef", "99." + token.split(".")[1], token[:-1] + ("0" if token[-1] != "0" else "1")):
+    sig = token.split(".")[1]
+    # «²» и арабо-индийские цифры проходят isdigit(), но не int(); число длиннее int4 роняло бы Postgres: ответ должен быть 404, не 500
+    odd = ("²." + sig, "٣." + sig, "9" * 30 + "." + sig, "-1." + sig, "." + sig)
+    for bad in ("x" * 12, "1.deadbeef", "99." + sig, token[:-1] + ("0" if token[-1] != "0" else "1"), *odd):
         assert client.post("/api/trusted/lookup", json={"token": bad}).status_code == 404
     assert contact_by_token(db, token) is not None
 

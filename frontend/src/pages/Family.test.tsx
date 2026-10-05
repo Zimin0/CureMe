@@ -20,12 +20,12 @@ function mockFamily(body: ReturnType<typeof family>) {
   )
 }
 
-it('владелец видит одноразовую ссылку со сроком и может выпустить новую (R04)', async () => {
+it('владелец видит одноразовую ссылку без подписи и может выпустить новую (R04)', async () => {
   mockFamily(family())
   server.use(http.post('/api/families/7/invite', () => HttpResponse.json(family({ invite_code: 'NEWCODE9' }))))
   const { user } = renderApp('/family')
   expect(await screen.findByText(/\/join\/ABCD2345$/)).toBeInTheDocument()
-  expect(screen.getByText(/Ссылка-приглашение · действует до/)).toBeInTheDocument()
+  expect(screen.queryByText(/Ссылка-приглашение/)).not.toBeInTheDocument()
   expect(screen.getByText(/Она одноразовая и будет действовать 24 часа/)).toBeInTheDocument()
   window.confirm = () => true
   await user.click(screen.getByTitle('Создать новую ссылку'))
