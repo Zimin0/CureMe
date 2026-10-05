@@ -1,0 +1,87 @@
+# Тестовый стенд https://dev-kapsulka.ru: при каждом push в develop собираем образ и по SSH
+# привозим на тот же сервер, но в отдельную папку /opt/cureme-staging со своей базой и своим .env.
+# HTTPS, пароль и noindex даёт Caddy основного стека (deploy/Caddyfile), своего Caddy у стенда нет.
+# Секреты те же, что у Deploy: SSH_PRIVATE_KEY и SSH_KNOWN_HOSTS. Пошаговая настройка: DEPLOY.md, раздел «Тестовый стенд».
+name: Deploy staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  DEPLOY_HOST: 158.255.7.113
+  DEPLOY_USER: root
+  DEPLOY_DIR: /opt/cureme-staging
+  POSTGRES_IMAGE: postgres:16-alpine
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -t cureme-app:staging \
+            --build-arg CUREME_COMMIT="${GITHUB_SHA::7}" \
+            --build-arg CUREME_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" .
+          docker pull "$POSTGRES_IMAGE"
+          docker save cureme-app:staging "$POSTGRES_IMAGE" | gzip > images.tar.gz
+          ls -lh images.tar.gz
+
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_deploy ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CFG
+          Host server
+            HostName $DEPLOY_HOST
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/id_deploy
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ServerAliveInterval 30
+          CFG
+
+      - name: Upload
+        run: |
+          ssh server "mkdir -p $DEPLOY_DIR"
+          scp images.tar.gz docker-compose.yml docker-compose.staging.yml server:$DEPLOY_DIR/
+
+      - name: Restart on server
+        run: |
+          ssh server DEPLOY_DIR="$DEPLOY_DIR" bash -s <<'SH'
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          gunzip -c images.tar.gz | docker load
+          rm images.tar.gz
+          # свои секрет и пароль базы, созданные один раз: ничего общего с продом
+          touch .env && chmod 600 .env
+          grep -q '^CUREME_SECRET_KEY=' .env || echo "CUREME_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+          grep -q '^CUREME_DB_PASSWORD=' .env || echo "CUREME_DB_PASSWORD=$(openssl rand -hex 24)" >> .env
+          docker network inspect cureme-edge >/dev/null 2>&1 || docker network create cureme-edge
+          COMPOSE="docker compose -p cureme-staging -f docker-compose.yml -f docker-compose.staging.yml"
+          $COMPOSE up -d --no-build --pull never --remove-orphans
+          for i in $(seq 1 60); do
+            if $COMPOSE exec -T app python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" 2>/dev/null; then
+              echo "Staging is up"; docker image prune -f >/dev/null; exit 0
+            fi
+            sleep 2
+          done
+          $COMPOSE logs --tail 50 app
+          exit 1
+          SH
