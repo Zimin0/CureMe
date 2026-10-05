@@ -22,7 +22,8 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
 	}
-	reverse_proxy app:8000
+	# prod-app, а не app: имя `app` есть и у стенда в общей сети (см. docker-compose.prod.yml)
+	reverse_proxy prod-app:8000
 }
 
 # www и дополнительные адреса из CUREME_OLD_DOMAIN (старый sslip.io, kapsulka.online) навсегда перенаправляем на основной домен,
