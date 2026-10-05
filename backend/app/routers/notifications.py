@@ -21,7 +21,8 @@ def _prefs(db: Session, user: User) -> NotificationPrefs:
     prefs = db.get(NotificationPrefs, user.id)
     if not prefs:
         prefs = NotificationPrefs(user_id=user.id, email_enabled=False, telegram_enabled=False,
-                                  notify_low=True, notify_expiry=True, expiry_days=get_settings().expiring_soon_days)
+                                  notify_low=True, notify_expiry=True, notify_expired=True,
+                                  expiry_days=get_settings().expiring_soon_days)
         db.add(prefs)
         db.flush()
     return prefs
@@ -53,6 +54,7 @@ def _out(db: Session, user: User, prefs: NotificationPrefs | None) -> Notificati
         telegram_name=prefs.telegram_name if tg and prefs else None,
         notify_low=prefs.notify_low if prefs else True,
         notify_expiry=prefs.notify_expiry if prefs else True,
+        notify_expired=prefs.notify_expired if prefs else True,
         expiry_days=prefs.expiry_days if prefs else s.expiring_soon_days,
     )
 

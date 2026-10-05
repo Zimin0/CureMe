@@ -601,6 +601,7 @@ class NotificationPrefsOut(BaseModel):
     telegram_name: str | None
     notify_low: bool
     notify_expiry: bool
+    notify_expired: bool
     expiry_days: int
 
 
@@ -609,6 +610,7 @@ class NotificationPrefsIn(BaseModel):
     telegram_enabled: bool | None = None
     notify_low: bool | None = None
     notify_expiry: bool | None = None
+    notify_expired: bool | None = None
     expiry_days: int | None = Field(default=None, ge=1, le=180)
 
     @model_validator(mode="after")

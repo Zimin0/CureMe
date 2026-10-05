@@ -106,7 +106,7 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
         if prefs.notify_low and med.min_quantity is not None and stock.total <= med.min_quantity:
             left = "закончилось" if stock.total <= 0 else f"осталось {_fmt_qty(stock.total)} {med.unit}"
             out.append(Reason("low", med.id, f"{med.name}{where}: {left}", (2, med.name)))
-        if not prefs.notify_expiry:
+        if not (prefs.notify_expiry or prefs.notify_expired):
             continue
         for p in med.packages:
             if p.quantity <= 0 or not p.expiry_date or (not debug and _is_fresh(p, now)):
@@ -114,8 +114,9 @@ def reasons_for(db: Session, user: User, prefs: NotificationPrefs, today: date,
             d = (p.expiry_date - today).days
             until = p.expiry_date.strftime("%d.%m.%Y")
             if d < 0:
-                out.append(Reason("expired", p.id, f"{med.name}{where}: срок истёк {until}", (0, p.expiry_date, med.name)))
-            elif d <= prefs.expiry_days:
+                if prefs.notify_expired:
+                    out.append(Reason("expired", p.id, f"{med.name}{where}: срок истёк {until}", (0, p.expiry_date, med.name)))
+            elif prefs.notify_expiry and d <= prefs.expiry_days:
                 when = "сегодня последний день" if d == 0 else f"годен до {until}, осталось {_days(d)}"
                 out.append(Reason("expiring", p.id, f"{med.name}{where}: {when}", (1, p.expiry_date, med.name)))
     return out
