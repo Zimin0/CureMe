@@ -689,8 +689,10 @@ body.plus-theme .side-plus-card { background: linear-gradient(135deg, #8b6be0, #
 .intake-tabs a { display: grid; place-items: center; height: 38px; border-radius: 11px; font-weight: 700; color: var(--muted); text-decoration: none; }
 .intake-tabs a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
 
-.seller-info > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
-.seller-info > summary::-webkit-details-marker { display: none; }
-.seller-info > summary::after { content: '▾'; margin-left: auto; color: var(--muted); }
-.seller-info[open] > summary::after { content: '▴'; }
-.seller-info > summary h2 { font-size: 15px; font-weight: 600; margin: 0; color: var(--muted); }
+.collapse { padding: 0; }
+.collapse > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 0 18px; }
+.collapse > summary::-webkit-details-marker { display: none; }
+.collapse > summary::after { content: '▾'; margin-left: auto; color: var(--muted); }
+.collapse[open] > summary::after { content: '▴'; }
+.collapse > summary h2 { font-size: 15px; font-weight: 600; margin: 0; line-height: 1.3; color: var(--muted); }
+.collapse-body { padding: 0 18px 18px; }
