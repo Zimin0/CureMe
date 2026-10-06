@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
-  Bell, CalendarClock, Check, FileText, History, Layers, Pill, ScanLine, Search, ShieldCheck, Sparkles, Users,
+  Bell, Boxes, CalendarClock, MapPin, Check, FileText, History, Layers, Pill, ScanLine, Search, ShieldCheck, Sparkles, Users,
 } from 'lucide-react'
 import { api } from '../api'
 import { LegalLinks } from './Legal'
@@ -12,6 +12,7 @@ const FEATURES = [
   { icon: ScanLine, title: 'Добавление сканом', text: 'Наведите камеру на код упаковки: название, срок годности и серия подставятся сами.' },
   { icon: Pill, title: 'Сроки годности', text: 'Видно, что скоро испортится, а что уже пора выбросить. Остатки считаются по таблеткам.' },
   { icon: Users, title: 'Вся семья в одной аптечке', text: 'Родные видят общую аптечку со своих телефонов. У каждого свои избранные лекарства.' },
+  { icon: Boxes, title: 'Несколько пачек одного лекарства', text: 'Та же упаковка добавляется в карточку, другая заводится отдельной. Остаток считается по всем пачкам.' },
   { icon: Search, title: 'Что есть дома от…', text: 'Введите, что беспокоит, и посмотрите, что из ваших лекарств указано в инструкции для такого случая.' },
 ] as const
 
@@ -30,6 +31,8 @@ const PLUS = [
   { icon: History, title: 'Вся история приёма', text: 'Кто и что принимал, без ограничения в 30 дней.' },
   { icon: FileText, title: 'Файл для врача', text: 'Список лекарств и история в PDF и Excel, чтобы показать на приёме.' },
   { icon: Layers, title: 'Несколько аптечек', text: 'Дача, машина, бабушка: у каждой своя аптечка.' },
+  { icon: Search, title: 'Поиск по всем аптечкам', text: 'Ищите лекарство и подбирайте «что есть дома от…» сразу во всех аптечках семьи.' },
+  { icon: MapPin, title: 'Где лежит лекарство', text: 'Схема полок и контейнеров: отметьте, где лежит каждое лекарство.' },
   { icon: Sparkles, title: 'Без ограничений бесплатного тарифа', text: 'Больше участников и лекарств в аптечке.' },
 ]
 
