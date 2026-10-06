@@ -52,7 +52,8 @@ describe('публичная страница /plus для гостей', () => 
     expect(screen.getByText(/Кнопка «Отключить автопродление»/)).toBeInTheDocument()
     expect(screen.getByText(/неиспользованный оставшийся период/)).toBeInTheDocument()
     expect(screen.getByText(/с момента возврата Плюс прекращается для всей семьи/)).toBeInTheDocument()  // R15
-    expect(screen.getByText(/ИНН: 470418719903/)).toBeInTheDocument()
+    expect(screen.getByText(/ИНН: 470418719903/)).toBeInTheDocument()  // реквизиты в свёрнутом блоке, текст в разметке
+    expect(screen.getByText('Исполнитель и контакты').closest('details')).not.toHaveAttribute('open')
     expect(screen.getByRole('link', { name: '+7 931 366-12-20' })).toHaveAttribute('href', 'tel:+79313661220')  // показ включён флагом SHOW_SELLER_ID
     expect(screen.getByText(/Зименков Никита Вячеславович/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'публичная оферта' })).toHaveAttribute('href', '/offer')

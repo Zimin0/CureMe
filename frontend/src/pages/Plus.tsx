@@ -160,9 +160,10 @@ export function PlusPublic() {
       </section>
 
       <PayTerms />
-      <SellerInfo />
 
       <Link to="/register" className="btn primary block">Попробовать бесплатно</Link>
+
+      <SellerInfo />
     </div>
   )
 }
