@@ -44,22 +44,14 @@ export function Layout() {
             <Icon size={20} />{label}
           </NavLink>
         ))}
-        {!showUpsell && (
-          <NavLink to="/plus" className="side-link"><Sparkles size={20} />Плюс</NavLink>
-        )}
         {me?.is_admin && (
           <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
         )}
         <div className="spacer" />
-        {showUpsell && (
-          <NavLink to="/plus" className="btn primary side-plus"><Sparkles size={18} />Подключить Плюс</NavLink>
-        )}
-        {me?.plus_active && plan?.plus_active && (
-          <NavLink to="/plus" className="side-plus-card">
-            <b><Sparkles size={16} /> Капсулка Плюс</b>
-            <span>{planLabel(plan)}</span>
-          </NavLink>
-        )}
+        <NavLink to="/plus" className="side-plus-card">
+          <b><Sparkles size={16} /> Капсулка Плюс</b>
+          <span>{me?.plus_active && plan?.plus_active ? planLabel(plan) : showUpsell ? 'Подключить' : 'Что входит'}</span>
+        </NavLink>
         {me && me.families.length > 1 && (
           <label className="family-switch small">
             <span className="muted">Аптечка семьи</span>
