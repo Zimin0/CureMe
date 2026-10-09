@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from . import reminders, seo
 from .config import get_settings
 from .db import SessionLocal
-from .routers import admin, assist, auth, categories, families, files, intakes, medicines, notifications, payments, reports, schedule, schedule_notify
+from .routers import admin, assist, auth, categories, families, files, illness, intakes, medicines, notifications, payments, reports, schedule, schedule_notify
 from .version import app_version
 
 settings = get_settings()
@@ -76,7 +76,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for r in (auth, families, categories, medicines, intakes, assist, files, reports, admin, notifications, payments, schedule, schedule_notify):
+for r in (auth, families, categories, medicines, intakes, illness, assist, files, reports, admin, notifications, payments, schedule, schedule_notify):
     app.include_router(r.router)
 app.include_router(schedule_notify.public)
 

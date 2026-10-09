@@ -24,7 +24,8 @@ const BOTTOM = [
 ]
 
 export function Layout() {
-  const onHistory = useLocation().pathname.startsWith('/history')
+  const path = useLocation().pathname
+  const onHistory = path.startsWith('/history') || path.startsWith('/illness')
   const { me, familyId, setFamilyId, signOut } = useAuth()
   const { plan } = usePlan()
   // Пока тариф не загрузился, остаётся зелёный по умолчанию: иначе при выключенном сиреневом виде цвет мигает.

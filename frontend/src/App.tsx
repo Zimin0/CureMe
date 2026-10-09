@@ -13,6 +13,7 @@ import { AdminPayments } from './pages/AdminPayments'
 import { Family } from './pages/Family'
 import { Find } from './pages/Find'
 import { History } from './pages/History'
+import { IllnessHistory } from './pages/Illness'
 import { Home } from './pages/Home'
 import { MedicineDetail } from './pages/MedicineDetail'
 import { MedicineForm } from './pages/MedicineForm'
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="find" element={<Find />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="history" element={<History />} />
+        <Route path="illness" element={<IllnessHistory />} />
         <Route path="family" element={<Family />} />
         <Route path="plus" element={<Plus />} />
         <Route path="export" element={<Export />} />
