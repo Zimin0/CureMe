@@ -345,6 +345,41 @@ class Intake(Base):
     user: Mapped[User] = relationship()
 
 
+class IllnessRecord(Base):
+    """Запись в истории болезней: период (один день или несколько), комментарий и фото документов.
+
+    Личные данные человека, не семьи: видит и меняет только автор, другим членам семьи запись не показывается.
+    Это сведения о здоровье (специальная категория ПД, ст. 10 152-ФЗ).
+    """
+
+    __tablename__ = "illness_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    date_from: Mapped[date] = mapped_column(Date, index=True)
+    date_to: Mapped[date] = mapped_column(Date)  # равна date_from, если болезнь отмечена одним днём
+    comment: Mapped[str] = mapped_column(Text, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    documents: Mapped[list["IllnessDocument"]] = relationship(
+        back_populates="record", cascade="all, delete-orphan", order_by="IllnessDocument.id")
+
+
+class IllnessDocument(Base):
+    """Фото документа к записи о болезни. Файл лежит в media/illness под случайным именем и отдаётся только автору."""
+
+    __tablename__ = "illness_documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    record_id: Mapped[int] = mapped_column(ForeignKey("illness_records.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    record: Mapped[IllnessRecord] = relationship(back_populates="documents")
+
+
 class Schedule(Base):
     """Назначенный приём: лекарство, доза и повторение. Личное расписание человека, другие его не видят.
 

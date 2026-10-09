@@ -910,3 +910,47 @@ class AdminPaymentOut(PaymentBrief):
 class ReceiptIn(BaseModel):
     url: str = Field(min_length=10, max_length=500, pattern=r"^https://\S+$")
     send_email: bool = True
+
+
+# --- история болезней (личные записи человека) ---
+ILLNESS_COMMENT_MAX = 5000
+
+
+class IllnessIn(BaseModel):
+    title: str = Field(default="", max_length=200)
+    date_from: date
+    date_to: date | None = None  # пусто — болезнь отмечена одним днём
+    comment: str = Field(default="", max_length=ILLNESS_COMMENT_MAX)
+
+    @field_validator("title", "comment")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+
+class IllnessUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    date_from: date | None = None
+    date_to: date | None = None
+    comment: str | None = Field(default=None, max_length=ILLNESS_COMMENT_MAX)
+
+    @field_validator("title", "comment")
+    @classmethod
+    def _strip(cls, v: str | None) -> str | None:
+        return v.strip() if v is not None else v
+
+
+class IllnessDocumentOut(BaseModel):
+    id: int
+    url: str  # адрес требует вход: открывать через fetch с токеном
+
+
+class IllnessOut(BaseModel):
+    id: int
+    title: str
+    date_from: date
+    date_to: date
+    comment: str
+    documents: list[IllnessDocumentOut]
+    created_at: datetime
+    updated_at: datetime
