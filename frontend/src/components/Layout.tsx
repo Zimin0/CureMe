@@ -4,7 +4,6 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { planLabel, usePlan } from '../plan'
 import { cabinetLabel, FrozenNotice, PlusEndingBanner } from './PlusEnding'
-import { TermsNotice } from './TermsNotice'
 
 // short — подпись в нижней панели на телефоне, если полная не помещается.
 const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?: boolean }[] = [
@@ -70,7 +69,6 @@ export function Layout() {
       </aside>
 
       <main className="main">
-        <TermsNotice />
         {me?.owner_transfer_waiting && (
           <div className="alert info" role="status" style={{ marginBottom: 14 }}>
             <div className="grow">Вам нужно ответить на предложение о владении семьёй. <Link to="/family">Открыть «Семья»</Link></div>
