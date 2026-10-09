@@ -4,7 +4,6 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { planLabel, usePlan } from '../plan'
 import { cabinetLabel, FrozenNotice, PlusEndingBanner } from './PlusEnding'
-import { TermsNotice } from './TermsNotice'
 
 // short — подпись в нижней панели на телефоне, если полная не помещается.
 const LINKS: { to: string; label: string; short?: string; icon: LucideIcon; end?: boolean }[] = [
@@ -44,22 +43,14 @@ export function Layout() {
             <Icon size={20} />{label}
           </NavLink>
         ))}
-        {!showUpsell && (
-          <NavLink to="/plus" className="side-link"><Sparkles size={20} />Плюс</NavLink>
-        )}
         {me?.is_admin && (
           <NavLink to="/admin" className="side-link"><Shield size={20} />Админка</NavLink>
         )}
         <div className="spacer" />
-        {showUpsell && (
-          <NavLink to="/plus" className="btn primary side-plus"><Sparkles size={18} />Подключить Плюс</NavLink>
-        )}
-        {me?.plus_active && plan?.plus_active && (
-          <NavLink to="/plus" className="side-plus-card">
-            <b><Sparkles size={16} /> Капсулка Плюс</b>
-            <span>{planLabel(plan)}</span>
-          </NavLink>
-        )}
+        <NavLink to="/plus" className="side-plus-card">
+          <b><Sparkles size={16} /> Капсулка Плюс</b>
+          <span>{me?.plus_active && plan?.plus_active ? planLabel(plan) : showUpsell ? 'Подключить' : 'Что входит'}</span>
+        </NavLink>
         {me && me.families.length > 1 && (
           <label className="family-switch small">
             <span className="muted">Аптечка семьи</span>
@@ -78,7 +69,6 @@ export function Layout() {
       </aside>
 
       <main className="main">
-        <TermsNotice />
         {me?.owner_transfer_waiting && (
           <div className="alert info" role="status" style={{ marginBottom: 14 }}>
             <div className="grow">Вам нужно ответить на предложение о владении семьёй. <Link to="/family">Открыть «Семья»</Link></div>
