@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,6 +65,9 @@ SECURITY_HEADERS = {
 }
 
 
+SHELL_FILES = {"/sw.js", "/registerSW.js", "/manifest.webmanifest", "/index.html"}
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -71,6 +75,13 @@ async def security_headers(request: Request, call_next):
         response.headers.setdefault(k, v)
     if not request.url.path.startswith(("/docs", "/redoc")):  # Swagger UI грузит скрипты с CDN
         response.headers.setdefault("Content-Security-Policy", CSP)
+    path = request.url.path
+    if path.startswith("/assets/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")  # имена файлов с хешем: не меняются
+    elif not path.startswith(("/api/", "/ocr/")) and (path in SHELL_FILES or not Path(path).suffix):
+        # Оболочка приложения: страница и service worker всегда проверяются на сервере, иначе браузер
+        # (или прокси) покажет старую версию после выката.
+        response.headers.setdefault("Cache-Control", "no-cache")
     if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/media/"):
         response.headers.setdefault("Cache-Control", "no-store")  # ответы API с данными семьи не кешируем
     return response

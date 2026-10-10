@@ -148,6 +148,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["version.py"],
         "tests": ["integration/test_version.py"],
     },
+    "Кеш оболочки приложения (заголовки Cache-Control)": {
+        "sources": [],
+        "tests": ["integration/test_cache_headers.py"],
+    },
     # Модули, на которых держится всё приложение: их правка запускает весь бэкенд.
     "Ядро": {
         "sources": ["main.py", "config.py", "deps.py", "schemas.py", "seed.py", "__init__.py", "routers/__init__.py"],
