@@ -714,7 +714,6 @@ body.plus-theme .side-plus-card { background: linear-gradient(135deg, #8b6be0, #
 .ill-add:hover { border-color: var(--primary); color: var(--primary-strong); }
 .ill-record { padding: 14px 0; border-top: 1px solid var(--border); }
 .ill-record:first-child { border-top: 0; padding-top: 0; }
-.ill-record.near { background: var(--primary-soft); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 12px; }
 .ill-title { color: var(--muted); }
 .ill-comment { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
