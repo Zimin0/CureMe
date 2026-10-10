@@ -85,6 +85,10 @@ FEATURES: dict[str, tuple[str, str]] = {
         "Где лежит лекарство",
         "Схема полок и контейнеров аптечки и отметка на ней, где лежит каждое лекарство. Бесплатно уже сделанное можно смотреть и убирать.",
     ),
+    "illness": (
+        "История болезней",
+        "Новые записи с датами, комментарием и фото справок. Бесплатно уже созданные записи можно смотреть, править и удалять.",
+    ),
     "no_limits": (
         "Без лимитов",
         "Сколько угодно участников и лекарств. Бесплатно — до 4 участников и 60 лекарств.",
@@ -237,6 +241,14 @@ def require_plus(db: Session, family: Family, feature: str) -> None:
     if feature not in FEATURES:
         raise ValueError(f"Неизвестная функция Плюса: {feature}")
     if not has_plus(db, family):
+        raise plus_required(feature)
+
+
+def require_house_plus(db: Session, house: Household | None, feature: str) -> None:
+    """То же, что require_plus, но по семье человека: для личных функций, не привязанных к аптечке (история болезней)."""
+    if feature not in FEATURES:
+        raise ValueError(f"Неизвестная функция Плюса: {feature}")
+    if not house_has_plus(db, house):
         raise plus_required(feature)
 
 

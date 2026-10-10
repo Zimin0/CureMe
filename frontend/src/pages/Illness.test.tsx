@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Illness } from '../api'
 import { dayKey } from '../illness'
-import { server } from '../test/server'
+import { planFixture, server } from '../test/server'
 import { renderApp } from '../test/utils'
 
 const now = new Date()
@@ -75,7 +75,7 @@ it('список: записи и кнопка «Записать» сверху
   expect(within(list).getByText('ОРВИ')).toBeInTheDocument()
   expect(within(list).getByText('температура')).toBeInTheDocument()
   expect(screen.queryByRole('grid')).toBeNull()  // календаря на списке нет
-  expect(screen.getByRole('link', { name: /Записать/ })).toHaveAttribute('href', '/illness/new')
+  expect(screen.getByRole('button', { name: /Записать/ })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Изменить запись' })).toHaveAttribute('href', '/illness/1/edit')
   await user.click(screen.getByRole('button', { name: 'Удалить запись' }))
   await waitFor(() => expect(removed).toBe(1))
@@ -85,7 +85,7 @@ it('пустой список зовёт нажать «Записать», кн
   server.use(http.get('/api/illnesses', () => HttpResponse.json([])))
   const { user } = renderApp('/illness')
   expect(await screen.findByText('Пока пусто')).toBeInTheDocument()
-  await user.click(screen.getAllByRole('link', { name: /Записать/ })[0])
+  await user.click(screen.getAllByRole('button', { name: /Записать/ })[0])
   expect(await screen.findByRole('heading', { name: 'Записать болезнь' })).toBeInTheDocument()
   expect(screen.getByTestId('location').textContent).toBe('/illness/new')
 })
@@ -165,4 +165,25 @@ it('выбранные фото отправляются вместе с зап�
   await user.click(screen.getByRole('button', { name: 'Сохранить запись' }))
   expect(await screen.findByText('Запись сохранена')).toBeInTheDocument()
   expect(uploaded).toEqual(['document'])
+})
+
+it('без Плюса «Записать» открывает шторку Плюса, а прямая ссылка на форму закрыта плашкой; список остаётся', async () => {
+  server.use(
+    http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false }))),
+    http.get('/api/illnesses', () => HttpResponse.json([record()])),
+  )
+  const { user } = renderApp('/illness')
+  expect(await screen.findByText('температура')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Записать' }))
+  expect(await screen.findByText('Доступно в Капсулке Плюс')).toBeInTheDocument()
+})
+
+it('без Плюса страница новой записи показывает плашку вместо формы', async () => {
+  server.use(
+    http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false }))),
+    http.get('/api/illnesses', () => HttpResponse.json([])),
+  )
+  renderApp('/illness/new')
+  expect(await screen.findByTestId('illness-locked')).toBeInTheDocument()
+  expect(screen.queryByRole('grid')).not.toBeInTheDocument()
 })
