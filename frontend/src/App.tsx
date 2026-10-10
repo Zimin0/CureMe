@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api'
@@ -25,6 +25,7 @@ import { Schedule } from './pages/Schedule'
 import { NoFamily } from './pages/NoFamily'
 import { Plus, PlusPublic } from './pages/Plus'
 import { Landing } from './pages/Landing'
+import { safeNext } from './redirect'
 import { versionLabel } from './version'
 
 function Protected() {
@@ -39,6 +40,13 @@ function Protected() {
   if (me.verification_needed) return <VerifyGate />
   if (!familyId) return <NoFamily />
   return <Layout />
+}
+
+/** Уже вошедшего с /login ведём туда, куда он шёл (?next=). React Router 7 откладывает переход из обработчика входа, и без этого
+ *  защита маршрута успевала увести человека на «/». */
+function LoggedInRedirect() {
+  const [params] = useSearchParams()
+  return <Navigate to={safeNext(params.get('next'))} replace />
 }
 
 /** Режим отладки (включается в админке): версия приложения вверху любой страницы. */
@@ -60,7 +68,7 @@ export default function App() {
     <>
     <DebugBar />
     <Routes>
-      <Route path="/login" element={me ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/login" element={me ? <LoggedInRedirect /> : <Login />} />
       <Route path="/reset-password" element={me ? <Navigate to="/" replace /> : <ResetPassword />} />
       <Route path="/register" element={me ? <Navigate to="/" replace /> : <Register />} />
       <Route path="/join/:code" element={<Join />} />
