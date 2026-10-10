@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Paperclip, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, Illness } from '../api'
-import { AuthImage } from '../components/AuthImage'
+import { AttachmentViewer } from '../components/AttachmentViewer'
 import { IntakeTabs } from '../components/IntakeTabs'
-import { Empty, PageLoader, Sheet, useToast } from '../components/ui'
+import { Empty, PageLoader, useToast } from '../components/ui'
 import { periodLabel } from '../illness'
 
 /** Личная история болезней: список записей, новые сверху. Записать новую и править старую — на странице формы. Видна только автору. */
@@ -13,7 +13,7 @@ export function IllnessHistory() {
   const qc = useQueryClient()
   const toast = useToast()
   const list = useQuery({ queryKey: ['illnesses'], queryFn: () => api<Illness[]>('/illnesses') })
-  const [open, setOpen] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<Illness | null>(null)
   const records = list.data ?? []
 
   const remove = useMutation({
@@ -51,24 +51,16 @@ export function IllnessHistory() {
               </div>
               {r.comment && <p className="ill-comment">{r.comment}</p>}
               {r.documents.length > 0 && (
-                <div className="ill-photos">
-                  {r.documents.map(d => (
-                    <div className="ill-thumb" key={d.id}>
-                      <button type="button" onClick={() => setOpen(d.url)} aria-label="Открыть фото"><AuthImage url={d.url} alt="Фото документа" /></button>
-                    </div>
-                  ))}
-                </div>
+                <button type="button" className="badge ok ill-attach" onClick={() => setViewing(r)}>
+                  <Paperclip size={13} />Есть вложения ({r.documents.length})
+                </button>
               )}
             </article>
           ))}
         </section>
       )}
 
-      {open && (
-        <Sheet title="Фото документа" onClose={() => setOpen(null)}>
-          <AuthImage className="photo-full" url={open} alt="Фото документа" />
-        </Sheet>
-      )}
+      {viewing && <AttachmentViewer docs={viewing.documents} onClose={() => setViewing(null)} />}
     </div>
   )
 }
