@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, expect, it } from 'vitest'
 import type { MedicineDetail } from '../api'
@@ -69,7 +69,7 @@ it('то же название и дозировка: спрашиваем пр�
   const { user } = renderApp('/medicines/new')
   await fillNew(user, 'миг 400', '400мг')
   await user.click(await screen.findByRole('button', { name: /Такая же упаковка: добавить пачку/ }))
-  expect(await screen.findByTestId('location')).toHaveTextContent('/medicines/5')
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/medicines/5'))
   expect(added).toMatchObject({ quantity: 1 })
 })
 
@@ -86,7 +86,7 @@ it('«Нет, другая упаковка» заводит отдельную 
   const { user } = renderApp('/medicines/new')
   await fillNew(user, 'МИГ 400', '400 мг')
   await user.click(await screen.findByRole('button', { name: /Нет, другая упаковка/ }))
-  expect(await screen.findByTestId('location')).toHaveTextContent('/medicines/9')
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/medicines/9'))
   expect(created).toMatchObject({ name: 'МИГ 400' })
 })
 
@@ -98,6 +98,6 @@ it('другая дозировка: вопроса нет, сразу нова�
   )
   const { user } = renderApp('/medicines/new')
   await fillNew(user, 'МИГ 400', '200 мг')
-  expect(await screen.findByTestId('location')).toHaveTextContent('/medicines/9')
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/medicines/9'))
   expect(screen.queryByText('Такая упаковка уже есть?')).not.toBeInTheDocument()
 })
