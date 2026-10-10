@@ -6,6 +6,7 @@ import { api, ApiError, Illness, uploadDocument } from '../api'
 import { AuthImage } from '../components/AuthImage'
 import { IllnessCalendar, Period } from '../components/IllnessCalendar'
 import { PageLoader, Sheet, useToast } from '../components/ui'
+import { PlusBanner, usePlan } from '../plan'
 import { compressImage } from '../image'
 import { daysIn, dayKey, parseDay, periodLabel } from '../illness'
 
@@ -19,6 +20,7 @@ export function IllnessForm() {
   const nav = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
+  const { available } = usePlan()
   const list = useQuery({ queryKey: ['illnesses'], queryFn: () => api<Illness[]>('/illnesses') })
   const records = list.data ?? []
   const editing = editingId ? records.find(r => r.id === editingId) ?? null : null
@@ -92,6 +94,16 @@ export function IllnessForm() {
     setPeriod(next)
   }
 
+  if (!editingId && !available('illness')) {
+    return (
+      <div className="page">
+        <PlusBanner testId="illness-locked" title="Новые записи — в Капсулке Плюс"
+          text="Уже созданные записи останутся: их можно смотреть, править и удалять. Чтобы записывать новые болезни и прикреплять фото справок, подключите Плюс."
+          cta="Что даёт Плюс" to="/plus" />
+        <Link className="btn" to="/illness">К списку</Link>
+      </div>
+    )
+  }
   if (editingId && list.isLoading) return <PageLoader />
   if (editingId && !editing) {
     return (

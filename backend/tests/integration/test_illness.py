@@ -137,3 +137,18 @@ def test_delete_account_removes_records_and_files(client):
     r = client.request("DELETE", "/api/auth/me", headers=h, json={"password": "kapsula-secret-123"})
     assert r.status_code == 204, r.text
     assert not list((get_settings().media_dir / "illness").glob("*"))
+
+
+def test_new_records_and_photos_are_plus_only_when_billing_on(client, me):
+    from tests.integration.test_cabinet_ops import enable_billing
+
+    rec = make(client, me, title="ОРВИ")
+    enable_billing(client, me)
+    r = client.post("/api/illnesses", headers=me, json={"date_from": "2026-10-02"})
+    assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "illness"
+    r = upload(client, me, rec["id"])
+    assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "illness"
+    # уже созданное остаётся: смотреть, править и удалять можно и без Плюса
+    assert [x["id"] for x in client.get("/api/illnesses", headers=me).json()] == [rec["id"]]
+    assert client.patch(f"/api/illnesses/{rec['id']}", headers=me, json={"comment": "лучше"}).status_code == 200
+    assert client.delete(f"/api/illnesses/{rec['id']}", headers=me).status_code == 204
