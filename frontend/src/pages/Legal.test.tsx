@@ -84,6 +84,11 @@ describe('юридические страницы', () => {
     expect(await screen.findByText(/в общий справочник Сервиса не попадают/)).toBeInTheDocument()
   })
 
+  it('Политика п. 1.2: номер уведомления в реестре операторов Роскомнадзора', async () => {
+    renderApp('/privacy', { loggedIn: false })
+    expect(await screen.findByText(/уведомление внесено в реестр операторов, номер уведомления 100445559/)).toBeInTheDocument()
+  })
+
   it('Соглашение п. 6.8: передача владения только с согласием, исключение для администрации', async () => {
     renderApp('/terms', { loggedIn: false })
     expect(await screen.findByText(/Владение передаётся только с согласия принимающего человека/)).toBeInTheDocument()
