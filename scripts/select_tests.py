@@ -146,7 +146,7 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "Версия приложения": {
         "sources": ["version.py"],
-        "tests": ["integration/test_version.py"],
+        "tests": ["integration/test_version.py", "integration/test_cache_headers.py"],
     },
     # Модули, на которых держится всё приложение: их правка запускает весь бэкенд.
     "Ядро": {
