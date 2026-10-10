@@ -714,6 +714,16 @@ body.plus-theme .side-plus-card { background: linear-gradient(135deg, #8b6be0, #
 .ill-add:hover { border-color: var(--primary); color: var(--primary-strong); }
 .ill-record { padding: 14px 0; border-top: 1px solid var(--border); }
 .ill-record:first-child { border-top: 0; padding-top: 0; }
+.ill-record:last-child { padding-bottom: 0; }
+.ill-attach { margin-top: 4px; border: 0; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; gap: 5px; }
+.att-wrap { position: relative; }
+.att-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.att-track::-webkit-scrollbar { display: none; }
+.att-slide { flex: 0 0 100%; scroll-snap-align: center; display: grid; place-items: center; min-width: 0; }
+.att-nav { position: absolute; top: 50%; transform: translateY(-50%); background: var(--surface); box-shadow: var(--shadow-sm); }
+.att-nav.prev { left: 6px; }
+.att-nav.next { right: 6px; }
+.att-nav:disabled { opacity: .35; }
 .ill-title { color: var(--muted); }
 .ill-comment { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 

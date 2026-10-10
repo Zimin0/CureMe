@@ -115,18 +115,27 @@ it('правка несуществующей записи показывает 
   expect(await screen.findByText(/Запись не найдена/)).toBeInTheDocument()
 })
 
-it('фото документа грузится с токеном и открывается крупно', async () => {
+it('вместо фото зелёная плашка «Есть вложения (N)»; просмотр листается и грузит фото с токеном', async () => {
   const auth: (string | null)[] = []
+  const photo = ({ request }: { request: Request }) => { auth.push(request.headers.get('Authorization')); return new HttpResponse(new Blob(['x'], { type: 'image/jpeg' }), { headers: { 'Content-Type': 'image/jpeg' } }) }
   server.use(
-    http.get('/api/illnesses', () => HttpResponse.json([record({ documents: [{ id: 9, url: '/api/illnesses/1/documents/9' }] })])),
-    http.get('/api/illnesses/1/documents/9', ({ request }) => { auth.push(request.headers.get('Authorization')); return new HttpResponse(new Blob(['x'], { type: 'image/jpeg' }), { headers: { 'Content-Type': 'image/jpeg' } }) }),
+    http.get('/api/illnesses', () => HttpResponse.json([record({ documents: [{ id: 9, url: '/api/illnesses/1/documents/9' }, { id: 10, url: '/api/illnesses/1/documents/10' }] })])),
+    http.get('/api/illnesses/1/documents/:doc', photo),
   )
   URL.createObjectURL = vi.fn(() => 'blob:doc')
   URL.revokeObjectURL = vi.fn()
   const { user } = renderApp('/illness')
-  await user.click(await screen.findByRole('button', { name: 'Открыть фото' }))
-  expect(await screen.findByRole('dialog')).toBeInTheDocument()
-  expect(auth[0]).toBe('Bearer test-token')
+  const badge = await screen.findByRole('button', { name: /Есть вложения \(2\)/ })
+  expect(badge.className).toContain('ok')
+  expect(screen.queryByAltText(/Фото документа/)).toBeNull()  // миниатюр в списке нет
+  await user.click(badge)
+  const dialog = await screen.findByRole('dialog', { name: 'Вложения (1 из 2)' })
+  expect(within(dialog).getByRole('button', { name: 'Предыдущее фото' })).toBeDisabled()
+  await user.click(within(dialog).getByRole('button', { name: 'Следующее фото' }))
+  expect(await screen.findByRole('dialog', { name: 'Вложения (2 из 2)' })).toBeInTheDocument()
+  await user.keyboard('{ArrowLeft}')
+  expect(await screen.findByRole('dialog', { name: 'Вложения (1 из 2)' })).toBeInTheDocument()
+  await waitFor(() => expect(auth[0]).toBe('Bearer test-token'))
 })
 
 it('на странице есть вкладки приёма', async () => {
