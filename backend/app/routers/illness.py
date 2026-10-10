@@ -16,6 +16,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import IllnessDocument, IllnessRecord, User
+from ..plans import require_house_plus
 from ..schemas import IllnessDocumentOut, IllnessIn, IllnessOut, IllnessUpdate
 from .files import SIGNATURES, media_dir
 
@@ -80,6 +81,7 @@ def list_records(user: User = Depends(current_user), db: Session = Depends(get_d
 
 @router.post("", response_model=IllnessOut, status_code=201)
 def create_record(body: IllnessIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    require_house_plus(db, user.household, "illness")  # новые записи платные; уже созданные у бесплатных остаются
     end = body.date_to or body.date_from
     _check_period(body.date_from, end)
     count = db.scalar(select(func.count()).select_from(IllnessRecord).where(IllnessRecord.user_id == user.id)) or 0
@@ -128,6 +130,7 @@ async def add_document(
     record_id: int, file: UploadFile = File(...),
     user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
+    require_house_plus(db, user.household, "illness")  # новые фото тоже платные
     rec = _get(db, user, record_id)
     if len(rec.documents) >= MAX_DOCUMENTS:
         raise HTTPException(409, f"Не больше {MAX_DOCUMENTS} фото в одной записи")

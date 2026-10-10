@@ -1,17 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Paperclip, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, Illness } from '../api'
 import { AttachmentViewer } from '../components/AttachmentViewer'
 import { IntakeTabs } from '../components/IntakeTabs'
 import { Empty, PageLoader, useToast } from '../components/ui'
 import { periodLabel } from '../illness'
+import { usePlan, useRequirePlus } from '../plan'
 
 /** Личная история болезней: список записей, новые сверху. Записать новую и править старую — на странице формы. Видна только автору. */
 export function IllnessHistory() {
   const qc = useQueryClient()
   const toast = useToast()
+  const nav = useNavigate()
+  const { available } = usePlan()
+  const locked = !available('illness')
+  const requirePlus = useRequirePlus()
   const list = useQuery({ queryKey: ['illnesses'], queryFn: () => api<Illness[]>('/illnesses') })
   const [viewing, setViewing] = useState<Illness | null>(null)
   const records = list.data ?? []
@@ -21,6 +26,10 @@ export function IllnessHistory() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['illnesses'] }); toast('Запись удалена') },
   })
 
+  // Новые записи платные: без Плюса кнопка открывает шторку, а уже созданное можно смотреть, править и удалять.
+  const write = () => requirePlus('illness', () => nav('/illness/new'))
+  const writeBtn = <button className={`btn ${locked ? 'plus-cta' : 'primary'}`} onClick={write}><Plus size={18} />Записать</button>
+
   return (
     <div className="page">
       <IntakeTabs />
@@ -29,13 +38,13 @@ export function IllnessHistory() {
           <h1>История болезней</h1>
           <p className="sub">Когда болели, что делали и фото справок. Записи личные: их видите только вы, даже члены семьи их не увидят.</p>
         </div>
-        <Link className="btn primary" to="/illness/new"><Plus size={18} />Записать</Link>
+        {writeBtn}
       </div>
 
       {list.isLoading ? <PageLoader /> : records.length === 0 ? (
         <div className="card">
           <Empty icon="🩺" title="Пока пусто" text="Нажмите «Записать», отметьте дни в календаре и сохраните первую запись."
-            action={<Link className="btn primary" to="/illness/new"><Plus size={18} />Записать</Link>} />
+            action={writeBtn} />
         </div>
       ) : (
         <section className="card" aria-label="Записи">

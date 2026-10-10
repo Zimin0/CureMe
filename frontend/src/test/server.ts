@@ -4,6 +4,7 @@ import type { Plan } from '../api'
 
 const FEATURES: Plan['features'] = [
   { key: 'reminders', title: 'Напоминания в Telegram и на почту', description: 'Напомним, когда лекарство заканчивается.', available: true },
+  { key: 'illness', title: 'История болезней', description: 'Новые записи о болезнях и фото справок.', available: true },
   { key: 'full_history', title: 'Вся история приёма', description: 'Бесплатно видны последние 30 дней.', available: true },
   { key: 'export_pdf', title: 'Экспорт в PDF и Excel для врача', description: 'Файл для врача.', available: true },
   { key: 'cabinets', title: 'Несколько своих аптечек', description: 'Бесплатно — одна своя.', available: true },
