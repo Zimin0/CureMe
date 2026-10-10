@@ -121,6 +121,11 @@ def test_account_endpoints_require_login(client):
     assert client.post("/api/notifications/telegram/link", json={"consent": True}).status_code == 401
     assert client.delete("/api/notifications/telegram").status_code == 401
     assert client.post("/api/notifications/test").status_code == 401
+    assert client.get("/api/illnesses").status_code == 401
+    assert client.post("/api/illnesses", json={"date_from": "2026-10-01"}).status_code == 401
+    assert client.patch("/api/illnesses/1", json={"comment": "X"}).status_code == 401
+    assert client.delete("/api/illnesses/1").status_code == 401
+    assert client.post("/api/illnesses/1/documents", files={"file": ("p.jpg", JPEG, "image/jpeg")}).status_code == 401
     assert client.get("/api/schedule-notifications").status_code == 401
     assert client.put("/api/schedule-notifications", json={"enabled": True}).status_code == 401
     assert client.post("/api/schedule-notifications/trusted", json={"name": "X", "email": "x@example.com", "attest": True}).status_code == 401

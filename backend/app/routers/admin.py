@@ -18,6 +18,7 @@ from ..schemas import (
     CategoryOut, CompressionSettingsIO, FamilyBrief, FamilyIn, HouseholdEventOut, IndicationHintsIn, MemberOut, RoleIn,
 )
 from ..email_verification import mark_verified
+from .illness import drop_user_files as drop_illness_files
 from ..schemas import MIN_ADMIN_PASSWORD
 from ..plans import PLUS, billing_settings, plus_active, set_billing_settings
 from ..security import hash_password
@@ -161,6 +162,7 @@ def delete_user(user_id: int, background: BackgroundTasks, me: User = Depends(ad
     if u.id == me.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя удалить свой собственный аккаунт")
     house, before = u.household, _owner_snapshot(u.household)
+    drop_illness_files(db, u)
     households.delete_account(db, u, admin=True)  # владельцу при других людях владение передаётся самому давнему участнику
     notice = households.support_owner_change(house, before)
     db.delete(u)
