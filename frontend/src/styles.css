@@ -110,9 +110,7 @@ p { margin: 0; }
   padding-bottom: env(safe-area-inset-bottom);
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center;
   padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: saturate(1.4) blur(16px);
-  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  background: var(--surface);
   border-top: 1px solid var(--border);
 }
 .bottom-nav a {
