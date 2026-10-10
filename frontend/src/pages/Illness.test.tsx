@@ -22,8 +22,8 @@ it('клик по дню выбирает один день, протяжка �
     http.get('/api/illnesses', () => HttpResponse.json([])),
     http.post('/api/illnesses', async ({ request }) => { posted.push(await request.json()); return HttpResponse.json(record(), { status: 201 }) }),
   )
-  const { user } = renderApp('/illness')
-  expect(await screen.findByText('Пока пусто')).toBeInTheDocument()
+  const { user } = renderApp('/illness/new')
+  await screen.findByRole('heading', { name: 'Записать болезнь' })
 
   fireEvent.pointerDown(cell(10))
   fireEvent.pointerUp(window)
@@ -52,43 +52,67 @@ it('клик по дню выбирает один день, протяжка �
   await user.click(screen.getByRole('button', { name: 'Сохранить запись' }))
   expect(await screen.findByText('Запись сохранена')).toBeInTheDocument()
   expect(posted).toEqual([{ title: 'Грипп', comment: 'лежали дома', date_from: day(8), date_to: day(12) }])
+  await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/illness'))  // после сохранения — назад к списку
 })
 
 it('без выбранных дат запись не отправляется', async () => {
   server.use(http.get('/api/illnesses', () => HttpResponse.json([])))
-  const { user } = renderApp('/illness')
-  await screen.findByText('Пока пусто')
+  const { user } = renderApp('/illness/new')
+  await screen.findByRole('heading', { name: 'Записать болезнь' })
   await user.click(screen.getByRole('button', { name: 'Сохранить запись' }))
   expect(await screen.findByText('Выберите день или период в календаре')).toBeInTheDocument()
 })
 
-it('записи видны, дни отмечены; правка и удаление', async () => {
-  const patched: unknown[] = []
+it('список: записи и кнопка «Записать» сверху, удаление', async () => {
   let removed = 0
   server.use(
     http.get('/api/illnesses', () => HttpResponse.json([record()])),
-    http.patch('/api/illnesses/1', async ({ request }) => { patched.push(await request.json()); return HttpResponse.json(record({ comment: 'лучше' })) }),
     http.delete('/api/illnesses/1', () => { removed++; return new HttpResponse(null, { status: 204 }) }),
   )
-  window.scrollTo = vi.fn()
   vi.spyOn(window, 'confirm').mockReturnValue(true)
   const { user } = renderApp('/illness')
   const list = await screen.findByRole('region', { name: 'Записи' })
   expect(within(list).getByText('ОРВИ')).toBeInTheDocument()
   expect(within(list).getByText('температура')).toBeInTheDocument()
+  expect(screen.queryByRole('grid')).toBeNull()  // календаря на списке нет
+  expect(screen.getByRole('link', { name: /Записать/ })).toHaveAttribute('href', '/illness/new')
+  expect(screen.getByRole('link', { name: 'Изменить запись' })).toHaveAttribute('href', '/illness/1/edit')
+  await user.click(screen.getByRole('button', { name: 'Удалить запись' }))
+  await waitFor(() => expect(removed).toBe(1))
+})
+
+it('пустой список зовёт нажать «Записать», кнопка открывает форму', async () => {
+  server.use(http.get('/api/illnesses', () => HttpResponse.json([])))
+  const { user } = renderApp('/illness')
+  expect(await screen.findByText('Пока пусто')).toBeInTheDocument()
+  await user.click(screen.getAllByRole('link', { name: /Записать/ })[0])
+  expect(await screen.findByRole('heading', { name: 'Записать болезнь' })).toBeInTheDocument()
+  expect(screen.getByTestId('location').textContent).toBe('/illness/new')
+})
+
+it('правка записи: форма заполнена, дни отмечены, после сохранения возврат к списку', async () => {
+  const patched: unknown[] = []
+  server.use(
+    http.get('/api/illnesses', () => HttpResponse.json([record()])),
+    http.patch('/api/illnesses/1', async ({ request }) => { patched.push(await request.json()); return HttpResponse.json(record({ comment: 'лучше' })) }),
+  )
+  const { user } = renderApp('/illness/1/edit')
+  expect(await screen.findByRole('heading', { name: 'Изменить запись' })).toBeInTheDocument()
+  await waitFor(() => expect(screen.getByLabelText('Название болезни')).toHaveValue('ОРВИ'))
+  expect(screen.getByLabelText('Болезнь по дату')).toHaveValue(day(5))
   expect(cell(4).className).toContain('marked')
   expect(cell(8).className).not.toContain('marked')
-
-  await user.click(screen.getByRole('button', { name: 'Изменить запись' }))
-  expect(screen.getByLabelText('Название болезни')).toHaveValue('ОРВИ')
-  expect(screen.getByLabelText('Болезнь по дату')).toHaveValue(day(5))
   await user.clear(screen.getByLabelText('Комментарий к болезни'))
   await user.type(screen.getByLabelText('Комментарий к болезни'), 'лучше')
   await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }))
   await waitFor(() => expect(patched).toEqual([{ title: 'ОРВИ', comment: 'лучше', date_from: day(3), date_to: day(5) }]))
+  await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/illness'))
+})
 
-  await user.click(screen.getByRole('button', { name: 'Удалить запись' }))
-  await waitFor(() => expect(removed).toBe(1))
+it('правка несуществующей записи показывает сообщение', async () => {
+  server.use(http.get('/api/illnesses', () => HttpResponse.json([])))
+  renderApp('/illness/99/edit')
+  expect(await screen.findByText(/Запись не найдена/)).toBeInTheDocument()
 })
 
 it('фото документа грузится с токеном и открывается крупно', async () => {
@@ -123,8 +147,8 @@ it('выбранные фото отправляются вместе с зап�
   globalThis.createImageBitmap = vi.fn(async () => ({ width: 10, height: 10, close() {} })) as never
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ drawImage() {} })) as never
   HTMLCanvasElement.prototype.toBlob = function (cb: BlobCallback) { cb(new Blob(['x'], { type: 'image/jpeg' })) }
-  const { user } = renderApp('/illness')
-  await screen.findByText('Пока пусто')
+  const { user } = renderApp('/illness/new')
+  await screen.findByRole('heading', { name: 'Записать болезнь' })
   fireEvent.pointerDown(cell(10)); fireEvent.pointerUp(window)
   const input = screen.getByLabelText('Добавить фото документа') as HTMLInputElement
   await user.upload(input, new File(['a'], 'справка.png', { type: 'image/png' }))
