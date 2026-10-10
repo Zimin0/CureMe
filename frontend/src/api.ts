@@ -25,7 +25,7 @@ export interface AdminFamily { id: number; name: string; created_at: string; med
 // --- тарифы: backend/app/plans.py ---
 export type PlanName = 'free' | 'plus'
 /** Функции Плюса. Ключи совпадают с FEATURES на бэкенде. */
-export type PlusFeature = 'reminders' | 'full_history' | 'export_pdf' | 'cabinets' | 'schedule' | 'search_all' | 'shelf_plan' | 'no_limits'
+export type PlusFeature = 'reminders' | 'full_history' | 'export_pdf' | 'cabinets' | 'schedule' | 'search_all' | 'shelf_plan' | 'illness' | 'no_limits'
 export type LimitName = 'members' | 'medicines' | 'own_families' | 'history_days'
 export interface PlanFeature { key: PlusFeature; title: string; description: string; available: boolean }
 export interface Plan {
@@ -166,6 +166,10 @@ export interface SchedulePrefs {
 }
 
 export interface MedicineDetail extends Medicine { packages: Package[] }
+
+/** Запись в истории болезней: личная, видна только автору. Даты — 'YYYY-MM-DD'; date_to равна date_from, если день один. */
+export interface IllnessDocument { id: number; url: string }
+export interface Illness { id: number; title: string; date_from: string; date_to: string; comment: string; documents: IllnessDocument[]; created_at: string; updated_at: string }
 
 /** Запись в истории приёма. Нажатия «Принял» за одну минуту уже сложены в одну запись. */
 export interface Intake {
@@ -312,6 +316,15 @@ export async function uploadFile<T>(path: string, file: Blob, filename = 'photo.
   const form = new FormData()
   form.append('file', file, filename)
   const res = await fetch(`/api${path}`, { method: 'PUT', headers: authHeaders(), body: form })
+  if (!res.ok) return failure(res)
+  return res.json()
+}
+
+/** Загрузка фото документа к записи о болезни (POST, поле file). */
+export async function uploadDocument<T>(path: string, file: Blob, filename = 'document.jpg'): Promise<T> {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await fetch(`/api${path}`, { method: 'POST', headers: authHeaders(), body: form })
   if (!res.ok) return failure(res)
   return res.json()
 }

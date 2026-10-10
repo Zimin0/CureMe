@@ -5,6 +5,8 @@
 export const OPERATOR = {
   name: 'Зименков Никита Вячеславович',
   email: 'kapsulka.ai@yandex.ru',
+  /** Уведомление в реестр операторов Роскомнадзора: подано 2.10.2026, статус «внесено в реестр» на 10.10.2026. Если Роскомнадзор выдаст другой регистрационный номер, замените. */
+  rknNotice: '100445559',
 }
 
 export const SITE = 'kapsulka.ru'
@@ -17,8 +19,8 @@ export const SITE = 'kapsulka.ru'
 export const MAIL_PROVIDER = 'ООО «ЯНДЕКС» (ИНН 7736207543, 119021, г. Москва, ул. Льва Толстого, д. 16)'
 
 /** Редакция документов. Меняется вместе с CONSENT_VERSION в backend/app/legal.py. */
-export const LEGAL_VERSION = '2026-10-02.2'
-export const LEGAL_DATE = '2 октября 2026 г.'
+export const LEGAL_VERSION = '2026-10-09.1'
+export const LEGAL_DATE = '9 октября 2026 г.'
 
 /**
  * Новая редакция Соглашения (семья с общим тарифом, в бесплатной семье до 3 человек) вступает в силу через десять

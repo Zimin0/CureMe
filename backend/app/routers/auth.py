@@ -19,6 +19,7 @@ from ..schemas import (
     PasswordResetRequestIn, RegisterIn, TokenOut, UserUpdate, VerifyEmailIn,
 )
 from ..security import burn_password_check, create_token, hash_password, verify_password
+from .illness import drop_user_files as drop_illness_files
 from ..services import access_settings, debug_enabled, has_access, telegram_active
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -145,6 +146,7 @@ def delete_me(body: DeleteAccountIn, user: User = Depends(signed_in_user), db: S
     limiter.hit(f"delete-me:{user.id}", limit=5, window=900)
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Неверный пароль")
+    drop_illness_files(db, user)
     households.delete_account(db, user)
     db.delete(user)
     db.commit()

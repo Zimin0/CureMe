@@ -16,6 +16,7 @@ export const FEATURE_TITLES: Record<PlusFeature, string> = {
   schedule: 'Расписание приёма',
   search_all: 'Поиск по всем аптечкам',
   shelf_plan: 'Где лежит лекарство',
+  illness: 'История болезней',
   no_limits: 'Без лимитов',
 }
 
