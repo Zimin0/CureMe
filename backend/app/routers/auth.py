@@ -4,7 +4,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import compression, households
-from ..analytics import metrika_counter_id
 from ..db import get_db
 from ..deps import signed_in_user
 from ..email_verification import (
@@ -245,7 +244,6 @@ def access(db: Session = Depends(get_db)):
     billing = billing_settings(db)
     return AccessOut(
         closed=access_settings(db)["closed"], debug=debug_enabled(db), telegram=telegram_active(db),
-        metrika_id=metrika_counter_id(),
         trial_days=billing.trial_days,
         price_month=billing.price_month if billing.enabled else None,
         price_year=billing.price_year if billing.enabled else None,

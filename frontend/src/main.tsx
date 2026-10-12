@@ -7,6 +7,7 @@ import App from './App'
 import { AuthProvider } from './auth'
 import { ToastProvider } from './components/ui'
 import { PlusProvider } from './plan'
+import { sendVisit } from './stats'
 import '@fontsource-variable/manrope'
 import '@fontsource-variable/comfortaa'
 import './styles.css'
@@ -30,6 +31,8 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+sendVisit()
 
 // Service worker сам ставит новую версию и перезагружает страницу (registerType: 'autoUpdate').
 // Без этого вызова вкладка после выката открывала старую версию из кеша ещё один заход.

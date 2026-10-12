@@ -145,7 +145,6 @@ class AccessOut(BaseModel):
     closed: bool
     telegram: bool = False  # Telegram на сайте включён (бот настроен и переключатель в админке)
     debug: bool = False  # режим отладки: показывать версию приложения на каждой странице
-    metrika_id: str | None = None  # номер счётчика Яндекс Метрики; None — аналитики на сайте нет
     # Для приветственной страницы гостей: пробный Плюс и (если задана и платная версия включена) цена.
     trial_days: int = 0
     price_month: int | None = None

@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { MailCheck } from 'lucide-react'
 import { FormEvent, useState } from 'react'
-import { GOALS, track } from '../analytics'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, InviteInfo, Me } from '../api'
 import { CooldownNote, JoinError, useJoinFamily } from '../join'
@@ -157,7 +156,7 @@ function RegisterForm() {
   })
   const m = useMutation({
     mutationFn: () => api<TokenOut>('/auth/register', { body: { ...form, invite_code: form.invite_code.trim() || null, consent: agreed.consent } }),
-    onSuccess: d => { track(GOALS.register); signIn(d.access_token, d.user); nav('/') },
+    onSuccess: d => { signIn(d.access_token, d.user); nav('/') },
   })
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value })
   return (
@@ -303,7 +302,7 @@ export function VerifyGate() {
   })
   const confirm = useMutation({
     mutationFn: () => api('/auth/verify-email', { body: { code } }),
-    onSuccess: () => { track(GOALS.emailConfirmed); refresh() },
+    onSuccess: () => refresh(),
   })
   const submit = (e: FormEvent) => { e.preventDefault(); setSent(false); confirm.mutate() }
   return (

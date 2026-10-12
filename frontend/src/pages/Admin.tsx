@@ -17,6 +17,7 @@ const TABS = [
   { id: 'telegram', label: 'Telegram' },
   { id: 'debug', label: 'Отладка' },
   { id: 'plans', label: 'Капсулка Плюс' },
+  { id: 'stats', label: 'Статистика' },
 ] as const
 type Tab = typeof TABS[number]['id']
 
@@ -74,6 +75,7 @@ export function Admin() {
       {tab === 'telegram' && <TelegramTab />}
       {tab === 'debug' && <DebugTab />}
       {tab === 'plans' && <PlansTab />}
+      {tab === 'stats' && <StatsTab />}
     </div>
   )
 }
@@ -543,6 +545,62 @@ function TelegramTab() {
 
 // ---------- режим отладки ----------
 /** Режим отладки: на каждой странице сверху видна версия приложения (для всех, кто открыл сайт). */
+interface SiteStats {
+  days: number
+  rows: ({ day: string } & Record<'visits' | 'registrations' | 'verified' | 'medicines' | 'plus_view' | 'pay_click' | 'paid', number>)[]
+  totals: Record<'visits' | 'registrations' | 'verified' | 'medicines' | 'plus_view' | 'pay_click' | 'paid', number>
+  sources: { key: string; count: number }[]
+  utm: { key: string; count: number }[]
+  pages: { key: string; count: number }[]
+}
+const FUNNEL = [
+  ['visits', 'Заходы на сайт'], ['registrations', 'Регистрации'], ['verified', 'Подтвердили почту'], ['medicines', 'Добавили лекарство'],
+  ['plus_view', 'Открыли тариф Плюс'], ['pay_click', 'Нажали «Оплатить»'], ['paid', 'Оплатили'],
+] as const
+
+/** Свои счётчики: заходы считает сервер без cookie и IP, остальное берётся из таблиц. */
+function StatsTab() {
+  const [days, setDays] = useState(30)
+  const q = useQuery({ queryKey: ['admin', 'site-stats', days], queryFn: () => api<SiteStats>(`/admin/site-stats?days=${days}`) })
+  if (q.isLoading || !q.data) return <PageLoader />
+  const { totals, rows } = q.data
+  const list = (title: string, items: { key: string; count: number }[]) => (
+    <div className="card" style={{ padding: 16 }}>
+      <b>{title}</b>
+      {items.length === 0 ? <p className="muted small">Пока пусто</p> : items.map(i => (
+        <div key={i.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>{i.key}</span><b>{i.count}</b></div>
+      ))}
+    </div>
+  )
+  return (
+    <div className="stack" data-testid="site-stats">
+      <div className="segmented" role="group" aria-label="Период">
+        {[7, 30, 90].map(d => <button key={d} className={days === d ? 'on' : ''} onClick={() => setDays(d)}>{d} дн.</button>)}
+      </div>
+      <div className="card" style={{ padding: 16 }}>
+        <b>Воронка за {days} дн.</b>
+        {FUNNEL.map(([k, label]) => (
+          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span>{label}</span>
+            <b>{totals[k]}{k !== 'visits' && totals.visits > 0 && <span className="muted small"> · {Math.round((totals[k] / totals.visits) * 1000) / 10}% от заходов</span>}</b>
+          </div>
+        ))}
+        <p className="muted small" style={{ marginBottom: 0 }}>Заходы, «Открыли тариф» и «Нажали „Оплатить“» считаются без cookie, поэтому это число событий, а не уникальных людей. Остальное берётся из базы. «Добавили лекарство» не учитывает уже удалённые.</p>
+      </div>
+      {list('Откуда пришли (домен)', q.data.sources)}
+      {list('Метки utm_source', q.data.utm)}
+      {list('Куда заходят', q.data.pages)}
+      <div className="card" style={{ padding: 16, overflowX: 'auto' }}>
+        <b>По дням</b>
+        <table className="compare">
+          <thead><tr><th>День</th>{FUNNEL.map(([k, label]) => <th key={k}>{label}</th>)}</tr></thead>
+          <tbody>{rows.map(r => <tr key={r.day}><td>{fmtDate(r.day)}</td>{FUNNEL.map(([k]) => <td key={k}>{r[k]}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function DebugTab() {
   const toast = useToast()
   const qc = useQueryClient()

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CreditCard } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { GOALS, track } from '../analytics'
+import { track } from '../stats'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, PayStatus } from '../api'
 import { fmtDate } from '../format'
@@ -31,7 +31,7 @@ export function PayBox() {
 
   const start = useMutation({
     mutationFn: () => api<{ payment_id: number; confirmation_url: string }>('/payments', { method: 'POST', body: { period, auto_renew: renew && !!status.data?.recurring_enabled, agree } }),
-    onSuccess: r => { track(GOALS.payClick); window.location.assign(r.confirmation_url) },
+    onSuccess: r => { track('pay_click'); window.location.assign(r.confirmation_url) },
     onError: (e: Error) => toast(e.message, 'error'),
   })
   const off = useMutation({
@@ -43,11 +43,6 @@ export function PayBox() {
   const s = status.data
   const paid = returned ? s?.payments.find(p => p.id === Number(returned)) : undefined
   useEffect(() => {
-    if (paid?.status === 'succeeded') {
-      // цель шлём один раз на платёж, даже если человек обновит страницу
-      const key = `curemePaidGoal${paid.id}`
-      try { if (!sessionStorage.getItem(key)) { sessionStorage.setItem(key, '1'); track(GOALS.paid) } } catch { /* без хранилища цель не шлём повторно */ }
-    }
     if (paid && paid.status !== 'pending') {
       ['plan', 'family', 'overview'].forEach(k => qc.invalidateQueries({ queryKey: [k] }))
     }

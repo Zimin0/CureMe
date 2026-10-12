@@ -2,7 +2,6 @@ import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-rou
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api'
-import { Analytics } from './analytics'
 import { useAuth } from './auth'
 import { Layout } from './components/Layout'
 import { PageLoader } from './components/ui'
@@ -68,7 +67,6 @@ export default function App() {
   return (
     <>
     <DebugBar />
-    <Analytics />
     <Routes>
       <Route path="/login" element={me ? <LoggedInRedirect /> : <Login />} />
       <Route path="/reset-password" element={me ? <Navigate to="/" replace /> : <ResetPassword />} />
