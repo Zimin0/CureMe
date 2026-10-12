@@ -41,7 +41,7 @@ export function ScheduleRemove({ schedule, onClose }: { schedule: Schedule; onCl
         <p className="muted small">Выберите дни и время, которые больше не нужны. Пустой выбор дней или времени значит «любые».</p>
         <section className="stack" style={{ gap: 8 }}>
           <h3>Дни</h3>
-          <DayChips value={days} onChange={setDays} presets={false} only={slotDays} />
+          <DayChips value={days} onChange={setDays} only={slotDays} />
         </section>
         <section className="stack" style={{ gap: 8 }}>
           <h3>Время</h3>

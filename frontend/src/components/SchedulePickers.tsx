@@ -1,13 +1,12 @@
 import { Plus, X } from 'lucide-react'
 import { useState } from 'react'
-import { DAY_PRESETS, DAY_SHORT, fmtMinute, TIME_PRESETS } from '../schedule'
+import { DAY_SHORT, fmtMinute, TIME_PRESETS } from '../schedule'
 import { TimeSlider } from './TimeSlider'
 
-const sameDays = (a: number[], b: number[]) => a.length === b.length && a.every(d => b.includes(d))
 
-/** Дни недели чипами: можно выбрать любые или нажать готовый набор («Будни»). Переключение — одним нажатием. */
-export function DayChips({ value, onChange, presets = true, only = null }: {
-  value: number[]; onChange: (days: number[]) => void; presets?: boolean
+/** Дни недели чипами: можно выбрать любые. Переключение — одним нажатием. */
+export function DayChips({ value, onChange, only = null }: {
+  value: number[]; onChange: (days: number[]) => void
   only?: number[] | null  // показывать только эти дни (для «убрать серию»)
 }) {
   const days = only ?? [0, 1, 2, 3, 4, 5, 6]
@@ -20,13 +19,6 @@ export function DayChips({ value, onChange, presets = true, only = null }: {
             onClick={() => toggle(d)}>{DAY_SHORT[d]}</button>
         ))}
       </div>
-      {presets && (
-        <div className="chips wrap">
-          {DAY_PRESETS.map(p => (
-            <button key={p.label} type="button" className={`chip${sameDays(value, p.days) ? ' active' : ''}`} onClick={() => onChange(p.days)}>{p.label}</button>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
