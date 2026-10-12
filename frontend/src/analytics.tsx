@@ -13,9 +13,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from './api'
+import { LEGAL_DATE as EDITION } from './legal' // редакция Политики, под которую дано согласие
 
 const KEY = 'curemeAnalytics'
-const EDITION = '12 октября 2026 г.' // редакция Политики, под которую дано согласие (legal.ts LEGAL_DATE)
 const EVENT = 'cureme-analytics-consent'
 
 /** Цели Метрики. Название цели в Метрике = название здесь; параметров не передаём. */
