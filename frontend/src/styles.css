@@ -601,7 +601,15 @@ a.intake-med { color: var(--primary); }
 .time-tag { display: inline-flex; align-items: center; gap: 6px; }
 .time-tag button { display: grid; place-items: center; border: none; background: none; color: inherit; padding: 0; cursor: pointer; }
 .remove-summary { padding: 12px; border-radius: 14px; background: var(--surface-2); font-size: 14px; }
-@media (max-width: 560px) { .slot-chip { padding: 5px 4px; font-size: 10px; } }
+@media (max-width: 560px) {
+  /* на телефоне неделя — вертикальный список дней: в семи узких колонках время и название не помещаются */
+  .week-grid { grid-template-columns: 1fr; gap: 6px; }
+  .week-col { flex-direction: row; flex-wrap: wrap; align-items: center; min-height: 0; padding: 8px 10px; }
+  .week-col-head { width: 28px; text-align: left; }
+  .week-empty { text-align: left; }
+  .slot-chip { flex-direction: row; align-items: center; gap: 6px; width: auto; max-width: 100%; padding: 6px 10px; font-size: 13px; }
+  .slot-chip span { max-width: 140px; }
+}
 
 /* ---------- приветственная страница для гостей ---------- */
 .lp { max-width: 1040px; margin: 0 auto; padding: 8px 20px 40px; display: flex; flex-direction: column; gap: 56px; }

@@ -29,6 +29,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const [times, setTimes] = useState<number[]>([])
   const [everyWeeks, setEveryWeeks] = useState(schedule?.every_weeks ?? 1)
   const [end, setEnd] = useState<string | null>(schedule?.end_date ?? null)
+  const [startDate, setStartDate] = useState(schedule?.start_date ?? mskToday())
 
   const meds = useQuery({
     queryKey: ['medicines', fam(''), ''], queryFn: () => api<Medicine[]>(fam('/medicines')), enabled: !editing,
@@ -40,15 +41,16 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const save = useMutation({
     mutationFn: async () => {
       if (!schedule) {
-        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, end_date: end } })
+        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, start_date: startDate, end_date: end } })
       }
-      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, end_date: end } })
+      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, start_date: startDate, end_date: end } })
       if (times.length) await api(fam(`/schedule/${schedule.id}/slots`), { body: { days: days.length ? days : EVERY_DAY, times } })
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['schedule'] }); toast(editing ? 'Расписание обновлено' : 'Добавили в расписание'); onClose() },
     onError: (e: Error) => toast(e.message, 'error'),
   })
-  const ready = editing ? true : medId !== null && days.length > 0 && times.length > 0
+  const badRange = !!end && end < startDate
+  const ready = (editing ? true : medId !== null && days.length > 0 && times.length > 0) && !!startDate && !badRange
   const unit = schedule?.unit ?? med?.unit ?? 'шт'
 
   return (
@@ -103,12 +105,18 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
             <button type="button" className={everyWeeks === 1 ? 'on' : ''} onClick={() => setEveryWeeks(1)}>Каждую неделю</button>
             <button type="button" className={everyWeeks === 2 ? 'on' : ''} onClick={() => setEveryWeeks(2)}>Через неделю</button>
           </div>
+          <label className="stack" style={{ gap: 4 }}>
+            <span className="muted small">Начало курса</span>
+            <input className="input" type="date" value={startDate} min={editing ? undefined : mskToday()} aria-label="Дата начала курса"
+              onChange={e => { setStartDate(e.target.value); if (end && e.target.value && end < e.target.value) setEnd(null) }} />
+          </label>
           <div className="chips wrap" aria-label="Срок курса">
             {COURSES.map(c => {
-              const value = c.days === null ? null : addDays(schedule?.start_date ?? mskToday(), c.days - 1)
+              const value = c.days === null ? null : addDays(startDate, c.days - 1)
               return <button key={c.label} type="button" className={`chip${end === value ? ' active' : ''}`} onClick={() => setEnd(value)}>{c.label}</button>
             })}
           </div>
+          {badRange && <p className="muted small">Дата окончания раньше начала курса.</p>}
         </section>
 
         <button className="btn primary block" disabled={!ready || save.isPending} onClick={() => save.mutate()}>
