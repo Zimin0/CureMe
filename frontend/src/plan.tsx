@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Lock, Sparkles } from 'lucide-react'
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import { GOALS, track } from './analytics'
 import { Link } from 'react-router-dom'
 import { api, LimitName, Plan, PlusFeature, setPlusRequiredHandler } from './api'
 import { useAuth } from './auth'
@@ -85,6 +86,7 @@ export function useRequirePlus() {
 function PlusSheet({ feature, onClose }: { feature: PlusFeature; onClose: () => void }) {
   const { plan } = usePlan()
   const f = plan?.features.find(x => x.key === feature)
+  useEffect(() => { track(GOALS.plusView) }, [])
   return (
     <Sheet title="Доступно в Капсулке Плюс" onClose={onClose}>
       <div className="stack">

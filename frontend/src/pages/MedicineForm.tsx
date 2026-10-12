@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe, ScanLine } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
+import { GOALS, track } from '../analytics'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, Category, Medicine, MedicineDetail, MedicineFields, PackageInput, ProductInfo, uploadFile } from '../api'
 import { CategoryPicker } from '../components/CategoryPicker'
@@ -86,6 +87,7 @@ export function MedicineForm() {
       qc.invalidateQueries({ queryKey: ['categories'] })
       qc.invalidateQueries({ queryKey: ['plan'] })
       qc.setQueryData(['medicine', fam(''), String(m.id)], m)
+      if (!editing) track(GOALS.medicineAdded)
       toast(editing ? 'Сохранено' : `«${m.name}» в аптечке`)
       nav(`/medicines/${m.id}`, { replace: true })
     },

@@ -26,6 +26,7 @@ services:
       CUREME_TELEGRAM_BOT_TOKEN: ""
       CUREME_YANDEX_VERIFICATION: ""
       CUREME_GOOGLE_VERIFICATION: ""
+      CUREME_METRIKA_ID: ""
     security_opt: ["no-new-privileges:true"]
     logging:
       driver: json-file

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     public_url: str = ""
     # Коды подтверждения сайта из Яндекс Вебмастера и Google Search Console (мета-тег на главной). Пусто — тега нет.
     yandex_verification: str = ""
+    # Номер счётчика Яндекс Метрики (только цифры). Пусто — счётчика и баннера cookie на сайте нет.
+    # Счётчик грузится в браузере только после согласия посетителя (frontend/src/analytics.ts).
+    metrika_id: str = ""
     google_verification: str = ""
     # Почта (SMTP). Пока smtp_host пуст, письма не отправляются, а пишутся в лог приложения.
     smtp_host: str = ""

@@ -251,4 +251,12 @@ docker compose -p cureme-staging -f docker-compose.yml -f docker-compose.staging
 Один раз вручную:
 1. Яндекс Вебмастер (webmaster.yandex.ru): добавить `https://kapsulka.ru`, способ подтверждения «Метатег», код записать в `/opt/cureme/.env` как `CUREME_YANDEX_VERIFICATION=<код>`, пересобрать контейнер, нажать «Проверить». Затем указать sitemap `https://kapsulka.ru/sitemap.xml`, задать регион, запросить переобход главной.
 2. Google Search Console: ресурс «Префикс URL», подтверждение метатегом, код в `CUREME_GOOGLE_VERIFICATION`, затем отправить sitemap.
-3. Яндекс Метрику и Google Analytics без решения по Политике не ставить: это передача данных о посетителях.
+3. Google Analytics не ставить: передача данных за рубеж.
+
+## Аналитика (Яндекс Метрика)
+
+Счётчик включается одной переменной и работает только у тех, кто нажал «Принять» в баннере cookie. Без переменной ни счётчика, ни баннера нет.
+1. Проверить уведомление в Роскомнадзоре (pd.rkn.gov.ru, № 100445559): цели обработки должны включать статистику посещаемости, а ООО «Яндекс» быть среди лиц, которым поручена обработка. Если нет, подать изменения и только потом включать счётчик.
+2. metrika.yandex.ru → «Добавить счётчик»: адрес `kapsulka.ru`, вебвизор, карту кликов и «Отслеживание хеша» не включать. В «Цели» создать JavaScript-события с идентификаторами `register`, `email_confirmed`, `medicine_added`, `plus_view`, `pay_click`, `paid`. Воронка: составная цель из них по порядку.
+3. Номер счётчика записать в `/opt/cureme/.env` как `CUREME_METRIKA_ID=<цифры>`, применить `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --pull never`.
+4. Проверить в браузере: до «Принять» в DevTools → Network нет запросов к `mc.yandex.ru`, после есть; в Метрике адреса выглядят как `/plus`, `/app`, без кодов.

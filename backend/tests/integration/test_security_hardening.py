@@ -268,3 +268,24 @@ def test_csp_allows_no_third_party_hosts(client):
     directives = dict(d.strip().split(" ", 1) for d in csp.split(";") if " " in d.strip())
     assert directives["frame-src"] == "'none'"
     assert "http" not in csp  # ни одного чужого адреса и ни одного «https:»: оплата ЮKassa идёт переходом, а не встроенной формой
+
+
+# --- Яндекс Метрика ---
+def test_metrika_off_by_default_and_csp_has_no_yandex(client):
+    assert client.get("/api/auth/access").json()["metrika_id"] is None
+    assert "yandex" not in client.get("/api/health").headers["Content-Security-Policy"]
+
+
+def test_metrika_on_opens_only_counter_hosts_in_csp(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "metrika_id", "12345678")
+    assert client.get("/api/auth/access").json()["metrika_id"] == "12345678"
+    csp = client.get("/api/health").headers["Content-Security-Policy"]
+    directives = {k: v.split() for k, v in (d.strip().split(" ", 1) for d in csp.split(";") if " " in d.strip())}
+    assert "https://mc.yandex.ru" in directives["script-src"] and "https://mc.yandex.ru" in directives["img-src"]
+    assert directives["frame-src"] == ["'none'"] and "'unsafe-eval'" not in csp
+
+
+def test_metrika_id_must_be_digits(client, monkeypatch):
+    """Номер попадает в адрес на странице, поэтому всё кроме цифр отбрасываем."""
+    monkeypatch.setattr(get_settings(), "metrika_id", '123"><script>')
+    assert client.get("/api/auth/access").json()["metrika_id"] is None

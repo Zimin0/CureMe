@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import reminders, seo
+from .analytics import METRIKA_CSP, metrika_counter_id
 from .config import get_settings
 from .db import SessionLocal
 from .routers import admin, assist, auth, categories, families, files, illness, intakes, medicines, notifications, payments, reports, schedule, schedule_notify
@@ -41,21 +42,32 @@ app.add_middleware(
 # wasm-unsafe-eval и blob: нужны сканеру штрихкодов (zxing-wasm) и распознаванию срока (tesseract).
 # Оплата идёт переходом на страницу ЮKassa целиком (сайт её не встраивает), поэтому скриптов, фреймов и запросов
 # к ЮKassa страница не загружает и в политике их нет: каждый разрешённый чужой адрес был бы лишней лазейкой для XSS.
-CSP = "; ".join([
-    "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' blob:",
-    "worker-src 'self' blob:",
-    "connect-src 'self' data: blob:",
-    "img-src 'self' data: blob:",
-    "frame-src 'none'",
-    "media-src 'self' blob:",
-    "style-src 'self' 'unsafe-inline'",
-    "font-src 'self' data:",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-])
+_CSP_RULES = {
+    "default-src": ["'self'"],
+    "script-src": ["'self'", "'wasm-unsafe-eval'", "blob:"],
+    "worker-src": ["'self'", "blob:"],
+    "connect-src": ["'self'", "data:", "blob:"],
+    "img-src": ["'self'", "data:", "blob:"],
+    "frame-src": ["'none'"],
+    "media-src": ["'self'", "blob:"],
+    "style-src": ["'self'", "'unsafe-inline'"],
+    "font-src": ["'self'", "data:"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "form-action": ["'self'"],
+    "frame-ancestors": ["'none'"],
+}
+
+
+def build_csp() -> str:
+    """Политика безопасности. Адреса Яндекс Метрики добавляются, только если счётчик задан в настройках (analytics.py)."""
+    rules = {k: list(v) for k, v in _CSP_RULES.items()}
+    if metrika_counter_id():
+        for directive, hosts in METRIKA_CSP.items():
+            rules[directive] += hosts
+    return "; ".join(f"{directive} {' '.join(values)}" for directive, values in rules.items())
+
+
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",     # не угадывать тип файла: картинка не станет скриптом
     "X-Frame-Options": "DENY",               # сайт нельзя встроить в чужую страницу (clickjacking)
@@ -74,7 +86,7 @@ async def security_headers(request: Request, call_next):
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
     if not request.url.path.startswith(("/docs", "/redoc")):  # Swagger UI грузит скрипты с CDN
-        response.headers.setdefault("Content-Security-Policy", CSP)
+        response.headers.setdefault("Content-Security-Policy", build_csp())
     path = request.url.path
     if path.startswith("/assets/"):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")  # имена файлов с хешем: не меняются
