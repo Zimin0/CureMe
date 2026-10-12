@@ -77,7 +77,7 @@ def list_occurrences(
         OccurrenceOut(
             schedule_id=o.schedule.id, slot_id=o.slot_id, medicine_id=o.schedule.medicine_id,
             medicine_name=o.schedule.medicine_name, unit=o.schedule.unit, amount=o.schedule.amount,
-            date=o.day, minute=o.minute, taken=o.taken_at is not None, taken_at=o.taken_at,
+            date=o.day, minute=o.minute, taken=o.taken_at is not None, taken_at=o.taken_at, note=o.schedule.note,
         )
         for o in occurrences(db, user.id, first, last, fam.id)
     ]
@@ -98,7 +98,7 @@ def create_schedule(
     s = Schedule(
         family_id=fam.id, user_id=user.id, medicine_id=med.id, medicine_name=med.name, unit=med.unit,
         amount=body.amount, start_date=body.start_date or _today(), end_date=body.end_date,
-        every_weeks=body.every_weeks,
+        every_weeks=body.every_weeks, note=body.note.strip(),
     )
     db.add(s)
     _add_slots(db, s, body.days, body.times)
@@ -115,7 +115,7 @@ def update_schedule(
     for k, v in body.model_dump(exclude_unset=True).items():
         if v is None and k != "end_date":
             continue  # очистить можно только дату окончания («бессрочно»)
-        setattr(s, k, v)
+        setattr(s, k, v.strip() if k == "note" else v)
     if s.end_date and s.end_date < s.start_date:
         raise HTTPException(400, "Дата окончания раньше даты начала")
     if s.end_date and (s.end_date - s.start_date).days + 1 > MAX_COURSE_DAYS:

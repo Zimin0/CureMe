@@ -686,6 +686,7 @@ MAX_TIMES = 12          # приёмов в день у одного назна�
 MAX_SCHEDULES = 100     # назначений у одного человека
 
 
+SCHEDULE_NOTE_MAX = 300  # длина комментария к курсу
 MAX_COURSE_DAYS = 365  # самый длинный срок курса, дней
 
 
@@ -716,6 +717,7 @@ class ScheduleOut(BaseModel):
     start_date: date
     end_date: date | None
     every_weeks: int
+    note: str = ""
     slots: list[SlotOut]
 
 
@@ -729,6 +731,7 @@ class ScheduleCreate(BaseModel):
     start_date: date | None = None                                              # по умолчанию — сегодня
     end_date: date | None = None
     every_weeks: int = Field(default=1, ge=1, le=12)
+    note: str = Field(default="", max_length=SCHEDULE_NOTE_MAX)
 
     _days = field_validator("days")(_check_days)
     _times = field_validator("times")(_check_times)
@@ -747,6 +750,7 @@ class ScheduleUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     every_weeks: int | None = Field(default=None, ge=1, le=12)
+    note: str | None = Field(default=None, max_length=SCHEDULE_NOTE_MAX)
 
 
 class SlotsIn(BaseModel):
@@ -793,6 +797,7 @@ class OccurrenceOut(BaseModel):
     minute: int
     taken: bool
     taken_at: datetime | None
+    note: str = ""
 
 
 # --- уведомления по расписанию и доверенный человек ---

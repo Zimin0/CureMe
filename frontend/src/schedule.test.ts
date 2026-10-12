@@ -3,7 +3,7 @@ import type { Schedule } from './api'
 import { addDays, daysText, fmtMinute, mondayOf, repeatText, scheduleText, weekdayOf } from './schedule'
 
 const sched = (over: Partial<Schedule> = {}): Schedule => ({
-  id: 1, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, start_date: '2026-10-05', end_date: null, every_weeks: 1,
+  id: 1, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, start_date: '2026-10-05', end_date: null, every_weeks: 1, note: "",
   slots: [], ...over,
 })
 

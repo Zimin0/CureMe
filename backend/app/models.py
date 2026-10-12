@@ -400,6 +400,7 @@ class Schedule(Base):
     start_date: Mapped[date] = mapped_column(Date)                        # с какого дня (по Москве)
     end_date: Mapped[date | None] = mapped_column(Date)                   # по какой день включительно; None — бессрочно
     every_weeks: Mapped[int] = mapped_column(Integer, default=1)          # 1 — каждую неделю, 2 — через неделю…
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")  # личный комментарий к курсу: «пить вот так»
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     slots: Mapped[list["ScheduleSlot"]] = relationship(

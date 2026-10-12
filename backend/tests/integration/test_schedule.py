@@ -218,3 +218,17 @@ def test_course_length_limit(client, med):
     bad = client.patch(f"/api/families/{f}/schedule/{ok.json()['id']}", headers=h,
                        json={"end_date": (MON + timedelta(days=400)).isoformat()})
     assert bad.status_code == 400
+
+
+def test_note_saved_shown_and_limited(client, med):
+    h, u, f, mid = med
+    s = create(client, h, f, mid, note="  пить после еды ")
+    assert s["note"] == "пить после еды"
+    r = client.patch(f"/api/families/{f}/schedule/{s['id']}", headers=h, json={"note": "утром"})
+    assert r.json()["note"] == "утром"
+    occ = client.get(f"/api/families/{f}/schedule/occurrences", headers=h,
+                     params={"since": MON.isoformat(), "until": MON.isoformat()}).json()
+    assert occ and all(o["note"] == "утром" for o in occ)
+    long = client.post(f"/api/families/{f}/schedule", headers=h, json={
+        "medicine_id": mid, "times": [480], "note": "я" * 301})
+    assert long.status_code == 422

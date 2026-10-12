@@ -11,12 +11,12 @@ afterAll(() => vi.useRealTimers())
 const today = '2026-10-07'
 const slots = (days: number[], times: number[]) => days.flatMap((weekday, i) => times.map((minute, j) => ({ id: i * 10 + j + 1, weekday, minute })))
 const schedule = (over: Partial<ScheduleT> = {}): ScheduleT => ({
-  id: 5, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, start_date: '2026-10-05', end_date: null, every_weeks: 1,
+  id: 5, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, start_date: '2026-10-05', end_date: null, every_weeks: 1, note: "",
   slots: slots([1, 2], [480, 960]), ...over,
 })
 const occurrence = (over: Partial<Occurrence> = {}): Occurrence => ({
   schedule_id: 5, slot_id: 1, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, date: today, minute: 0,
-  taken: false, taken_at: null, ...over,
+  taken: false, taken_at: null, note: "", ...over,
 })
 
 it('пустое расписание зовёт добавить лекарство', async () => {
@@ -87,7 +87,7 @@ it('добавляет назначение: лекарство, дни-прес
   await user.click(within(sheet).getByRole('button', { name: /На ночь/ }))
   await user.click(add)
   await waitFor(() => expect(created).toEqual([{
-    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null,
+    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null, note: '',
   }]))
 })
 

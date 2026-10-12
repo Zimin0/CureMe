@@ -30,6 +30,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const [everyWeeks, setEveryWeeks] = useState(schedule?.every_weeks ?? 1)
   const [end, setEnd] = useState<string | null>(schedule?.end_date ?? null)
   const [startDate, setStartDate] = useState(schedule?.start_date ?? mskToday())
+  const [note, setNote] = useState(schedule?.note ?? '')
   const [custom, setCustom] = useState(false)
   const [customDays, setCustomDays] = useState('')
 
@@ -43,9 +44,9 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const save = useMutation({
     mutationFn: async () => {
       if (!schedule) {
-        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, start_date: startDate, end_date: end } })
+        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, start_date: startDate, end_date: end, note } })
       }
-      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, start_date: startDate, end_date: end } })
+      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, start_date: startDate, end_date: end, note } })
       if (times.length) await api(fam(`/schedule/${schedule.id}/slots`), { body: { days: days.length ? days : EVERY_DAY, times } })
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['schedule'] }); toast(editing ? 'Расписание обновлено' : 'Добавили в расписание'); onClose() },
@@ -138,6 +139,11 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
             </label>
           )}
           {badCustom && customDays !== '' && <p className="muted small">Введите целое число дней от 1 до {MAX_COURSE_DAYS}.</p>}
+          <label className="stack" style={{ gap: 4 }}>
+            <span className="muted small">Комментарий к курсу (необязательно)</span>
+            <textarea className="input" rows={2} maxLength={300} placeholder="Например: пить после еды, запивать водой"
+              value={note} aria-label="Комментарий к курсу" onChange={e => setNote(e.target.value)} />
+          </label>
           {badRange && <p className="muted small">Дата окончания раньше начала курса.</p>}
         </section>
 
