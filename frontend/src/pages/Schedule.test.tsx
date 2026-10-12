@@ -91,6 +91,30 @@ it('добавляет назначение: лекарство, дни-прес
   }]))
 })
 
+it('свой срок курса: 20 дней даёт дату окончания', async () => {
+  const created: any[] = []
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([])),
+    http.get('/api/families/7/medicines', () => HttpResponse.json([medicine({ id: 1, name: 'Амепрозол', unit: 'таб' })])),
+    http.post('/api/families/7/schedule', async ({ request }) => { created.push(await request.json()); return HttpResponse.json(schedule(), { status: 201 }) }),
+  )
+  const { user } = renderApp('/schedule')
+  await user.click((await screen.findAllByRole('button', { name: /Добавить/ }))[0])
+  const sheet = await screen.findByRole('dialog')
+  const add = within(sheet).getByRole('button', { name: 'Добавить в расписание' })
+  await user.click(await within(sheet).findByRole('radio', { name: 'Амепрозол' }))
+  await user.click(within(sheet).getByRole('button', { name: /Утро/ }))
+  await user.click(within(sheet).getByRole('button', { name: 'Свой срок' }))
+  expect(add).toBeDisabled()
+  await user.type(within(sheet).getByLabelText('Свой срок курса, дней'), '20')
+  expect(add).toBeEnabled()
+  await user.click(add)
+  await waitFor(() => expect(created).toHaveLength(1))
+  const days = (Date.parse(created[0].end_date) - Date.parse(created[0].start_date)) / 86400000 + 1
+  expect(days).toBe(20)
+})
+
 it('неделя: нажатие на плашку открывает перенос приёма', async () => {
   const moved: unknown[] = []
   server.use(

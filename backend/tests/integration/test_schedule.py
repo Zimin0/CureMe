@@ -205,3 +205,16 @@ def test_dose_before_creation_time_on_start_day_is_skipped(client, med, db):
     today = [o.minute for o in occurrences(db, u["id"], MON, MON)]
     assert today == [1200]
     assert [o.minute for o in occurrences(db, u["id"], MON + timedelta(days=1), MON + timedelta(days=1))] == [660, 1200]
+
+
+def test_course_length_limit(client, med):
+    h, u, f, mid = med
+    ok = client.post(f"/api/families/{f}/schedule", headers=h, json={
+        "medicine_id": mid, "times": [480], "start_date": MON.isoformat(), "end_date": (MON + timedelta(days=19)).isoformat()})
+    assert ok.status_code == 201
+    long = client.post(f"/api/families/{f}/schedule", headers=h, json={
+        "medicine_id": mid, "times": [480], "start_date": MON.isoformat(), "end_date": (MON + timedelta(days=365)).isoformat()})
+    assert long.status_code == 422
+    bad = client.patch(f"/api/families/{f}/schedule/{ok.json()['id']}", headers=h,
+                       json={"end_date": (MON + timedelta(days=400)).isoformat()})
+    assert bad.status_code == 400

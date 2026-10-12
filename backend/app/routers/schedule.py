@@ -10,6 +10,7 @@ from ..plans import require_plus
 from ..models import Family, Medicine, Schedule, ScheduleSlot, User
 from ..reminders import MSK
 from ..schedule import occurrences
+from ..schemas import MAX_COURSE_DAYS
 from ..schemas import (
     MAX_SCHEDULES, MAX_TIMES, OccurrenceOut, ScheduleCreate, ScheduleOut, ScheduleUpdate, SlotMove, SlotsIn,
     SlotsRemove,
@@ -117,6 +118,8 @@ def update_schedule(
         setattr(s, k, v)
     if s.end_date and s.end_date < s.start_date:
         raise HTTPException(400, "Дата окончания раньше даты начала")
+    if s.end_date and (s.end_date - s.start_date).days + 1 > MAX_COURSE_DAYS:
+        raise HTTPException(400, f"Курс не длиннее {MAX_COURSE_DAYS} дней")
     db.commit()
     return _out(s)
 

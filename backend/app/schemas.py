@@ -686,6 +686,9 @@ MAX_TIMES = 12          # приёмов в день у одного назна�
 MAX_SCHEDULES = 100     # назначений у одного человека
 
 
+MAX_COURSE_DAYS = 365  # самый длинный срок курса, дней
+
+
 def _check_days(days: list[int]) -> list[int]:
     if any(d < 0 or d > 6 for d in days):
         raise ValueError("День недели — число от 0 (понедельник) до 6 (воскресенье)")
@@ -734,6 +737,8 @@ class ScheduleCreate(BaseModel):
     def _dates(self):
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValueError("Дата окончания раньше даты начала")
+        if self.start_date and self.end_date and (self.end_date - self.start_date).days + 1 > MAX_COURSE_DAYS:
+            raise ValueError(f"Курс не длиннее {MAX_COURSE_DAYS} дней")
         return self
 
 
