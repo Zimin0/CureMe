@@ -193,3 +193,15 @@ def test_create_needs_plus_but_existing_stays(client, med, db):
     assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "schedule"
     assert client.get(f"/api/families/{f}/schedule", headers=h).json()[0]["id"] == s["id"]
     assert client.delete(f"/api/families/{f}/schedule/{s['id']}", headers=h).status_code == 204
+
+
+def test_dose_before_creation_time_on_start_day_is_skipped(client, med, db):
+    """Добавили «11:00» в 18:00 в день старта: сегодняшний приём не появляется как «Пропущено», завтрашний есть."""
+    h, u, f, mid = med
+    s = create(client, h, f, mid, times=[660, 1200])
+    row = db.get(Schedule, s["id"])
+    row.created_at = datetime.combine(MON, datetime.min.time(), tzinfo=MSK).replace(hour=18).astimezone(timezone.utc)
+    db.commit()
+    today = [o.minute for o in occurrences(db, u["id"], MON, MON)]
+    assert today == [1200]
+    assert [o.minute for o in occurrences(db, u["id"], MON + timedelta(days=1), MON + timedelta(days=1))] == [660, 1200]
