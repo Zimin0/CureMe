@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CreditCard } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { track } from '../stats'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, PayStatus } from '../api'
 import { fmtDate } from '../format'
@@ -30,7 +31,7 @@ export function PayBox() {
 
   const start = useMutation({
     mutationFn: () => api<{ payment_id: number; confirmation_url: string }>('/payments', { method: 'POST', body: { period, auto_renew: renew && !!status.data?.recurring_enabled, agree } }),
-    onSuccess: r => window.location.assign(r.confirmation_url),
+    onSuccess: r => { track('pay_click'); window.location.assign(r.confirmation_url) },
     onError: (e: Error) => toast(e.message, 'error'),
   })
   const off = useMutation({
