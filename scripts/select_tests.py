@@ -127,6 +127,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
             "integration/test_email_verification.py", "integration/test_plans.py", "integration/test_household_check.py",
             "integration/test_owner_transfer.py", "integration/test_plus_end.py", "integration/test_switch_rules.py"],
     },
+    "Статистика сайта": {
+        "sources": ["sitestats.py", "routers/stats.py"],
+        "tests": ["integration/test_site_stats.py", "integration/test_access_control.py"],
+    },
     "Напоминания: почта и Telegram": {
         "sources": ["reminders.py", "telegram.py", "routers/notifications.py"],
         "tests": ["integration/test_reminders.py", "integration/test_invites.py", "integration/test_owner_transfer.py",
