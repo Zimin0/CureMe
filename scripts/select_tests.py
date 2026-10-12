@@ -120,16 +120,16 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/reports.py", "doctor_report.py"],
         "tests": ["integration/test_reports.py", "integration/test_access_control.py"],
     },
+    "Статистика сайта (заходы, воронка)": {
+        "sources": ["sitestats.py", "routers/stats.py"],
+        "tests": ["integration/test_site_stats.py", "integration/test_admin.py"],
+    },
     "Администрирование": {
         "sources": ["routers/admin.py", "household_check.py"],
         "tests": [
             "integration/test_admin.py", "integration/test_closed_mode.py", "integration/test_access_control.py",
             "integration/test_email_verification.py", "integration/test_plans.py", "integration/test_household_check.py",
             "integration/test_owner_transfer.py", "integration/test_plus_end.py", "integration/test_switch_rules.py"],
-    },
-    "Статистика сайта": {
-        "sources": ["sitestats.py", "routers/stats.py"],
-        "tests": ["integration/test_site_stats.py", "integration/test_access_control.py"],
     },
     "Напоминания: почта и Telegram": {
         "sources": ["reminders.py", "telegram.py", "routers/notifications.py"],
