@@ -454,6 +454,8 @@ def test_owner_choice_may_keep_four_when_the_family_was_four(client, big, sessio
 
 def test_fourth_person_before_the_new_terms_sets_the_flag_and_after_does_not(client, session_factory, monkeypatch):
     from app import households
+    # «До новых условий» задаём явно: иначе тест зависит от реальной даты и краснеет с 13.10.2026 (00:00 МСК)
+    monkeypatch.setattr(households, "NEW_TERMS_FROM", datetime.now(timezone.utc) + 5 * DAY)
     h, owner = register(client)
     f = fid(owner)
     grant_plus(client, h, f)
