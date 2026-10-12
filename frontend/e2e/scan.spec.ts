@@ -8,8 +8,9 @@ test('новый штрихкод → сохранить → повторный 
   await loginAs(page, acc, '/scan')
 
   const findByCode = async () => {
+    await page.getByRole('button', { name: 'Ввести вручную' }).click()
     await page.getByPlaceholder(/Цифры под штрихкодом/).fill(ean)
-    await page.getByRole('button', { name: 'Найти', exact: true }).click()
+    await page.getByRole('button', { name: 'Найти по коду в интернете' }).click()
   }
 
   await findByCode()
@@ -30,8 +31,9 @@ test('новый штрихкод → сохранить → повторный 
 test('неверный код показывает ошибку', async ({ page, request }) => {
   const acc = await registerApi(request)
   await loginAs(page, acc, '/scan')
+  await page.getByRole('button', { name: 'Ввести вручную' }).click()
   await page.getByPlaceholder(/Цифры под штрихкодом/).fill('12345')
-  await page.getByRole('button', { name: 'Найти', exact: true }).click()
+  await page.getByRole('button', { name: 'Найти по коду в интернете' }).click()
   await expect(page.getByText(/Не получилось распознать код/)).toBeVisible()
 })
 
