@@ -87,7 +87,7 @@ it('добавляет назначение: лекарство, дни-прес
   await user.click(within(sheet).getByRole('button', { name: /На ночь/ }))
   await user.click(add)
   await waitFor(() => expect(created).toEqual([{
-    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, end_date: null,
+    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null,
   }]))
 })
 
