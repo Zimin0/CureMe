@@ -15,6 +15,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { api } from './api'
 
 const KEY = 'curemeAnalytics'
+const EDITION = '12 октября 2026 г.' // редакция Политики, под которую дано согласие (legal.ts LEGAL_DATE)
 const EVENT = 'cureme-analytics-consent'
 
 /** Цели Метрики. Название цели в Метрике = название здесь; параметров не передаём. */
@@ -32,18 +33,23 @@ type Consent = 'yes' | 'no' | null
 
 export function getConsent(): Consent {
   try {
-    const v = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return null
+    const v = (JSON.parse(raw) as { v?: string }).v
     return v === 'yes' || v === 'no' ? v : null
   } catch { return null }
 }
 
 export function setConsent(v: 'yes' | 'no' | null) {
   try {
-    if (v) localStorage.setItem(KEY, v)
+    // Храним и дату с редакцией Политики: оператор должен уметь подтвердить, что согласие дано (ст. 9 152-ФЗ).
+    if (v) localStorage.setItem(KEY, JSON.stringify({ v, at: new Date().toISOString(), edition: EDITION }))
     else localStorage.removeItem(KEY)
   } catch { /* хранилище недоступно: просто не запоминаем выбор */ }
   if (v !== 'yes') clearYmCookies()
   window.dispatchEvent(new Event(EVENT))
+  // Уже загруженный скрипт Метрики мог бы дальше слать данные и заново ставить cookie: перезагружаем страницу.
+  if (v !== 'yes' && loadedId) location.reload()
 }
 
 function subscribe(cb: () => void) {
@@ -98,8 +104,21 @@ let currentId: string | null = null
 
 /** Цель в Метрику. Без номера счётчика или без согласия ничего не делает. */
 export function track(goal: Goal) {
-  if (!currentId || getConsent() !== 'yes' || !window.ym) return
-  window.ym(Number(currentId), 'reachGoal', goal)
+  if (!currentId || getConsent() !== 'yes') return
+  pending.add(goal)
+  flush()
+}
+
+/** Цель уходит вместе с реальным адресом страницы, поэтому на адресах с кодами (приглашение, сброс пароля, ?invite=, ?code=) ждём,
+ *  пока человек уйдёт на чистый адрес (например, после регистрации — на «/»). */
+const pending = new Set<Goal>()
+function urlIsClean() {
+  return !/[?&](invite|code|token|email|next)=/i.test(location.search) && !/^\/(join|reset-password)(\/|$)/.test(location.pathname)
+}
+function flush() {
+  if (!currentId || !window.ym || !urlIsClean()) return
+  for (const g of pending) window.ym(Number(currentId), 'reachGoal', g)
+  pending.clear()
 }
 
 function hit(id: string, pathname: string) {
@@ -119,7 +138,7 @@ export function Analytics() {
   }, [id, consent])
 
   useEffect(() => {
-    if (id && consent === 'yes') hit(id, pathname)
+    if (id && consent === 'yes') { hit(id, pathname); flush() }
   }, [id, consent, pathname])
 
   if (!id || consent !== null) return null
@@ -127,7 +146,7 @@ export function Analytics() {
     <div className="cookie-banner" role="dialog" aria-label="Файлы cookie">
       <p>
         Мы считаем посещения сайта сервисом Яндекс Метрика: для этого Яндекс ставит cookie и получает ваш IP-адрес и адреса открытых
-        страниц (без названий лекарств и личных данных). Без вашего согласия мы этого не делаем.{' '}
+        страниц (без названий лекарств и личных данных); данные получает ООО «Яндекс». Без вашего согласия мы этого не делаем. Согласие действует до отзыва, отозвать его можно в Политике, раздел 8.{' '}
         <Link to="/privacy#cookie">Подробнее в Политике</Link>
       </p>
       <div className="cookie-banner-actions">

@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getConsent, safePath, setConsent } from './analytics'
+import { GOALS, getConsent, safePath, setConsent, track } from './analytics'
 import { server } from './test/server'
 import { renderApp } from './test/utils'
 
@@ -57,5 +57,28 @@ describe('аналитика', () => {
     renderApp('/privacy', { loggedIn: false })
     expect(await screen.findByText(/8\.2\. Для учёта посещаемости/)).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Отозвать согласие' })).toBeInTheDocument()
+  })
+
+  it('согласие хранится с датой и редакцией Политики', () => {
+    setConsent('yes')
+    const saved = JSON.parse(localStorage.getItem('curemeAnalytics')!)
+    expect(saved).toMatchObject({ v: 'yes', edition: '12 октября 2026 г.' })
+    expect(saved.at).toMatch(/^\d{4}-\d\d-\d\dT/)
+  })
+
+  it('цель на адресе с кодом приглашения ждёт чистого адреса', async () => {
+    withCounter()
+    setConsent('yes')
+    const ym = vi.fn()
+    window.ym = ym
+    window.history.pushState({}, '', '/register?invite=ABC123')
+    renderApp('/register?invite=ABC123', { loggedIn: false })
+    await vi.waitFor(() => expect(ym).toHaveBeenCalledWith(12345678, 'hit', expect.any(String), { title: '' }))
+    ym.mockClear()
+    track(GOALS.register)
+    expect(ym).not.toHaveBeenCalledWith(12345678, 'reachGoal', 'register')
+    window.history.pushState({}, '', '/')
+    track(GOALS.register)
+    expect(ym).toHaveBeenCalledWith(12345678, 'reachGoal', 'register')
   })
 })
