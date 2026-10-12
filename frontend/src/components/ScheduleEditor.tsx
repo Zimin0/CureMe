@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, Medicine, Schedule } from '../api'
 import { useFamilyPath } from '../auth'
-import { COURSES, EVERY_DAY, addDays, mskToday } from '../schedule'
+import { COURSES, EVERY_DAY, MAX_COURSE_DAYS, addDays, mskToday } from '../schedule'
 import { DayChips, TimesPicker } from './SchedulePickers'
 import { Stepper } from './QuantityInput'
 import { PlusBanner, usePlan } from '../plan'
@@ -30,6 +30,9 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const [everyWeeks, setEveryWeeks] = useState(schedule?.every_weeks ?? 1)
   const [end, setEnd] = useState<string | null>(schedule?.end_date ?? null)
   const [startDate, setStartDate] = useState(schedule?.start_date ?? mskToday())
+  const [note, setNote] = useState(schedule?.note ?? '')
+  const [custom, setCustom] = useState(false)
+  const [customDays, setCustomDays] = useState('')
 
   const meds = useQuery({
     queryKey: ['medicines', fam(''), ''], queryFn: () => api<Medicine[]>(fam('/medicines')), enabled: !editing,
@@ -41,16 +44,23 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const save = useMutation({
     mutationFn: async () => {
       if (!schedule) {
-        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, start_date: startDate, end_date: end } })
+        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, start_date: startDate, end_date: end, note } })
       }
-      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, start_date: startDate, end_date: end } })
+      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, start_date: startDate, end_date: end, note } })
       if (times.length) await api(fam(`/schedule/${schedule.id}/slots`), { body: { days: days.length ? days : EVERY_DAY, times } })
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['schedule'] }); toast(editing ? 'Расписание обновлено' : 'Добавили в расписание'); onClose() },
     onError: (e: Error) => toast(e.message, 'error'),
   })
   const badRange = !!end && end < startDate
-  const ready = (editing ? true : medId !== null && days.length > 0 && times.length > 0) && !!startDate && !badRange
+  const customN = Number(customDays)
+  const badCustom = custom && (!Number.isInteger(customN) || customN < 1 || customN > MAX_COURSE_DAYS)
+  const setCustomCourse = (v: string) => {
+    setCustomDays(v)
+    const n = Number(v)
+    setEnd(Number.isInteger(n) && n >= 1 && n <= MAX_COURSE_DAYS ? addDays(startDate, n - 1) : null)
+  }
+  const ready = (editing ? true : medId !== null && days.length > 0 && times.length > 0) && !!startDate && !badRange && !badCustom
   const unit = schedule?.unit ?? med?.unit ?? 'шт'
 
   return (
@@ -108,14 +118,32 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
           <label className="stack" style={{ gap: 4 }}>
             <span className="muted small">Начало курса</span>
             <input className="input" type="date" value={startDate} min={editing ? undefined : mskToday()} aria-label="Дата начала курса"
-              onChange={e => { setStartDate(e.target.value); if (end && e.target.value && end < e.target.value) setEnd(null) }} />
+              onChange={e => {
+                setStartDate(e.target.value)
+                if (custom && e.target.value && Number.isInteger(customN) && customN >= 1) setEnd(addDays(e.target.value, customN - 1))
+                else if (end && e.target.value && end < e.target.value) setEnd(null)
+              }} />
           </label>
           <div className="chips wrap" aria-label="Срок курса">
             {COURSES.map(c => {
               const value = c.days === null ? null : addDays(startDate, c.days - 1)
-              return <button key={c.label} type="button" className={`chip${end === value ? ' active' : ''}`} onClick={() => setEnd(value)}>{c.label}</button>
+              return <button key={c.label} type="button" className={`chip${!custom && end === value ? ' active' : ''}`} onClick={() => { setCustom(false); setEnd(value) }}>{c.label}</button>
             })}
+            <button type="button" className={`chip${custom ? ' active' : ''}`} onClick={() => { setCustom(true); setCustomCourse(customDays) }}>Свой срок</button>
           </div>
+          {custom && (
+            <label className="stack" style={{ gap: 4 }}>
+              <span className="muted small">Сколько дней принимать (от 1 до {MAX_COURSE_DAYS})</span>
+              <input className="input" type="number" inputMode="numeric" min={1} max={MAX_COURSE_DAYS} step={1} placeholder="Например, 20"
+                value={customDays} aria-label="Свой срок курса, дней" onChange={e => setCustomCourse(e.target.value)} />
+            </label>
+          )}
+          {badCustom && customDays !== '' && <p className="muted small">Введите целое число дней от 1 до {MAX_COURSE_DAYS}.</p>}
+          <label className="stack" style={{ gap: 4 }}>
+            <span className="muted small">Комментарий к курсу (необязательно)</span>
+            <textarea className="input" rows={2} maxLength={300} placeholder="Например: пить после еды, запивать водой"
+              value={note} aria-label="Комментарий к курсу" onChange={e => setNote(e.target.value)} />
+          </label>
           {badRange && <p className="muted small">Дата окончания раньше начала курса.</p>}
         </section>
 

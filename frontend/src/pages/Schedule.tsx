@@ -127,6 +127,7 @@ export function Schedule() {
                       <div className="grow" style={{ minWidth: 0 }}>
                         <div className="ellipsis" style={{ fontWeight: 700 }}>{o.medicine_name}</div>
                         <div className="muted small">{fmtQty(o.amount)} {o.unit}</div>
+                        {o.note && <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{o.note}</div>}
                       </div>
                       <span className={`badge ${STATE_BADGE[st]}`}>{STATE_LABEL[st]}</span>
                       {st !== 'taken' && o.medicine_id !== null && (st !== 'soon' || (o.date === today && o.minute - now <= EARLY)) && (
@@ -150,6 +151,7 @@ export function Schedule() {
                   <div style={{ fontWeight: 700 }}>{s.medicine_name} <span className="muted small">· {fmtQty(s.amount)} {s.unit}</span></div>
                   <div className="muted small">{scheduleText(s)}</div>
                   {repeatText(s) && <div className="faint small">{repeatText(s)}</div>}
+                  {s.note && <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{s.note}</div>}
                 </div>
                 <button className="icon-btn" aria-label={`Изменить ${s.medicine_name}`} onClick={() => setEditor(s)}><Pencil size={17} /></button>
                 <button className="btn ghost sm" onClick={() => setRemoving(s.id)}>Убрать приёмы</button>

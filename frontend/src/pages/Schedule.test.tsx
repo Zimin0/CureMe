@@ -11,12 +11,12 @@ afterAll(() => vi.useRealTimers())
 const today = '2026-10-07'
 const slots = (days: number[], times: number[]) => days.flatMap((weekday, i) => times.map((minute, j) => ({ id: i * 10 + j + 1, weekday, minute })))
 const schedule = (over: Partial<ScheduleT> = {}): ScheduleT => ({
-  id: 5, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, start_date: '2026-10-05', end_date: null, every_weeks: 1,
+  id: 5, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, start_date: '2026-10-05', end_date: null, every_weeks: 1, note: "",
   slots: slots([1, 2], [480, 960]), ...over,
 })
 const occurrence = (over: Partial<Occurrence> = {}): Occurrence => ({
   schedule_id: 5, slot_id: 1, medicine_id: 1, medicine_name: 'Амепрозол', unit: 'таб', amount: 1, date: today, minute: 0,
-  taken: false, taken_at: null, ...over,
+  taken: false, taken_at: null, note: "", ...over,
 })
 
 it('пустое расписание зовёт добавить лекарство', async () => {
@@ -82,13 +82,38 @@ it('добавляет назначение: лекарство, дни-прес
   const add = within(sheet).getByRole('button', { name: 'Добавить в расписание' })
   expect(add).toBeDisabled()
   await user.click(await within(sheet).findByRole('radio', { name: 'Амепрозол' }))
-  await user.click(within(sheet).getByRole('button', { name: 'Будни' }))
+  await user.click(within(sheet).getByRole('button', { name: 'Сб' }))
+  await user.click(within(sheet).getByRole('button', { name: 'Вс' }))
   await user.click(within(sheet).getByRole('button', { name: /Утро/ }))
   await user.click(within(sheet).getByRole('button', { name: /На ночь/ }))
   await user.click(add)
   await waitFor(() => expect(created).toEqual([{
-    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null,
+    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null, note: '',
   }]))
+})
+
+it('свой срок курса: 20 дней даёт дату окончания', async () => {
+  const created: any[] = []
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([])),
+    http.get('/api/families/7/medicines', () => HttpResponse.json([medicine({ id: 1, name: 'Амепрозол', unit: 'таб' })])),
+    http.post('/api/families/7/schedule', async ({ request }) => { created.push(await request.json()); return HttpResponse.json(schedule(), { status: 201 }) }),
+  )
+  const { user } = renderApp('/schedule')
+  await user.click((await screen.findAllByRole('button', { name: /Добавить/ }))[0])
+  const sheet = await screen.findByRole('dialog')
+  const add = within(sheet).getByRole('button', { name: 'Добавить в расписание' })
+  await user.click(await within(sheet).findByRole('radio', { name: 'Амепрозол' }))
+  await user.click(within(sheet).getByRole('button', { name: /Утро/ }))
+  await user.click(within(sheet).getByRole('button', { name: 'Свой срок' }))
+  expect(add).toBeDisabled()
+  await user.type(within(sheet).getByLabelText('Свой срок курса, дней'), '20')
+  expect(add).toBeEnabled()
+  await user.click(add)
+  await waitFor(() => expect(created).toHaveLength(1))
+  const days = (Date.parse(created[0].end_date) - Date.parse(created[0].start_date)) / 86400000 + 1
+  expect(days).toBe(20)
 })
 
 it('неделя: нажатие на плашку открывает перенос приёма', async () => {
