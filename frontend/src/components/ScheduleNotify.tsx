@@ -76,8 +76,7 @@ export function ScheduleNotify() {
     <section className="card stack" data-testid="schedule-notify">
       <div className="card-head"><h2><Bell size={18} style={{ verticalAlign: -3 }} /> Уведомления</h2></div>
       <p className="muted small">
-        Напомним о приёме письмом. Уведомления — вспомогательная функция: письма могут приходить с задержкой
-        или не приходить, поэтому не полагайтесь на них одни. Капсулка не заменяет врача.
+        Напомним о приёме письмом. Капсулка не заменяет врача.
       </p>
       {locked && (
         <PlusBanner testId="plus-banner" title="Уведомления — в Капсулке Плюс" to="/plus" cta="Узнать про Плюс"
