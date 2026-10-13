@@ -400,6 +400,7 @@ class Schedule(Base):
     start_date: Mapped[date] = mapped_column(Date)                        # с какого дня (по Москве)
     end_date: Mapped[date | None] = mapped_column(Date)                   # по какой день включительно; None — бессрочно
     every_weeks: Mapped[int] = mapped_column(Integer, default=1)          # 1 — каждую неделю, 2 — через неделю…
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")  # личный комментарий к курсу: «пить вот так»
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     slots: Mapped[list["ScheduleSlot"]] = relationship(
@@ -558,3 +559,18 @@ class FamilyProduct(Base):
     blister_size: Mapped[int | None] = mapped_column(Integer)
     source: Mapped[str] = mapped_column(String(30), default="user", server_default="user")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class SiteStat(Base):
+    """Обезличенный счётчик заходов: на день, вид (visit/page/ref/utm/goal) и ключ (адрес, источник, цель).
+
+    Никаких cookie, IP и идентификаторов посетителя: это только число. Поэтому персональных данных тут нет
+    (docs: Политика п. 8) и согласие на cookie не нужно.
+    """
+
+    __tablename__ = "site_stats"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), primary_key=True, default="")
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

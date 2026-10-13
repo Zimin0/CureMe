@@ -686,6 +686,10 @@ MAX_TIMES = 12          # приёмов в день у одного назна�
 MAX_SCHEDULES = 100     # назначений у одного человека
 
 
+SCHEDULE_NOTE_MAX = 300  # длина комментария к курсу
+MAX_COURSE_DAYS = 365  # самый длинный срок курса, дней
+
+
 def _check_days(days: list[int]) -> list[int]:
     if any(d < 0 or d > 6 for d in days):
         raise ValueError("День недели — число от 0 (понедельник) до 6 (воскресенье)")
@@ -713,6 +717,7 @@ class ScheduleOut(BaseModel):
     start_date: date
     end_date: date | None
     every_weeks: int
+    note: str = ""
     slots: list[SlotOut]
 
 
@@ -726,6 +731,7 @@ class ScheduleCreate(BaseModel):
     start_date: date | None = None                                              # по умолчанию — сегодня
     end_date: date | None = None
     every_weeks: int = Field(default=1, ge=1, le=12)
+    note: str = Field(default="", max_length=SCHEDULE_NOTE_MAX)
 
     _days = field_validator("days")(_check_days)
     _times = field_validator("times")(_check_times)
@@ -734,6 +740,8 @@ class ScheduleCreate(BaseModel):
     def _dates(self):
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValueError("Дата окончания раньше даты начала")
+        if self.start_date and self.end_date and (self.end_date - self.start_date).days + 1 > MAX_COURSE_DAYS:
+            raise ValueError(f"Курс не длиннее {MAX_COURSE_DAYS} дней")
         return self
 
 
@@ -742,6 +750,7 @@ class ScheduleUpdate(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     every_weeks: int | None = Field(default=None, ge=1, le=12)
+    note: str | None = Field(default=None, max_length=SCHEDULE_NOTE_MAX)
 
 
 class SlotsIn(BaseModel):
@@ -788,6 +797,7 @@ class OccurrenceOut(BaseModel):
     minute: int
     taken: bool
     taken_at: datetime | None
+    note: str = ""
 
 
 # --- уведомления по расписанию и доверенный человек ---

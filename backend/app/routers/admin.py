@@ -11,6 +11,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user
 from ..mailer import send_mail
+from .. import sitestats
 from ..models import Category, Family, HouseholdEvent, Medicine, MedicineCategory, Membership, Payment, User
 from ..schemas import (
     AccessSettings, AdminPaymentOut, AdminPlanIn, ReceiptIn, BillingSettings, DebugSettings, TelegramSettings,
@@ -84,6 +85,12 @@ def stats(db: Session = Depends(get_db)):
         users=count(User), admins=count(User, User.is_admin.is_(True)), families=count(Family),
         medicines=count(Medicine), categories=count(Category),
     )
+
+
+@router.get("/site-stats")
+def site_stats(days: int = 30, db: Session = Depends(get_db)):
+    """Заходы, регистрации и оплаты по дням (docs: app/sitestats.py). 1–180 дней."""
+    return sitestats.report(db, max(1, min(days, 180)))
 
 
 # --- пользователи ---

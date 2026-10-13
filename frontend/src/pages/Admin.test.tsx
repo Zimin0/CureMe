@@ -243,4 +243,18 @@ describe('Telegram', () => {
     await waitFor(() => expect(box).not.toBeChecked())
     expect(puts).toEqual([true, false])
   })
+
+  it('вкладка «Статистика»: воронка и источники', async () => {
+    const zero = { visits: 0, registrations: 0, verified: 0, medicines: 0, plus_view: 0, pay_click: 0, paid: 0 }
+    server.use(stats, http.get('/api/admin/site-stats', () => HttpResponse.json({
+      days: 30, rows: [{ day: '2026-10-12', ...zero, visits: 40, registrations: 4 }],
+      totals: { ...zero, visits: 40, registrations: 4, paid: 1 },
+      sources: [{ key: 't.me', count: 25 }], utm: [{ key: 'tg_mama', count: 25 }], pages: [{ key: '/', count: 30 }],
+    })))
+    renderApp('/admin?tab=stats', { me: ADMIN })
+    const box = await screen.findByTestId('site-stats')
+    expect(within(box).getByText('Воронка за 30 дн.')).toBeInTheDocument()
+    expect(within(box).getByText('t.me')).toBeInTheDocument()
+    expect(within(box).getByText(/10% от заходов/)).toBeInTheDocument()
+  })
 })

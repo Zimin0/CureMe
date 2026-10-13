@@ -132,6 +132,7 @@ export interface Schedule {
   start_date: string
   end_date: string | null
   every_weeks: number
+  note: string
   slots: ScheduleSlot[]
 }
 export interface Occurrence {
@@ -145,6 +146,7 @@ export interface Occurrence {
   minute: number
   taken: boolean
   taken_at: string | null
+  note: string
 }
 
 // --- уведомления по расписанию: backend/app/routers/schedule_notify.py ---

@@ -24,8 +24,9 @@ function scanReturns(result: Partial<ScanResult>, hints = ['головная б�
 }
 
 async function enterCode(user: UserEvent, code = '4605077018932') {
+  await user.click(await screen.findByRole('button', { name: 'Ввести вручную' }))
   await user.type(await screen.findByPlaceholderText(/Цифры под штрихкодом/), code)
-  await user.click(screen.getByRole('button', { name: 'Найти' }))
+  await user.click(screen.getByRole('button', { name: 'Найти по коду в интернете' }))
 }
 
 describe('сканирование: ручной ввод кода', () => {
@@ -62,13 +63,25 @@ describe('сканирование: ручной ввод кода', () => {
     expect(within(dialog).getByRole('button', { name: 'Добавить упаковку' })).toBeInTheDocument()
   })
 
-  it('нераспознанный код — ошибка и кнопка «Ещё раз»', async () => {
+  it('«Ввести вручную» открывает форму лекарства с подставленным кодом', async () => {
+    server.use(
+      http.get('/api/families/7/categories', () => HttpResponse.json([])),
+      http.get('/api/indication-hints', () => HttpResponse.json([])),
+    )
+    const { user } = renderApp('/scan')
+    await user.click(await screen.findByRole('button', { name: 'Ввести вручную' }))
+    await user.type(screen.getByPlaceholderText(/Цифры под штрихкодом/), '4605077018932')
+    await user.click(screen.getByRole('button', { name: 'Заполнить вручную' }))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/medicines/new'))
+    expect(await screen.findByDisplayValue('4605077018932')).toBeInTheDocument()
+  })
+
+  it('нераспознанный код — показываем ошибку', async () => {
     server.use(http.post('/api/families/7/scan', () => HttpResponse.json({ detail: 'Не получилось распознать код товара.' }, { status: 422 })))
     const { user } = renderApp('/scan')
     await enterCode(user, '123')
     expect(await screen.findByText('Не получилось распознать код товара.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Ещё раз' }))
-    expect(screen.queryByText('Не получилось распознать код товара.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ещё раз' })).not.toBeInTheDocument()
   })
 
   it('фото, снятое в окне сканирования, не теряется после «Заполнить подробнее»', async () => {

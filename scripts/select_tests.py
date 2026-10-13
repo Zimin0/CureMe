@@ -120,6 +120,10 @@ SECTIONS: dict[str, dict[str, list[str]]] = {
         "sources": ["routers/reports.py", "doctor_report.py"],
         "tests": ["integration/test_reports.py", "integration/test_access_control.py"],
     },
+    "Статистика сайта (заходы, воронка)": {
+        "sources": ["sitestats.py", "routers/stats.py"],
+        "tests": ["integration/test_site_stats.py", "integration/test_admin.py"],
+    },
     "Администрирование": {
         "sources": ["routers/admin.py", "household_check.py"],
         "tests": [

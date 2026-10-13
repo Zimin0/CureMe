@@ -29,6 +29,18 @@ def is_active_on(s: Schedule, day: date) -> bool:
     return ((monday(day) - monday(s.start_date)).days // 7) % s.every_weeks == 0
 
 
+def _before_creation(s: Schedule, day: date, minute: int) -> bool:
+    """Приём в день старта, время которого уже прошло к моменту создания назначения: его не было смысла ждать.
+
+    Иначе назначение «на 11:00», добавленное в 18:00, сразу показывалось бы «Пропущено» и слало письма.
+    Работает только для дня, в который назначение создали; будущую дату старта и правки позже не трогает.
+    """
+    created = _aware(s.created_at).astimezone(MSK) if s.created_at else None
+    if created is None or created.date() != s.start_date or day != s.start_date:
+        return False
+    return minute < created.hour * 60 + created.minute
+
+
 @dataclass
 class Occurrence:
     schedule: Schedule
@@ -56,7 +68,7 @@ def occurrences(db: Session, user_id: int, first: date, last: date, family_id: i
         for s in schedules:
             if is_active_on(s, day):
                 found += [Occurrence(s, sl.id, day, sl.minute, datetime.min, datetime.min)
-                          for sl in s.slots if sl.weekday == day.weekday()]
+                          for sl in s.slots if sl.weekday == day.weekday() and not _before_creation(s, day, sl.minute)]
         day += timedelta(days=1)
     _fit_windows(found)
     _mark_taken(db, user_id, found)

@@ -22,6 +22,8 @@ export const COURSES: { label: string; days: number | null }[] = [
   { label: '14 дней', days: 14 },
   { label: '30 дней', days: 30 },
 ]
+/** Самый длинный срок курса, дней (то же ограничение на сервере). */
+export const MAX_COURSE_DAYS = 365
 
 export function fmtMinute(m: number) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`

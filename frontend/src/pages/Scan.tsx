@@ -19,6 +19,8 @@ const SOURCE_LABEL = { internet: 'Найдено в интернете', user: '
 export function Scan() {
   const fam = useFamilyPath()
   const [manual, setManual] = useState('')
+  const [manualOpen, setManualOpen] = useState(false)
+  const nav = useNavigate()
   const [result, setResult] = useState<ScanResult | null>(null)
 
   const scan = useMutation({
@@ -26,6 +28,11 @@ export function Scan() {
     onSuccess: setResult,
   })
   const onCode = useCallback((raw: string) => { if (!scan.isPending) scan.mutate(raw) }, [scan])
+  const goManual = () => {
+    const gtin = manual.trim().replace(/\s+/g, '')
+    const state: ScanPrefill = gtin ? { fields: { gtin } } : {}
+    nav('/medicines/new', { state })
+  }
   const close = () => { setResult(null); scan.reset() }
 
   return (
@@ -39,18 +46,23 @@ export function Scan() {
 
       <Scanner onCode={onCode} paused={!!result || scan.isPending} />
 
-      <form className="card stack" onSubmit={e => { e.preventDefault(); manual.trim() && scan.mutate(manual.trim()) }}>
-        <div className="row"><Keyboard size={18} className="muted" /><h3>Ввести код вручную</h3></div>
-        <div className="row">
-          <input className="input grow" inputMode="numeric" placeholder="Цифры под штрихкодом, например 4605077018932"
-            value={manual} onChange={e => setManual(e.target.value)} />
-          <button className="btn primary" disabled={!manual.trim() || scan.isPending}>Найти</button>
-        </div>
-      </form>
+      <button type="button" className="btn block" onClick={() => setManualOpen(true)}><Keyboard size={18} />Ввести вручную</button>
+      {manualOpen && (
+        <Sheet title="Ввести вручную" onClose={() => setManualOpen(false)}>
+          <form className="stack" onSubmit={e => { e.preventDefault(); manual.trim() && scan.mutate(manual.trim()); setManualOpen(false) }}>
+            <label className="field"><span>Код с упаковки (необязательно)</span>
+              <input className="input" inputMode="numeric" autoFocus placeholder="Цифры под штрихкодом, например 4605077018932"
+                value={manual} onChange={e => setManual(e.target.value)} />
+            </label>
+            <button type="button" className="btn primary block" onClick={goManual}>Заполнить вручную</button>
+            <button className="btn ghost block" disabled={!manual.trim() || scan.isPending}>Найти по коду в интернете</button>
+          </form>
+        </Sheet>
+      )}
 
       {scan.isPending && <div className="row" style={{ justifyContent: 'center' }}><Spinner /><span className="muted">Ищем в аптечке и в интернете…</span></div>}
       {scan.error && !result && (
-        <div className="alert error row between"><span>{scan.error.message}</span><button className="btn sm" onClick={() => scan.reset()}>Ещё раз</button></div>
+        <div className="alert error">{scan.error.message}</div>
       )}
 
       {result && <ResultSheet result={result} onClose={close} />}

@@ -193,3 +193,42 @@ def test_create_needs_plus_but_existing_stays(client, med, db):
     assert r.status_code == 402 and r.headers["X-Plus-Feature"] == "schedule"
     assert client.get(f"/api/families/{f}/schedule", headers=h).json()[0]["id"] == s["id"]
     assert client.delete(f"/api/families/{f}/schedule/{s['id']}", headers=h).status_code == 204
+
+
+def test_dose_before_creation_time_on_start_day_is_skipped(client, med, db):
+    """Добавили «11:00» в 18:00 в день старта: сегодняшний приём не появляется как «Пропущено», завтрашний есть."""
+    h, u, f, mid = med
+    s = create(client, h, f, mid, times=[660, 1200])
+    row = db.get(Schedule, s["id"])
+    row.created_at = datetime.combine(MON, datetime.min.time(), tzinfo=MSK).replace(hour=18).astimezone(timezone.utc)
+    db.commit()
+    today = [o.minute for o in occurrences(db, u["id"], MON, MON)]
+    assert today == [1200]
+    assert [o.minute for o in occurrences(db, u["id"], MON + timedelta(days=1), MON + timedelta(days=1))] == [660, 1200]
+
+
+def test_course_length_limit(client, med):
+    h, u, f, mid = med
+    ok = client.post(f"/api/families/{f}/schedule", headers=h, json={
+        "medicine_id": mid, "times": [480], "start_date": MON.isoformat(), "end_date": (MON + timedelta(days=19)).isoformat()})
+    assert ok.status_code == 201
+    long = client.post(f"/api/families/{f}/schedule", headers=h, json={
+        "medicine_id": mid, "times": [480], "start_date": MON.isoformat(), "end_date": (MON + timedelta(days=365)).isoformat()})
+    assert long.status_code == 422
+    bad = client.patch(f"/api/families/{f}/schedule/{ok.json()['id']}", headers=h,
+                       json={"end_date": (MON + timedelta(days=400)).isoformat()})
+    assert bad.status_code == 400
+
+
+def test_note_saved_shown_and_limited(client, med):
+    h, u, f, mid = med
+    s = create(client, h, f, mid, note="  пить после еды ")
+    assert s["note"] == "пить после еды"
+    r = client.patch(f"/api/families/{f}/schedule/{s['id']}", headers=h, json={"note": "утром"})
+    assert r.json()["note"] == "утром"
+    occ = client.get(f"/api/families/{f}/schedule/occurrences", headers=h,
+                     params={"since": MON.isoformat(), "until": MON.isoformat()}).json()
+    assert occ and all(o["note"] == "утром" for o in occ)
+    long = client.post(f"/api/families/{f}/schedule", headers=h, json={
+        "medicine_id": mid, "times": [480], "note": "я" * 301})
+    assert long.status_code == 422

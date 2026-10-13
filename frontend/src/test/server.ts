@@ -35,6 +35,8 @@ const PLAN_OPEN = planFixture()
  */
 export const server = setupServer(
   // по умолчанию сайт открыт; тесты закрытого режима подменяют ответ
+  http.post('/api/stats/visit', () => new HttpResponse(null, { status: 204 })),
+  http.post('/api/stats/goal', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/auth/access', () => HttpResponse.json({ closed: false })),
   // по умолчанию платная версия выключена и всё доступно; тесты Плюса подменяют ответ (planFixture из utils)
   http.get('/api/families/:id/plan', () => HttpResponse.json(PLAN_OPEN)),
