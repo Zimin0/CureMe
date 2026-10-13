@@ -66,7 +66,7 @@ export function Schedule() {
   }, [occ.data, today, now])
 
   const take = useMutation({
-    mutationFn: (o: Occurrence) => api(fam(`/medicines/${o.medicine_id}/consume`), { body: { amount: o.amount } }),
+    mutationFn: (o: Occurrence) => api(fam(`/medicines/${o.medicine_id}/consume`), { body: { amount: o.amount, slot_id: o.slot_id, slot_date: o.date } }),
     onSuccess: () => { qc.invalidateQueries(); toast('Отметили приём') },
     onError: (e: Error) => toast(e.message, 'error'),
   })

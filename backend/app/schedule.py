@@ -103,9 +103,23 @@ def _mark_taken(db: Session, user_id: int, items: list[Occurrence]) -> None:
                              Intake.taken_at >= lo, Intake.taken_at <= hi).order_by(Intake.taken_at)
     ).all()
     used: set[int] = set()  # одна запись в истории закрывает только один приём
+    # Сначала нажатия «Принял(а)» прямо на приёме из расписания: они закрывают его в любое время.
+    linked = db.scalars(
+        select(Intake).where(Intake.user_id == user_id, Intake.slot_id.in_({o.slot_id for o in items}),
+                             Intake.slot_date >= min(o.day for o in items), Intake.slot_date <= max(o.day for o in items))
+        .order_by(Intake.taken_at)
+    ).all()
+    for o in items:
+        for i in linked:
+            if i.id not in used and (i.slot_id, i.slot_date) == (o.slot_id, o.day):
+                o.taken_at = _aware(i.taken_at)
+                used.add(i.id)
+                break
     for o in sorted(items, key=lambda o: o.due):
+        if o.taken_at:
+            continue
         for i in intakes:
-            if i.id in used or i.medicine_id != o.schedule.medicine_id:
+            if i.id in used or i.slot_id is not None or i.medicine_id != o.schedule.medicine_id:
                 continue
             t = _aware(i.taken_at)
             if o.window_start <= t <= o.window_end:

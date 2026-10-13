@@ -44,7 +44,7 @@ it('показывает приёмы дня и отмечает «Принял(
   expect(within(doses[0]).getByText('Пропущено')).toBeInTheDocument()
   expect(within(doses[0]).getByText('00:00')).toBeInTheDocument()
   await user.click(within(doses[0]).getByRole('button', { name: /Принял/ }))
-  await waitFor(() => expect(consumed).toEqual([{ amount: 1 }]))
+  await waitFor(() => expect(consumed).toEqual([{ amount: 1, slot_id: 1, slot_date: today }]))
   expect(within(doses[1]).getByText('Впереди')).toBeInTheDocument()
   expect(within(doses[1]).queryByRole('button', { name: /Принял/ })).toBeNull()  // до приёма далеко: отметить пока нельзя
 })

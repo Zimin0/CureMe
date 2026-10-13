@@ -341,6 +341,10 @@ class Intake(Base):
     comment: Mapped[str] = mapped_column(Text, default="", server_default="")
     taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)  # последнее нажатие
+    # «Принял(а)» из расписания: какой именно приём (время в расписании + день) закрыт этой записью.
+    # Нужен, чтобы пропущенный приём отмечался, даже если нажали позже его окна.
+    slot_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    slot_date: Mapped[date | None] = mapped_column(Date)
 
     user: Mapped[User] = relationship()
 

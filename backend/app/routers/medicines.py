@@ -206,7 +206,7 @@ def consume_medicine(
     short = consume(med, body.amount)
     if short >= body.amount:
         raise HTTPException(400, "В аптечке не осталось годных упаковок")
-    record_intake(db, med, user.id, body.amount - short, body.comment)
+    record_intake(db, med, user.id, body.amount - short, body.comment, slot_id=body.slot_id, slot_date=body.slot_date)
     db.commit()
     reminders.nudge(fam.id)  # остаток мог опуститься до порога «Напомнить, когда останется»
     return _detail(db, fam, medicine_id, user)
