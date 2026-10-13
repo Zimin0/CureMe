@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { Occurrence, Schedule as ScheduleT } from '../api'
@@ -88,7 +88,7 @@ it('добавляет назначение: лекарство, дни-прес
   await user.click(within(sheet).getByRole('button', { name: /На ночь/ }))
   await user.click(add)
   await waitFor(() => expect(created).toEqual([{
-    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], every_weeks: 1, start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null, note: '',
+    medicine_id: 1, amount: 1, days: [0, 1, 2, 3, 4], times: [480, 1320], start_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), end_date: null, note: '',
   }]))
 })
 
@@ -131,6 +131,40 @@ it('неделя: нажатие на плашку открывает перен
   await waitFor(() => expect(moved).toEqual([{ weekday: 3, minute: 960 }]))
 })
 
+it('неделя: день написан целиком, принятый приём отмечен зелёным', async () => {
+  const wed = today
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([schedule()])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([occurrence({ slot_id: 12, date: wed, minute: 960, taken: true })])),
+  )
+  renderApp('/schedule')
+  const chip = await screen.findByRole('button', { name: 'Амепрозол 16:00, Ср, принято' })
+  expect(chip).toHaveClass('taken')
+  expect(screen.getAllByText('Вторник').length).toBeGreaterThan(0)
+  expect(screen.getByRole('button', { name: 'Амепрозол 08:00, Вт' })).not.toHaveClass('taken')
+})
+
+it('правка назначения: время уже созданных приёмов можно изменить', async () => {
+  const moved: { slot: string; body: unknown }[] = []
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([schedule()])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([])),
+    http.patch('/api/families/7/schedule/5', () => HttpResponse.json(schedule())),
+    http.patch('/api/families/7/schedule/5/slots/:slot', async ({ request, params }) => {
+      moved.push({ slot: String(params.slot), body: await request.json() }); return HttpResponse.json(schedule())
+    }),
+  )
+  const { user } = renderApp('/schedule')
+  await user.click(await screen.findByRole('button', { name: 'Изменить Амепрозол' }))
+  const sheet = await screen.findByRole('dialog')
+  expect(within(sheet).queryByRole('group', { name: 'Повтор' })).toBeNull()  // «Каждую неделю / Через неделю» убрано
+  fireEvent.change(within(sheet).getByLabelText('Время приёма 08:00'), { target: { value: '09:30' } })
+  await user.click(within(sheet).getByRole('button', { name: 'Сохранить' }))
+  await waitFor(() => expect(moved).toEqual([
+    { slot: '1', body: { minute: 570 } }, { slot: '11', body: { minute: 570 } },
+  ]))
+})
+
 it('без Плюса форма «Добавить в расписание» закрыта плашкой и недоступна', async () => {
   server.use(
     http.get('/api/families/7/plan', () => HttpResponse.json(planFixture({ has_plus: false }))),
@@ -142,5 +176,5 @@ it('без Плюса форма «Добавить в расписание» з
   await user.click((await screen.findAllByRole('button', { name: /Добавить/ }))[0])
   expect(await screen.findByTestId('plus-banner')).toBeInTheDocument()
   expect(screen.getAllByRole('button', { name: 'Добавить в расписание' }).at(-1)).toBeDisabled()
-  expect(screen.getByRole('group', { name: 'Повтор' }).closest('fieldset')).toBeDisabled()
+  expect(screen.getByLabelText('Дата начала курса').closest('fieldset')).toBeDisabled()
 })
