@@ -12,7 +12,7 @@ import { Empty, PageLoader, useToast } from '../components/ui'
 import { fmtQty } from '../format'
 import { usePlan } from '../plan'
 import {
-  addDays, DAY_SHORT, fmtDay, fmtMinute, mondayOf, mskMinute, mskToday, repeatText, scheduleText, weekdayOf,
+  addDays, DAY_FULL, DAY_SHORT, fmtDay, fmtMinute, mondayOf, mskMinute, mskToday, repeatText, scheduleText, weekdayOf,
 } from '../schedule'
 
 const EARLY = 60  // как на сервере (backend/app/schedule.py): за час до времени приёма отметка уже засчитывается,
@@ -54,6 +54,8 @@ export function Schedule() {
     for (const o of occ.data ?? []) { c[o.date] ??= { all: 0, taken: 0 }; c[o.date].all++; if (o.taken) c[o.date].taken++ }
     return c
   }, [occ.data])
+
+  const takenSet = useMemo(() => new Set((occ.data ?? []).filter(o => o.taken).map(o => `${o.schedule_id}-${o.slot_id}-${weekdayOf(o.date)}`)), [occ.data])
 
   const take = useMutation({
     mutationFn: (o: Occurrence) => api(fam(`/medicines/${o.medicine_id}/consume`), { body: { amount: o.amount } }),
@@ -140,7 +142,7 @@ export function Schedule() {
             )}
           </section>
 
-          <WeekGrid schedules={list} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
+          <WeekGrid schedules={list} taken={takenSet} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
             onMove={(s, slot, weekday) => move.mutate({ s, slot, weekday })} />
 
           <section className="card flush" aria-label="Назначения">
@@ -179,8 +181,9 @@ export function Schedule() {
  * Неделя по дням: у каждого приёма своя плашка, её можно перетащить на другой день
  * (пальцем или мышью), а нажатие открывает лист с точной правкой дня и времени.
  */
-function WeekGrid({ schedules, onOpen, onMove }: {
+function WeekGrid({ schedules, taken, onOpen, onMove }: {
   schedules: ScheduleT[]
+  taken: Set<string>  // `${расписание}-${приём}-${день недели}`: уже принято на этой неделе
   onOpen: (scheduleId: number, slot: ScheduleSlot) => void
   onMove: (scheduleId: number, slotId: number, weekday: number) => void
 }) {
@@ -220,12 +223,13 @@ function WeekGrid({ schedules, onOpen, onMove }: {
       <div className="week-grid">
         {cols.map((items, d) => (
           <div key={d} data-weekday={d} className={`week-col${drag?.over === d ? ' over' : ''}${d === todayDay ? ' today' : ''}`}>
-            <div className="week-col-head">{DAY_SHORT[d]}</div>
+            <div className="week-col-head"><span className="d-short">{DAY_SHORT[d]}</span><span className="d-full">{DAY_FULL[d]}</span></div>
             {items.length === 0 && <div className="faint small week-empty">—</div>}
             {items.map(({ s, slot }) => {
               const label = `${s.medicine_name} ${fmtMinute(slot.minute)}`
               return (
-                <button key={slot.id} type="button" className="slot-chip" aria-label={`${label}, ${DAY_SHORT[d]}`}
+                <button key={slot.id} type="button" className={`slot-chip${taken.has(`${s.id}-${slot.id}-${d}`) ? ' taken' : ''}`}
+                  aria-label={`${label}, ${DAY_SHORT[d]}${taken.has(`${s.id}-${slot.id}-${d}`) ? ', принято' : ''}`}
                   onPointerDown={down} onPointerMove={e => moveTo(e, label)} onPointerUp={e => up(e, s, slot)}
                   onPointerCancel={() => { start.current = null; setDrag(null) }}
                   onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen(s.id, slot))}>

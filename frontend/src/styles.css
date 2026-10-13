@@ -586,7 +586,10 @@ a.intake-med { color: var(--primary); }
 .week-col.today { border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
 .week-col.over { border-color: var(--primary); background: var(--primary-soft); }
 .week-col-head { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+.week-col-head .d-full { display: none; }
 .week-empty { text-align: center; }
+.slot-chip.taken { background: var(--success-soft); border-color: var(--success); }
+.slot-chip.taken b { color: var(--success); }
 .slot-chip {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 7px; border-radius: 10px; border: 1px solid var(--border);
   background: var(--surface); color: var(--text); font: inherit; font-size: 11px; text-align: left; cursor: grab; touch-action: none; min-width: 0; width: 100%;
@@ -605,7 +608,9 @@ a.intake-med { color: var(--primary); }
   /* на телефоне неделя — вертикальный список дней: в семи узких колонках время и название не помещаются */
   .week-grid { grid-template-columns: 1fr; gap: 6px; }
   .week-col { flex-direction: row; flex-wrap: wrap; align-items: center; min-height: 0; padding: 8px 10px; }
-  .week-col-head { width: 28px; text-align: left; }
+  .week-col-head { width: 100%; text-align: left; }
+  .week-col-head .d-short { display: none; }
+  .week-col-head .d-full { display: inline; }
   .week-empty { text-align: left; }
   .slot-chip { flex-direction: row; align-items: center; gap: 6px; width: auto; max-width: 100%; padding: 6px 10px; font-size: 13px; }
   .slot-chip span { max-width: 140px; }
