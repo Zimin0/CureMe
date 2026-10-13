@@ -10,13 +10,9 @@ export const DAY_PRESETS: { label: string; days: number[] }[] = [
   { label: 'Будни', days: [0, 1, 2, 3, 4] },
   { label: 'Выходные', days: [5, 6] },
 ]
-/** Быстрый выбор времени: утро, день, вечер, на ночь. */
-export const TIME_PRESETS: { label: string; minute: number }[] = [
-  { label: 'Утро', minute: 8 * 60 },
-  { label: 'День', minute: 13 * 60 },
-  { label: 'Вечер', minute: 19 * 60 },
-  { label: 'На ночь', minute: 22 * 60 },
-]
+/** Подписи быстрого выбора времени; само время у каждого своё (настройки расписания), стандартное — ниже. */
+export const PRESET_LABELS = ['Утро', 'День', 'Вечер', 'На ночь']
+export const DEFAULT_PRESET_MINUTES = [8 * 60, 13 * 60, 19 * 60, 22 * 60]
 export const COURSES: { label: string; days: number | null }[] = [
   { label: 'Бессрочно', days: null },
   { label: '7 дней', days: 7 },

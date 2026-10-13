@@ -19,6 +19,11 @@ const occurrence = (over: Partial<Occurrence> = {}): Occurrence => ({
   taken: false, taken_at: null, note: "", ...over,
 })
 
+// Приёмы недели 5–11 октября по слотам назначения, как отдаёт сервер (в таблице «Неделя» плашки берутся из них).
+const weekOf = (s: ScheduleT, over: (slot: number) => Partial<Occurrence> = () => ({})) => s.slots.map(sl => occurrence({
+  schedule_id: s.id, slot_id: sl.id, minute: sl.minute, date: new Date(Date.UTC(2026, 9, 5 + sl.weekday)).toISOString().slice(0, 10), ...over(sl.id),
+}))
+
 it('пустое расписание зовёт добавить лекарство', async () => {
   server.use(
     http.get('/api/families/7/schedule', () => HttpResponse.json([])),
@@ -120,7 +125,7 @@ it('неделя: нажатие на плашку открывает перен
   const moved: unknown[] = []
   server.use(
     http.get('/api/families/7/schedule', () => HttpResponse.json([schedule()])),
-    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json(weekOf(schedule()))),
     http.patch('/api/families/7/schedule/5/slots/12', async ({ request }) => { moved.push(await request.json()); return HttpResponse.json(schedule()) }),
   )
   const { user } = renderApp('/schedule')
@@ -132,10 +137,9 @@ it('неделя: нажатие на плашку открывает перен
 })
 
 it('неделя: день написан целиком, принятый приём отмечен зелёным', async () => {
-  const wed = today
   server.use(
     http.get('/api/families/7/schedule', () => HttpResponse.json([schedule()])),
-    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([occurrence({ slot_id: 12, date: wed, minute: 960, taken: true })])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json(weekOf(schedule(), id => (id === 12 ? { taken: true } : {})))),
   )
   renderApp('/schedule')
   const chip = await screen.findByRole('button', { name: 'Амепрозол 16:00, Ср, принято' })
@@ -194,4 +198,27 @@ it('пропущенное сегодня жёлтое, за прошлый де
   expect(await screen.findByText('Пропущено')).toHaveClass('expired')
   // курс стартовал в среду: вторник в таблице недели пуст
   expect(screen.queryByRole('button', { name: 'Амепрозол 08:00, Вт' })).toBeNull()
+})
+
+it('настройки расписания: своё время «Утро» сохраняется и появляется в быстром выборе', async () => {
+  let saved: unknown = null
+  let minutes = [480, 780, 1140, 1320]
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([schedule()])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([])),
+    http.get('/api/schedule-presets', () => HttpResponse.json({ minutes, default: [480, 780, 1140, 1320] })),
+    http.put('/api/schedule-presets', async ({ request }) => {
+      saved = await request.json(); minutes = (saved as { minutes: number[] }).minutes
+      return HttpResponse.json({ minutes, default: [480, 780, 1140, 1320] })
+    }),
+  )
+  const { user } = renderApp('/schedule')
+  await user.click(await screen.findByRole('button', { name: /Настройки/ }))
+  const sheet = await screen.findByRole('dialog')
+  await user.click(within(sheet).getByRole('button', { name: /Утро/ }))
+  fireEvent.change(within(sheet).getByLabelText('Утро: время', { selector: 'input' }), { target: { value: '630' } })
+  await user.click(within(sheet).getByRole('button', { name: 'Сохранить' }))
+  await waitFor(() => expect(saved).toEqual({ minutes: [630, 780, 1140, 1320] }))
+  await user.click(await screen.findByRole('button', { name: /Добавить/ }))
+  expect(await screen.findByRole('button', { name: /Утро 10:30/ })).toBeInTheDocument()
 })
