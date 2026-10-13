@@ -219,7 +219,8 @@ def _aware(dt: datetime) -> datetime:
 
 
 def record_intake(
-    db: Session, med: Medicine, user_id: int, amount: float, comment: str = "", now: datetime | None = None
+    db: Session, med: Medicine, user_id: int, amount: float, comment: str = "", now: datetime | None = None,
+    slot_id: int | None = None, slot_date: date | None = None,
 ) -> Intake:
     """Пишет приём в историю. Если тот же человек нажал «Принял» у этого лекарства меньше минуты
     назад (считая от последнего нажатия), дописывает количество в ту же запись."""
@@ -229,7 +230,8 @@ def record_intake(
         select(Intake).where(Intake.medicine_id == med.id, Intake.user_id == user_id)
         .order_by(Intake.last_at.desc(), Intake.id.desc()).limit(1)
     )
-    if last and now - _aware(last.last_at) <= MERGE_WINDOW:
+    # Нажатия для разных приёмов расписания (и обычные нажатия) в одну запись не сливаем.
+    if last and now - _aware(last.last_at) <= MERGE_WINDOW and (last.slot_id, last.slot_date) == (slot_id, slot_date):
         last.amount = round(last.amount + amount, 4)
         last.last_at = now
         if comment:
@@ -238,6 +240,7 @@ def record_intake(
     intake = Intake(
         family_id=med.family_id, medicine_id=med.id, medicine_name=med.name, unit=med.unit,
         user_id=user_id, amount=round(amount, 4), comment=comment, taken_at=now, last_at=now,
+        slot_id=slot_id, slot_date=slot_date,
     )
     db.add(intake)
     return intake

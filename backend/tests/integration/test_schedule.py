@@ -232,3 +232,27 @@ def test_note_saved_shown_and_limited(client, med):
     long = client.post(f"/api/families/{f}/schedule", headers=h, json={
         "medicine_id": mid, "times": [480], "note": "я" * 301})
     assert long.status_code == 422
+
+
+def test_press_on_missed_dose_closes_that_dose(client, med, db):
+    """Приём 14:10 пропущен, «Принял(а)» нажали в 18:20: закрывается именно он, а не приём 18:00."""
+    h, u, f, mid = med
+    s = create(client, h, f, mid, days=[0], times=[14 * 60 + 10, 18 * 60, 20 * 60])
+    slot = next(x for x in s["slots"] if x["minute"] == 14 * 60 + 10)
+    when = datetime(2026, 10, 5, 18, 20, tzinfo=MSK).astimezone(timezone.utc)
+    db.add(Intake(family_id=1, medicine_id=mid, medicine_name="Амепрозол", user_id=u["id"], amount=1,
+                  taken_at=when, last_at=when, slot_id=slot["id"], slot_date=MON))
+    db.commit()
+    occ = occurrences(db, u["id"], MON, MON)
+    assert [(o.minute, o.taken_at is not None) for o in occ] == [(850, True), (1080, False), (1200, False)]
+
+
+def test_consume_with_slot_does_not_merge_into_plain_press(client, med, db):
+    h, u, f, mid = med
+    s = create(client, h, f, mid, days=[0], times=[480])
+    url = f"/api/families/{f}/medicines/{mid}/consume"
+    assert client.post(url, headers=h, json={"amount": 1}).status_code == 200
+    body = {"amount": 1, "slot_id": s["slots"][0]["id"], "slot_date": MON.isoformat()}
+    assert client.post(url, headers=h, json=body).status_code == 200
+    rows = db.scalars(select(Intake).order_by(Intake.id)).all()
+    assert [(r.amount, r.slot_id) for r in rows] == [(1, None), (1, s["slots"][0]["id"])]
