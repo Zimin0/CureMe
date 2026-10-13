@@ -558,6 +558,24 @@ class SplitIn(BaseModel):
     medicine_ids: list[int] = Field(min_length=1, max_length=500)
 
 
+class TimePresetsIn(BaseModel):
+    """Время быстрых кнопок «Утро, День, Вечер, На ночь» в расписании, минуты от полуночи по Москве."""
+
+    minutes: list[int] = Field(min_length=4, max_length=4)
+
+    @field_validator("minutes")
+    @classmethod
+    def _in_day(cls, v: list[int]) -> list[int]:
+        if any(m < 0 or m > 1439 for m in v):
+            raise ValueError("Время должно быть в пределах суток")
+        return v
+
+
+class TimePresetsOut(BaseModel):
+    minutes: list[int]
+    default: list[int]
+
+
 class ConsumeIn(BaseModel):
     amount: float = Field(default=1, gt=0, le=1_000_000)
     comment: str = Field(default="", max_length=COMMENT_MAX)  # необязательно: «почему принял»

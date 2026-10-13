@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronLeft, ChevronRight, CalendarClock, Clock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, CalendarClock, Clock, Pencil, Plus, Settings, Trash2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { IntakeTabs } from '../components/IntakeTabs'
 import { api, Occurrence, Schedule as ScheduleT, ScheduleSlot } from '../api'
 import { useFamilyPath } from '../auth'
 import { ScheduleEditor } from '../components/ScheduleEditor'
 import { ScheduleNotify } from '../components/ScheduleNotify'
+import { ScheduleSettings } from '../components/ScheduleSettings'
 import { ScheduleRemove } from '../components/ScheduleRemove'
 import { SlotSheet } from '../components/SlotSheet'
 import { Empty, PageLoader, useToast } from '../components/ui'
@@ -39,6 +40,7 @@ export function Schedule() {
   const today = mskToday()
   const [day, setDay] = useState(today)
   const [editor, setEditor] = useState<ScheduleT | 'new' | null>(null)
+  const [settings, setSettings] = useState(false)
   const [removing, setRemoving] = useState<number | null>(null)
   const [slotSheet, setSlotSheet] = useState<{ schedule: number; slot: ScheduleSlot } | null>(null)
 
@@ -57,6 +59,7 @@ export function Schedule() {
     return c
   }, [occ.data])
 
+  const shownSet = useMemo(() => (occ.data ? new Set(occ.data.map(o => `${o.schedule_id}-${o.slot_id}-${weekdayOf(o.date)}`)) : null), [occ.data])
   const takenSet = useMemo(() => new Set((occ.data ?? []).filter(o => o.taken).map(o => `${o.schedule_id}-${o.slot_id}-${weekdayOf(o.date)}`)), [occ.data])
 
   const missedMap = useMemo(() => {
@@ -95,7 +98,10 @@ export function Schedule() {
           <h1>Расписание</h1>
           <p className="sub">Назначенные таблетки: что, когда и сколько принимать.</p>
         </div>
-        <button className={`btn ${locked ? 'plus-cta' : 'primary'}`} onClick={() => setEditor('new')}><Plus size={18} />Добавить</button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={() => setSettings(true)}><Settings size={18} />Настройки</button>
+          <button className={`btn ${locked ? 'plus-cta' : 'primary'}`} onClick={() => setEditor('new')}><Plus size={18} />Добавить</button>
+        </div>
       </div>
 
       {list.length === 0 && <ScheduleNotify />}
@@ -150,7 +156,7 @@ export function Schedule() {
             )}
           </section>
 
-          <WeekGrid schedules={list} week={week} taken={takenSet} missed={missedMap} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
+          <WeekGrid schedules={list} shown={shownSet} taken={takenSet} missed={missedMap} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
             onMove={(s, slot, weekday) => move.mutate({ s, slot, weekday })} />
 
           <section className="card flush" aria-label="Назначения">
@@ -177,6 +183,7 @@ export function Schedule() {
 
       {list.length > 0 && <ScheduleNotify />}
 
+      {settings && <ScheduleSettings onClose={() => setSettings(false)} />}
       {editor && <ScheduleEditor schedule={editor === 'new' ? undefined : editor} onClose={() => setEditor(null)} />}
       {removeTarget && <ScheduleRemove schedule={removeTarget} onClose={() => setRemoving(null)} />}
       {sheetTarget && slotSheet && (
@@ -191,12 +198,9 @@ export function Schedule() {
  * Неделя по дням: у каждого приёма своя плашка, её можно перетащить на другой день
  * (пальцем или мышью), а нажатие открывает лист с точной правкой дня и времени.
  */
-// назначение идёт в этот день: внутри периода (как в day-списке; до старта и после конца приёмов нет)
-const inPeriod = (s: ScheduleT, iso: string) => iso >= s.start_date && (!s.end_date || iso <= s.end_date)
-
-function WeekGrid({ schedules, week, taken, missed, onOpen, onMove }: {
+function WeekGrid({ schedules, shown, taken, missed, onOpen, onMove }: {
   schedules: ScheduleT[]
-  week: string  // понедельник показанной недели
+  shown: Set<string> | null  // приёмы недели по данным сервера (как в списке дня); пока не загрузились — null, показываем всё
   missed: Map<string, string>  // тот же ключ: 'late' — пропущено сегодня, 'lost' — в прошлые дни
   taken: Set<string>  // `${расписание}-${приём}-${день недели}`: уже принято на этой неделе
   onOpen: (scheduleId: number, slot: ScheduleSlot) => void
@@ -205,7 +209,7 @@ function WeekGrid({ schedules, week, taken, missed, onOpen, onMove }: {
   const [drag, setDrag] = useState<{ label: string; x: number; y: number; over: number | null } | null>(null)
   const start = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const todayDay = weekdayOf(mskToday())
-  const cols = DAY_SHORT.map((_, d) => schedules.flatMap(s => s.slots.filter(x => x.weekday === d && inPeriod(s, addDays(week, d))).map(slot => ({ s, slot })))
+  const cols = DAY_SHORT.map((_, d) => schedules.flatMap(s => s.slots.filter(x => x.weekday === d && (!shown || shown.has(`${s.id}-${x.id}-${d}`))).map(slot => ({ s, slot })))
     .sort((a, b) => a.slot.minute - b.slot.minute || a.s.medicine_name.localeCompare(b.s.medicine_name)))
 
   const overDay = (x: number, y: number) => {

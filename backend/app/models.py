@@ -33,6 +33,8 @@ class User(Base):
     plus_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Когда аккаунту выдан пробный Плюс. Выдаётся один раз: повторно (в том числе после окончания) не дарим.
     trial_granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Своё время быстрых кнопок в расписании: минуты от полуночи для «Утро, День, Вечер, На ночь». Пусто — стандартное.
+    time_presets: Mapped[list[int] | None] = mapped_column(JSON)
     # Когда человек перешёл по ссылке из письма. Пусто — почта не подтверждена.
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Хеш (SHA-256) одноразового токена из последнего письма и время отправки: сам токен в базе не храним,
