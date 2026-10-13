@@ -3,6 +3,7 @@ import type { Schedule } from './api'
 
 export const DAY_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 export const DAY_LONG = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
+export const DAY_FULL = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 export const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
 export const DAY_PRESETS: { label: string; days: number[] }[] = [
   { label: 'Каждый день', days: EVERY_DAY },

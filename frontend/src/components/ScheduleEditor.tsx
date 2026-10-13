@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, Medicine, Schedule } from '../api'
 import { useFamilyPath } from '../auth'
-import { COURSES, EVERY_DAY, MAX_COURSE_DAYS, addDays, mskToday } from '../schedule'
+import { COURSES, EVERY_DAY, MAX_COURSE_DAYS, addDays, fmtMinute, mskToday } from '../schedule'
 import { DayChips, TimesPicker } from './SchedulePickers'
 import { Stepper } from './QuantityInput'
 import { PlusBanner, usePlan } from '../plan'
@@ -27,7 +27,9 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const [amount, setAmount] = useState(schedule?.amount ?? 1)
   const [days, setDays] = useState<number[]>(editing ? [] : EVERY_DAY)
   const [times, setTimes] = useState<number[]>([])
-  const [everyWeeks, setEveryWeeks] = useState(schedule?.every_weeks ?? 1)
+  // Уже назначенные времена: ключ — прежняя минута, значение — новая (правка существующих приёмов).
+  const oldMinutes = [...new Set((schedule?.slots ?? []).map(s => s.minute))].sort((a, b) => a - b)
+  const [newMinutes, setNewMinutes] = useState<Record<number, number>>(() => Object.fromEntries(oldMinutes.map(m => [m, m])))
   const [end, setEnd] = useState<string | null>(schedule?.end_date ?? null)
   const [startDate, setStartDate] = useState(schedule?.start_date ?? mskToday())
   const [note, setNote] = useState(schedule?.note ?? '')
@@ -44,9 +46,15 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
   const save = useMutation({
     mutationFn: async () => {
       if (!schedule) {
-        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, every_weeks: everyWeeks, start_date: startDate, end_date: end, note } })
+        return api(fam('/schedule'), { body: { medicine_id: medId, amount, days, times, start_date: startDate, end_date: end, note } })
       }
-      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, every_weeks: everyWeeks, start_date: startDate, end_date: end, note } })
+      await api(fam(`/schedule/${schedule.id}`), { method: 'PATCH', body: { amount, start_date: startDate, end_date: end, note } })
+      for (const m of oldMinutes) {
+        if (newMinutes[m] === m) continue
+        for (const slot of schedule.slots.filter(x => x.minute === m)) {
+          await api(fam(`/schedule/${schedule.id}/slots/${slot.id}`), { method: 'PATCH', body: { minute: newMinutes[m] } })
+        }
+      }
       if (times.length) await api(fam(`/schedule/${schedule.id}/slots`), { body: { days: days.length ? days : EVERY_DAY, times } })
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['schedule'] }); toast(editing ? 'Расписание обновлено' : 'Добавили в расписание'); onClose() },
@@ -99,6 +107,23 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
           <div className="row"><Stepper value={amount} onChange={setAmount} min={0.5} label="Доза за один приём" /><span className="muted">{unit}</span></div>
         </section>
 
+        {editing && oldMinutes.length > 0 && (
+          <section className="stack" style={{ gap: 8 }}>
+            <h3>Время приёма</h3>
+            <p className="muted small">Изменится у всех дней, где назначено это время.</p>
+            <div className="chips wrap">
+              {oldMinutes.map(m => (
+                <input key={m} className="input" type="time" style={{ width: 'auto' }} aria-label={`Время приёма ${fmtMinute(m)}`}
+                  value={fmtMinute(newMinutes[m])}
+                  onChange={e => {
+                    const [h, mm] = e.target.value.split(':').map(Number)
+                    if (Number.isFinite(h) && Number.isFinite(mm)) setNewMinutes(v => ({ ...v, [m]: h * 60 + mm }))
+                  }} />
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="stack" style={{ gap: 8 }}>
           <h3>{editing ? 'Добавить дни' : '3. Дни'}</h3>
           <DayChips value={days} onChange={setDays} />
@@ -110,11 +135,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule?: Schedule; onC
         </section>
 
         <section className="stack" style={{ gap: 8 }}>
-          <h3>{editing ? 'Повтор и срок' : '5. Повтор и срок'}</h3>
-          <div className="segmented" role="group" aria-label="Повтор">
-            <button type="button" className={everyWeeks === 1 ? 'on' : ''} onClick={() => setEveryWeeks(1)}>Каждую неделю</button>
-            <button type="button" className={everyWeeks === 2 ? 'on' : ''} onClick={() => setEveryWeeks(2)}>Через неделю</button>
-          </div>
+          <h3>{editing ? 'Срок' : '5. Срок'}</h3>
           <label className="stack" style={{ gap: 4 }}>
             <span className="muted small">Начало курса</span>
             <input className="input" type="date" value={startDate} min={editing ? undefined : mskToday()} aria-label="Дата начала курса"
