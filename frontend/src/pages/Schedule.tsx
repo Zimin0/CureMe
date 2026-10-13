@@ -27,6 +27,8 @@ function stateOf(o: Occurrence, today: string, now: number): State {
 }
 const STATE_LABEL: Record<State, string> = { taken: 'Принято', due: 'Пора принять', missed: 'Пропущено', soon: 'Впереди' }
 const STATE_BADGE: Record<State, string> = { taken: 'ok', due: 'accent', missed: 'expired', soon: 'info' }
+// Пропущенное: жёлтым до конца сегодняшнего дня, красным, когда день прошёл
+const badgeOf = (st: State, date: string, today: string) => (st === 'missed' && date >= today ? 'low' : STATE_BADGE[st])
 
 export function Schedule() {
   const fam = useFamilyPath()
@@ -56,6 +58,12 @@ export function Schedule() {
   }, [occ.data])
 
   const takenSet = useMemo(() => new Set((occ.data ?? []).filter(o => o.taken).map(o => `${o.schedule_id}-${o.slot_id}-${weekdayOf(o.date)}`)), [occ.data])
+
+  const missedMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const o of occ.data ?? []) if (stateOf(o, today, now) === 'missed') m.set(`${o.schedule_id}-${o.slot_id}-${weekdayOf(o.date)}`, o.date >= today ? 'late' : 'lost')
+    return m
+  }, [occ.data, today, now])
 
   const take = useMutation({
     mutationFn: (o: Occurrence) => api(fam(`/medicines/${o.medicine_id}/consume`), { body: { amount: o.amount } }),
@@ -131,7 +139,7 @@ export function Schedule() {
                         <div className="muted small">{fmtQty(o.amount)} {o.unit}</div>
                         {o.note && <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{o.note}</div>}
                       </div>
-                      <span className={`badge ${STATE_BADGE[st]}`}>{STATE_LABEL[st]}</span>
+                      <span className={`badge ${badgeOf(st, o.date, today)}`}>{STATE_LABEL[st]}</span>
                       {st !== 'taken' && o.medicine_id !== null && (st !== 'soon' || (o.date === today && o.minute - now <= EARLY)) && (
                         <button className="btn primary sm" disabled={take.isPending} onClick={() => take.mutate(o)}><Check size={16} />Принял(а)</button>
                       )}
@@ -142,7 +150,7 @@ export function Schedule() {
             )}
           </section>
 
-          <WeekGrid schedules={list} taken={takenSet} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
+          <WeekGrid schedules={list} week={week} taken={takenSet} missed={missedMap} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
             onMove={(s, slot, weekday) => move.mutate({ s, slot, weekday })} />
 
           <section className="card flush" aria-label="Назначения">
@@ -155,10 +163,12 @@ export function Schedule() {
                   {repeatText(s) && <div className="faint small">{repeatText(s)}</div>}
                   {s.note && <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{s.note}</div>}
                 </div>
-                <button className="icon-btn" aria-label={`Изменить ${s.medicine_name}`} onClick={() => setEditor(s)}><Pencil size={17} /></button>
-                <button className="btn ghost sm" onClick={() => setRemoving(s.id)}>Убрать приёмы</button>
-                <button className="icon-btn" aria-label={`Удалить ${s.medicine_name}`}
-                  onClick={() => window.confirm(`Удалить всё расписание «${s.medicine_name}»?`) && dropAll.mutate(s.id)}><Trash2 size={17} /></button>
+                <div className="schedule-actions">
+                  <button className="icon-btn" aria-label={`Изменить ${s.medicine_name}`} onClick={() => setEditor(s)}><Pencil size={17} /></button>
+                  <button className="btn ghost sm" onClick={() => setRemoving(s.id)}>Убрать приёмы</button>
+                  <button className="icon-btn" aria-label={`Удалить ${s.medicine_name}`}
+                    onClick={() => window.confirm(`Удалить всё расписание «${s.medicine_name}»?`) && dropAll.mutate(s.id)}><Trash2 size={17} /></button>
+                </div>
               </div>
             ))}
           </section>
@@ -181,8 +191,13 @@ export function Schedule() {
  * Неделя по дням: у каждого приёма своя плашка, её можно перетащить на другой день
  * (пальцем или мышью), а нажатие открывает лист с точной правкой дня и времени.
  */
-function WeekGrid({ schedules, taken, onOpen, onMove }: {
+// назначение идёт в этот день: внутри периода (как в day-списке; до старта и после конца приёмов нет)
+const inPeriod = (s: ScheduleT, iso: string) => iso >= s.start_date && (!s.end_date || iso <= s.end_date)
+
+function WeekGrid({ schedules, week, taken, missed, onOpen, onMove }: {
   schedules: ScheduleT[]
+  week: string  // понедельник показанной недели
+  missed: Map<string, string>  // тот же ключ: 'late' — пропущено сегодня, 'lost' — в прошлые дни
   taken: Set<string>  // `${расписание}-${приём}-${день недели}`: уже принято на этой неделе
   onOpen: (scheduleId: number, slot: ScheduleSlot) => void
   onMove: (scheduleId: number, slotId: number, weekday: number) => void
@@ -190,7 +205,7 @@ function WeekGrid({ schedules, taken, onOpen, onMove }: {
   const [drag, setDrag] = useState<{ label: string; x: number; y: number; over: number | null } | null>(null)
   const start = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const todayDay = weekdayOf(mskToday())
-  const cols = DAY_SHORT.map((_, d) => schedules.flatMap(s => s.slots.filter(x => x.weekday === d).map(slot => ({ s, slot })))
+  const cols = DAY_SHORT.map((_, d) => schedules.flatMap(s => s.slots.filter(x => x.weekday === d && inPeriod(s, addDays(week, d))).map(slot => ({ s, slot })))
     .sort((a, b) => a.slot.minute - b.slot.minute || a.s.medicine_name.localeCompare(b.s.medicine_name)))
 
   const overDay = (x: number, y: number) => {
@@ -228,7 +243,7 @@ function WeekGrid({ schedules, taken, onOpen, onMove }: {
             {items.map(({ s, slot }) => {
               const label = `${s.medicine_name} ${fmtMinute(slot.minute)}`
               return (
-                <button key={slot.id} type="button" className={`slot-chip${taken.has(`${s.id}-${slot.id}-${d}`) ? ' taken' : ''}`}
+                <button key={slot.id} type="button" className={`slot-chip${taken.has(`${s.id}-${slot.id}-${d}`) ? ' taken' : ''}${missed.has(`${s.id}-${slot.id}-${d}`) ? ` missed-${missed.get(`${s.id}-${slot.id}-${d}`)}` : ''}`}
                   aria-label={`${label}, ${DAY_SHORT[d]}${taken.has(`${s.id}-${slot.id}-${d}`) ? ', принято' : ''}`}
                   onPointerDown={down} onPointerMove={e => moveTo(e, label)} onPointerUp={e => up(e, s, slot)}
                   onPointerCancel={() => { start.current = null; setDrag(null) }}

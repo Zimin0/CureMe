@@ -178,3 +178,20 @@ it('без Плюса форма «Добавить в расписание» з
   expect(screen.getAllByRole('button', { name: 'Добавить в расписание' }).at(-1)).toBeDisabled()
   expect(screen.getByLabelText('Дата начала курса').closest('fieldset')).toBeDisabled()
 })
+
+it('пропущенное сегодня жёлтое, за прошлый день красное; дни до старта курса в неделе пусты', async () => {
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([schedule({ start_date: '2026-10-07' })])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json([
+      occurrence({ slot_id: 1, minute: 0 }),
+      occurrence({ slot_id: 2, minute: 60, date: '2026-10-06' }),
+    ])),
+  )
+  const { user } = renderApp('/schedule')
+  const badge = await screen.findByText('Пропущено')
+  expect(badge).toHaveClass('low')
+  await user.click(screen.getByRole('tab', { name: /Вт/ }))
+  expect(await screen.findByText('Пропущено')).toHaveClass('expired')
+  // курс стартовал в среду: вторник в таблице недели пуст
+  expect(screen.queryByRole('button', { name: 'Амепрозол 08:00, Вт' })).toBeNull()
+})
