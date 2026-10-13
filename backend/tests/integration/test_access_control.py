@@ -127,6 +127,8 @@ def test_account_endpoints_require_login(client):
     assert client.delete("/api/illnesses/1").status_code == 401
     assert client.post("/api/illnesses/1/documents", files={"file": ("p.jpg", JPEG, "image/jpeg")}).status_code == 401
     assert client.get("/api/schedule-notifications").status_code == 401
+    assert client.get("/api/schedule-presets").status_code == 401
+    assert client.put("/api/schedule-presets", json={"minutes": [1, 2, 3, 4]}).status_code == 401
     assert client.put("/api/schedule-notifications", json={"enabled": True}).status_code == 401
     assert client.post("/api/schedule-notifications/trusted", json={"name": "X", "email": "x@example.com", "attest": True}).status_code == 401
     assert client.post("/api/schedule-notifications/trusted/resend").status_code == 401

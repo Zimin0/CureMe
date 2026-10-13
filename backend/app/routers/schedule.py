@@ -13,10 +13,12 @@ from ..schedule import occurrences
 from ..schemas import MAX_COURSE_DAYS
 from ..schemas import (
     MAX_SCHEDULES, MAX_TIMES, OccurrenceOut, ScheduleCreate, ScheduleOut, ScheduleUpdate, SlotMove, SlotsIn,
-    SlotsRemove,
+    SlotsRemove, TimePresetsIn, TimePresetsOut,
 )
 
 router = APIRouter(prefix="/api/families/{family_id}/schedule", tags=["schedule"])
+presets = APIRouter(prefix="/api/schedule-presets", tags=["schedule"])
+DEFAULT_PRESETS = [8 * 60, 13 * 60, 19 * 60, 22 * 60]  # утро, день, вечер, на ночь
 MAX_SLOTS = 7 * MAX_TIMES  # приёмов в неделю у одного назначения
 MAX_RANGE_DAYS = 31
 
@@ -186,3 +188,15 @@ def move_slot(
     slot.weekday, slot.minute = weekday, minute
     db.commit()
     return _out(s)
+
+
+@presets.get("", response_model=TimePresetsOut)
+def get_presets(user: User = Depends(current_user)):
+    return TimePresetsOut(minutes=user.time_presets or DEFAULT_PRESETS, default=DEFAULT_PRESETS)
+
+
+@presets.put("", response_model=TimePresetsOut)
+def set_presets(body: TimePresetsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    user.time_presets = None if body.minutes == DEFAULT_PRESETS else body.minutes
+    db.commit()
+    return TimePresetsOut(minutes=user.time_presets or DEFAULT_PRESETS, default=DEFAULT_PRESETS)

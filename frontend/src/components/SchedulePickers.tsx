@@ -1,6 +1,7 @@
 import { Plus, X } from 'lucide-react'
 import { useState } from 'react'
-import { DAY_SHORT, fmtMinute, TIME_PRESETS } from '../schedule'
+import { DAY_SHORT, fmtMinute } from '../schedule'
+import { useTimePresets } from '../timePresets'
 import { TimeSlider } from './TimeSlider'
 
 
@@ -26,12 +27,13 @@ export function DayChips({ value, onChange, only = null }: {
 /** Время приёма: утро/день/вечер/на ночь одним нажатием или ползунок для любого времени. Приёмов в день может быть несколько. */
 export function TimesPicker({ value, onChange, max = 12 }: { value: number[]; onChange: (times: number[]) => void; max?: number }) {
   const [custom, setCustom] = useState(12 * 60)
+  const presets = useTimePresets()
   const add = (m: number) => value.length < max && !value.includes(m) && onChange([...value, m].sort((a, b) => a - b))
   const remove = (m: number) => onChange(value.filter(x => x !== m))
   return (
     <div className="stack" style={{ gap: 10 }}>
       <div className="chips wrap" aria-label="Готовое время">
-        {TIME_PRESETS.map(p => (
+        {presets.map(p => (
           <button key={p.label} type="button" className={`chip${value.includes(p.minute) ? ' active' : ''}`}
             onClick={() => (value.includes(p.minute) ? remove(p.minute) : add(p.minute))}>
             {p.label} <span className="count">{fmtMinute(p.minute)}</span>

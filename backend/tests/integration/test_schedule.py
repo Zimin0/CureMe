@@ -256,3 +256,16 @@ def test_consume_with_slot_does_not_merge_into_plain_press(client, med, db):
     assert client.post(url, headers=h, json=body).status_code == 200
     rows = db.scalars(select(Intake).order_by(Intake.id)).all()
     assert [(r.amount, r.slot_id) for r in rows] == [(1, None), (1, s["slots"][0]["id"])]
+
+
+def test_time_presets_default_save_reset_and_validation(client, med):
+    h, u, f, mid = med
+    r = client.get("/api/schedule-presets", headers=h).json()
+    assert r["minutes"] == r["default"] == [480, 780, 1140, 1320]
+    assert client.put("/api/schedule-presets", headers=h, json={"minutes": [630, 780, 1140, 1320]}).json()["minutes"][0] == 630
+    assert client.get("/api/schedule-presets", headers=h).json()["minutes"][0] == 630
+    for bad in ([1, 2, 3], [1, 2, 3, 1440], [-1, 2, 3, 4]):
+        assert client.put("/api/schedule-presets", headers=h, json={"minutes": bad}).status_code == 422
+    # то же, что стандартное, снова хранится как «по умолчанию»
+    client.put("/api/schedule-presets", headers=h, json={"minutes": [480, 780, 1140, 1320]})
+    assert client.get("/api/schedule-presets", headers=h).json()["minutes"] == [480, 780, 1140, 1320]

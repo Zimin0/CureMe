@@ -90,6 +90,7 @@ async def security_headers(request: Request, call_next):
 for r in (auth, families, categories, medicines, intakes, illness, assist, files, reports, admin, notifications, payments, schedule, schedule_notify, stats):
     app.include_router(r.router)
 app.include_router(schedule_notify.public)
+app.include_router(schedule.presets)
 
 
 @app.get("/api/health")
