@@ -222,3 +222,21 @@ it('настройки расписания: своё время «Утро» с
   await user.click(await screen.findByRole('button', { name: /Добавить/ }))
   expect(await screen.findByRole('button', { name: /Утро 10:30/ })).toBeInTheDocument()
 })
+
+it('неделя: у пропущенного приёма в меню есть «Отметить принятым», у будущего нет', async () => {
+  const consumed: unknown[] = []
+  server.use(
+    http.get('/api/families/7/schedule', () => HttpResponse.json([schedule()])),
+    http.get('/api/families/7/schedule/occurrences', () => HttpResponse.json(weekOf(schedule()))),
+    http.post('/api/families/7/medicines/1/consume', async ({ request }) => { consumed.push(await request.json()); return HttpResponse.json({}) }),
+  )
+  const { user } = renderApp('/schedule')
+  await user.click(await screen.findByRole('button', { name: 'Амепрозол 08:00, Вт' }))  // вторник прошёл: пропущено
+  let sheet = await screen.findByRole('dialog')
+  await user.click(within(sheet).getByRole('button', { name: 'Отметить принятым в 08:00' }))
+  await waitFor(() => expect(consumed).toEqual([{ amount: 1, slot_id: 1, slot_date: '2026-10-06', at_slot: true }]))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await user.click(screen.getByRole('button', { name: 'Амепрозол 16:00, Ср' }))  // среда 16:00: ещё впереди
+  sheet = await screen.findByRole('dialog')
+  expect(within(sheet).queryByRole('button', { name: /Отметить принятым/ })).toBeNull()
+})
