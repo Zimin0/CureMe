@@ -99,8 +99,8 @@ export function Schedule() {
           <p className="sub">Назначенные таблетки: что, когда и сколько принимать.</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn" onClick={() => setSettings(true)}><Settings size={18} />Настройки</button>
           <button className={`btn ${locked ? 'plus-cta' : 'primary'}`} onClick={() => setEditor('new')}><Plus size={18} />Добавить</button>
+          <button className="btn" onClick={() => setSettings(true)}><Settings size={18} />Настройки</button>
         </div>
       </div>
 
