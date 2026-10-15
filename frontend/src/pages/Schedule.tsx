@@ -42,7 +42,7 @@ export function Schedule() {
   const [editor, setEditor] = useState<ScheduleT | 'new' | null>(null)
   const [settings, setSettings] = useState(false)
   const [removing, setRemoving] = useState<number | null>(null)
-  const [slotSheet, setSlotSheet] = useState<{ schedule: number; slot: ScheduleSlot } | null>(null)
+  const [slotSheet, setSlotSheet] = useState<{ schedule: number; slot: ScheduleSlot; date: string } | null>(null)
 
   const week = mondayOf(day)
   const schedules = useQuery({ queryKey: ['schedule', fam(''), 'list'], queryFn: () => api<ScheduleT[]>(fam('/schedule')) })
@@ -156,7 +156,7 @@ export function Schedule() {
             )}
           </section>
 
-          <WeekGrid schedules={list} shown={shownSet} taken={takenSet} missed={missedMap} onOpen={(schedule, slot) => setSlotSheet({ schedule, slot })}
+          <WeekGrid schedules={list} week={week} shown={shownSet} taken={takenSet} missed={missedMap} onOpen={(schedule, slot, date) => setSlotSheet({ schedule, slot, date })}
             onMove={(s, slot, weekday) => move.mutate({ s, slot, weekday })} />
 
           <section className="card flush" aria-label="Назначения">
@@ -187,7 +187,9 @@ export function Schedule() {
       {editor && <ScheduleEditor schedule={editor === 'new' ? undefined : editor} onClose={() => setEditor(null)} />}
       {removeTarget && <ScheduleRemove schedule={removeTarget} onClose={() => setRemoving(null)} />}
       {sheetTarget && slotSheet && (
-        <SlotSheet schedule={sheetTarget} slot={slotSheet.slot} onClose={() => setSlotSheet(null)}
+        <SlotSheet schedule={sheetTarget} slot={slotSheet.slot} date={slotSheet.date}
+          missed={(occ.data ?? []).find(o => o.schedule_id === sheetTarget.id && o.slot_id === slotSheet.slot.id && o.date === slotSheet.date && stateOf(o, today, now) === 'missed')}
+          onClose={() => setSlotSheet(null)}
           onRemoveSeries={() => { setRemoving(sheetTarget.id); setSlotSheet(null) }} />
       )}
     </div>
@@ -198,12 +200,13 @@ export function Schedule() {
  * Неделя по дням: у каждого приёма своя плашка, её можно перетащить на другой день
  * (пальцем или мышью), а нажатие открывает лист с точной правкой дня и времени.
  */
-function WeekGrid({ schedules, shown, taken, missed, onOpen, onMove }: {
+function WeekGrid({ schedules, week, shown, taken, missed, onOpen, onMove }: {
   schedules: ScheduleT[]
+  week: string  // понедельник показанной недели
   shown: Set<string> | null  // приёмы недели по данным сервера (как в списке дня); пока не загрузились — null, показываем всё
   missed: Map<string, string>  // тот же ключ: 'late' — пропущено сегодня, 'lost' — в прошлые дни
   taken: Set<string>  // `${расписание}-${приём}-${день недели}`: уже принято на этой неделе
-  onOpen: (scheduleId: number, slot: ScheduleSlot) => void
+  onOpen: (scheduleId: number, slot: ScheduleSlot, date: string) => void
   onMove: (scheduleId: number, slotId: number, weekday: number) => void
 }) {
   const [drag, setDrag] = useState<{ label: string; x: number; y: number; over: number | null } | null>(null)
@@ -231,7 +234,7 @@ function WeekGrid({ schedules, shown, taken, missed, onOpen, onMove }: {
     const st = start.current
     start.current = null
     setDrag(null)
-    if (!st?.moved) return onOpen(s.id, slot)
+    if (!st?.moved) return onOpen(s.id, slot, addDays(week, slot.weekday))
     const target = overDay(e.clientX, e.clientY)
     if (target !== null && target !== slot.weekday) onMove(s.id, slot.id, target)
   }
@@ -251,7 +254,7 @@ function WeekGrid({ schedules, shown, taken, missed, onOpen, onMove }: {
                   aria-label={`${label}, ${DAY_SHORT[d]}${taken.has(`${s.id}-${slot.id}-${d}`) ? ', принято' : ''}`}
                   onPointerDown={down} onPointerMove={e => moveTo(e, label)} onPointerUp={e => up(e, s, slot)}
                   onPointerCancel={() => { start.current = null; setDrag(null) }}
-                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen(s.id, slot))}>
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen(s.id, slot, addDays(week, slot.weekday)))}>
                   <b>{fmtMinute(slot.minute)}</b><span>{s.medicine_name}</span>
                 </button>
               )

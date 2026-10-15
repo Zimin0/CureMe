@@ -1,14 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, Schedule, ScheduleSlot } from '../api'
+import { api, Occurrence, Schedule, ScheduleSlot } from '../api'
 import { useFamilyPath } from '../auth'
 import { DAY_LONG, DAY_SHORT, fmtMinute } from '../schedule'
 import { TimeSlider } from './TimeSlider'
 import { Sheet, useToast } from './ui'
 
 /** Один приём: сдвинуть на другой день или время либо убрать. То же, что перетаскивание, но нажатиями. */
-export function SlotSheet({ schedule, slot, onClose, onRemoveSeries }: {
+export function SlotSheet({ schedule, slot, date, missed, onClose, onRemoveSeries }: {
   schedule: Schedule; slot: ScheduleSlot; onClose: () => void; onRemoveSeries: () => void
+  date: string               // день, на который нажали, ГГГГ-ММ-ДД
+  missed?: Occurrence        // этот приём пропущен: можно отметить принятым временем из расписания
 }) {
   const fam = useFamilyPath()
   const qc = useQueryClient()
@@ -24,6 +26,12 @@ export function SlotSheet({ schedule, slot, onClose, onRemoveSeries }: {
   const drop = useMutation({
     mutationFn: () => api(fam(`/schedule/${schedule.id}/remove`), { body: { days: [slot.weekday], times: [slot.minute] } }),
     onSuccess: () => done('Приём убран'), onError,
+  })
+  const mark = useMutation({
+    mutationFn: () => api(fam(`/medicines/${schedule.medicine_id}/consume`), {
+      body: { amount: schedule.amount, slot_id: slot.id, slot_date: date, at_slot: true },
+    }),
+    onSuccess: () => { qc.invalidateQueries(); toast(`Отметили приём на ${fmtMinute(slot.minute)}`); onClose() }, onError,
   })
   const changed = weekday !== slot.weekday || minute !== slot.minute
   return (
@@ -42,7 +50,12 @@ export function SlotSheet({ schedule, slot, onClose, onRemoveSeries }: {
           <h3>Время</h3>
           <TimeSlider value={minute} onChange={setMinute} />
         </section>
-        <button className="btn primary block" disabled={!changed || move.isPending} onClick={() => move.mutate()}>Перенести</button>
+        {missed && schedule.medicine_id !== null && (
+          <button className="btn primary block" disabled={mark.isPending} onClick={() => mark.mutate()}>
+            Отметить принятым в {fmtMinute(slot.minute)}
+          </button>
+        )}
+        <button className={`btn block${missed ? '' : ' primary'}`} disabled={!changed || move.isPending} onClick={() => move.mutate()}>Перенести</button>
         <button className="btn danger block" disabled={drop.isPending} onClick={() => drop.mutate()}>Убрать только этот приём</button>
         <button className="btn ghost block" onClick={onRemoveSeries}>Убрать серией…</button>
       </div>
