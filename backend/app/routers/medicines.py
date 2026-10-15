@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .. import cabinet_ops, reminders
@@ -9,7 +10,10 @@ from ..db import get_db
 from ..deps import current_user, family_membership, get_family
 from ..limits import ensure_can_add_medicine
 from ..lookup import remember_product
-from ..models import Category, Family, Medicine, MedicineCategory, Membership, Package, User, UserMark
+from ..models import (
+    Category, Family, Intake, Medicine, MedicineCategory, Membership, Package, Schedule, ScheduleSlot, User, UserMark,
+)
+from ..reminders import MSK
 from ..schemas import (
     ConsumeIn, MarkIn, MedicineDetail, MedicineIn, MedicineOut, MedicineUpdate, MoveIn, MoveOut, PackageIn,
     PackageOut, PackageUpdate,
@@ -197,16 +201,40 @@ def mark(
     return _detail(db, fam, medicine_id, user)
 
 
+def _slot_time(db: Session, fam: Family, user: User, med: Medicine, body: ConsumeIn) -> datetime:
+    """Время приёма из расписания для «Отметить принятым» на пропущенном: день плюс время слота по Москве.
+
+    Слот должен быть из личного расписания этого лекарства, день — совпадать с днём недели слота и не быть будущим;
+    один приём отмечается один раз.
+    """
+    if body.slot_id is None or body.slot_date is None:
+        raise HTTPException(400, "Не указан приём из расписания")
+    slot = db.scalar(
+        select(ScheduleSlot).join(Schedule).where(
+            ScheduleSlot.id == body.slot_id, Schedule.user_id == user.id, Schedule.family_id == fam.id, Schedule.medicine_id == med.id)
+    )
+    if not slot or slot.weekday != body.slot_date.weekday():
+        raise HTTPException(404, "Приём не найден")
+    when = datetime.combine(body.slot_date, time(), tzinfo=MSK) + timedelta(minutes=slot.minute)
+    if when > datetime.now(timezone.utc):
+        raise HTTPException(400, "Этот приём ещё впереди")
+    if db.scalar(select(Intake.id).where(Intake.user_id == user.id, Intake.slot_id == slot.id, Intake.slot_date == body.slot_date)):
+        raise HTTPException(409, "Этот приём уже отмечен")
+    return when.astimezone(timezone.utc)
+
+
 @router.post("/{medicine_id}/consume", response_model=MedicineDetail)
 def consume_medicine(
     medicine_id: int, body: ConsumeIn,
     fam: Family = Depends(get_family), user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
     med = _load_one(db, fam, medicine_id)
+    taken_at = _slot_time(db, fam, user, med, body) if body.at_slot else None
     short = consume(med, body.amount)
     if short >= body.amount:
         raise HTTPException(400, "В аптечке не осталось годных упаковок")
-    record_intake(db, med, user.id, body.amount - short, body.comment, slot_id=body.slot_id, slot_date=body.slot_date)
+    record_intake(db, med, user.id, body.amount - short, body.comment, now=taken_at, slot_id=body.slot_id, slot_date=body.slot_date,
+                  merge=taken_at is None)
     db.commit()
     reminders.nudge(fam.id)  # остаток мог опуститься до порога «Напомнить, когда останется»
     return _detail(db, fam, medicine_id, user)

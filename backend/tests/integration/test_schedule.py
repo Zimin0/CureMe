@@ -269,3 +269,33 @@ def test_time_presets_default_save_reset_and_validation(client, med):
     # то же, что стандартное, снова хранится как «по умолчанию»
     client.put("/api/schedule-presets", headers=h, json={"minutes": [480, 780, 1140, 1320]})
     assert client.get("/api/schedule-presets", headers=h).json()["minutes"] == [480, 780, 1140, 1320]
+
+
+def test_mark_missed_dose_taken_at_slot_time(client, med, db):
+    """«Отметить принятым» на пропущенном: время из расписания, остаток списан, приём закрыт, повтор — 409."""
+    h, u, f, mid = med
+    s = create(client, h, f, mid, days=[0], times=[10 * 60 + 25])  # пн 10:25
+    slot = s["slots"][0]["id"]
+    url = f"/api/families/{f}/medicines/{mid}/consume"
+    body = {"amount": 2, "slot_id": slot, "slot_date": MON.isoformat(), "at_slot": True}
+    r = client.post(url, headers=h, json=body)
+    assert r.status_code == 200, r.text
+    assert sum(p["quantity"] for p in r.json()["packages"]) == 28
+    row = db.scalars(select(Intake)).one()
+    assert (row.amount, row.slot_id, row.slot_date) == (2, slot, MON)
+    assert row.taken_at.replace(tzinfo=timezone.utc).astimezone(MSK).strftime("%H:%M") == "10:25"
+    assert occurrences(db, u["id"], MON, MON)[0].taken_at is not None
+    assert client.post(url, headers=h, json=body).status_code == 409
+
+
+def test_mark_taken_validation(client, med):
+    h, u, f, mid = med
+    s = create(client, h, f, mid, days=[0], times=[600])
+    slot = s["slots"][0]["id"]
+    url = f"/api/families/{f}/medicines/{mid}/consume"
+    ok = {"amount": 1, "slot_id": slot, "slot_date": MON.isoformat(), "at_slot": True}
+    assert client.post(url, headers=h, json={**ok, "slot_id": None}).status_code == 400
+    assert client.post(url, headers=h, json={**ok, "slot_id": slot + 999}).status_code == 404
+    assert client.post(url, headers=h, json={**ok, "slot_date": (MON + timedelta(days=1)).isoformat()}).status_code == 404  # не тот день недели
+    future = (date.today() + timedelta(days=(7 - date.today().weekday()) % 7 + 7)).isoformat()  # ближайший будущий понедельник
+    assert client.post(url, headers=h, json={**ok, "slot_date": future}).status_code == 400

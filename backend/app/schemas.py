@@ -581,6 +581,7 @@ class ConsumeIn(BaseModel):
     comment: str = Field(default="", max_length=COMMENT_MAX)  # необязательно: «почему принял»
     slot_id: int | None = None      # из расписания: какой приём отмечаем
     slot_date: date | None = None
+    at_slot: bool = False           # записать приём временем из расписания, а не «сейчас» (для пропущенного)
 
 
 class IntakeOut(BaseModel):
