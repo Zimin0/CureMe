@@ -11,7 +11,7 @@ COPY frontend/ ./
 RUN CUREME_COMMIT="$CUREME_COMMIT" npm run build
 
 # 2) Python-сервер, который отдаёт и API, и собранный фронтенд
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app/backend
 ENV PYTHONUNBUFFERED=1 CUREME_DATABASE_URL=sqlite:////data/cureme.db CUREME_MEDIA_DIR=/data/media CUREME_FRONTEND_DIST=/app/frontend/dist
 COPY backend/requirements.txt ./
